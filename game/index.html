@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#6B4423" />
+    <title>Infinite Monkeys</title>
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icon-192.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=Courier+Prime&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600&display=swap"
+    />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="eyebrow">Bureau of Infinite Typing</p>
+        <h1>Infinite Monkeys</h1>
+        <p class="note">Placeholder build: proves the engine, loop, saving, and offline install. M3 screens come next.</p>
+      </header>
+
+      <section class="readout" aria-live="polite">
+        <div><span class="label">Bananas</span><span class="value" id="bananas">0</span></div>
+        <div><span class="label">Monkeys</span><span class="value" id="monkeys">1</span></div>
+        <div><span class="label">Desks</span><span class="value" id="desks">1</span></div>
+      </section>
+
+      <section class="actions">
+        <button id="hire" class="primary">Hire</button>
+        <button id="desk">Buy desk <span id="desk-cost"></span></button>
+      </section>
+
+      <footer>
+        <button id="reset" class="quiet">Reset save</button>
+        <span id="tick" class="label"></span>
+      </footer>
+    </main>
+
+    <div id="update" class="toast" hidden>
+      New version available. <button id="reload">Reload</button>
+    </div>
+
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

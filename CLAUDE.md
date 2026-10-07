@@ -26,6 +26,9 @@ npm run typecheck
 npm test             # vitest run
 npx vitest run tests/hotel.test.ts   # single file
 npm run sim          # simulation report (or: node --import tsx sim/report.ts)
+npm run dev          # Vite dev server for game/ at /infinite-monkeys/
+npm run build        # production build to dist/ (with service worker)
+npm run preview      # serve dist/ locally to test the PWA
 ```
 
 ## Architecture
@@ -36,7 +39,7 @@ content/   tuning data only
 sim/       bots + simulation report
 tests/     Vitest unit tests and sim assertions
 scripts/   check-purity.mjs (enforces core/ rules)
-game/      (to be created) UI, service worker, persistence adapter
+game/      UI (Vite root): main.ts, loop.ts (fixed-step rAF), persist.ts (IndexedDB)
 ```
 
 Hard rules:
