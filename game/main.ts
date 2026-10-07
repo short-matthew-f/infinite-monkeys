@@ -76,10 +76,43 @@ function render() {
 
 startLoop(() => state, t, sink, render);
 
+// ---------- builds and updates ----------
+
+const UPDATE_CHECK_MS = 10 * 60 * 1000;
+
+const built = new Date(__BUILD_TIME__);
+$('build').textContent = `${__BUILD_SHA__} · ${built.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`;
+
+// The browser only checks for a new service worker on navigation, so an
+// installed app left open would never notice a deploy. Check on return to
+// the app, on a timer, and on demand.
+let registration: ServiceWorkerRegistration | undefined;
+const checkForUpdate = () => registration?.update().catch(() => {});
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) void checkForUpdate();
+});
+setInterval(checkForUpdate, UPDATE_CHECK_MS);
+
 const updateSW = registerSW({
+  onRegisteredSW(_url, r) {
+    registration = r;
+  },
   onNeedRefresh() {
     $('update').hidden = false;
+    $('update-status').textContent = '';
   },
+});
+
+$('check-update').addEventListener('click', async () => {
+  const status = $('update-status');
+  if (!registration) {
+    status.textContent = 'Updates unavailable here';
+    return;
+  }
+  status.textContent = 'Checking…';
+  await checkForUpdate();
+  if (registration.installing || registration.waiting) status.textContent = 'Downloading update…';
+  else if ($('update').hidden) status.textContent = 'Up to date';
 });
 $('reload').addEventListener('click', async () => {
   await persist.save(state);

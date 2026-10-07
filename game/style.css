@@ -97,6 +97,7 @@ button:focus-visible { outline: 3px solid var(--mustard); outline-offset: 2px; }
 button.quiet { font-size: 0.85rem; padding: 6px 12px; min-height: 0; border-color: var(--concrete); }
 
 footer { display: flex; justify-content: space-between; align-items: center; }
+.build { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; border-top: 1px solid var(--concrete); padding-top: 12px; }
 
 .toast {
   position: fixed;

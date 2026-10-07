@@ -77,6 +77,21 @@ Hard rules:
   tsconfig (or a project reference) with `"lib": ["ES2022", "DOM"]`, and keep
   the root config DOM-free for `core/`.
 
+## Shipping a build
+
+Every push to `main` deploys. After each push, once the Actions run is green,
+give Matt a short **"what to look for"** guide in chat:
+1. **Build:** the short commit SHA. The footer shows `Build <sha> · <time>`, so
+   he can confirm the device is running it.
+2. **How to get it:** open or return to the app, and a "New version available"
+   bar appears (or tap "Check for updates"). Tap Reload.
+3. **What changed:** two to five bullets in player terms, not code terms.
+4. **Try this:** concrete things to tap or watch, and what should happen.
+5. **Known rough edges:** what's placeholder or deliberately unfinished, so it
+   isn't reported as a bug.
+
+Keep it short enough to read on a phone.
+
 ## Model routing (Claude 5.5 family)
 
 The main session runs on **Opus 5.5** (`claude-opus-5-5`). Use subagents (the

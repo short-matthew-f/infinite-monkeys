@@ -1,12 +1,27 @@
+import { execSync } from 'node:child_process';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 // Served from https://short-matthew-f.github.io/infinite-monkeys/ (a subpath).
 const base = '/infinite-monkeys/';
 
+// Build stamp shown in the footer, so a device can confirm which build it runs.
+function commitSha(): string {
+  if (process.env.GITHUB_SHA) return process.env.GITHUB_SHA.slice(0, 7);
+  try {
+    return execSync('git rev-parse --short HEAD').toString().trim();
+  } catch {
+    return 'dev';
+  }
+}
+
 export default defineConfig({
   root: 'game',
   base,
+  define: {
+    __BUILD_SHA__: JSON.stringify(commitSha()),
+    __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+  },
   // es2022 for top-level await in main.ts.
   build: { outDir: '../dist', emptyOutDir: true, target: 'es2022' },
   plugins: [
