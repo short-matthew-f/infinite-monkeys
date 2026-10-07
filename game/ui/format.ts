@@ -14,7 +14,8 @@ export function count(x: Num | number): string {
   const tier = Math.min(SUFFIXES.length - 1, Math.floor(Math.log10(a) / 3));
   if (tier >= SUFFIXES.length - 1 && a >= 1e36) return v.toExponential(2);
   const scaled = v / 10 ** (tier * 3);
-  return `${scaled.toFixed(scaled < 100 ? 2 : 1)}${SUFFIXES[tier]}`;
+  // Three significant figures, trailing zeros dropped: 50K, 12.3K, 4.56M.
+  return `${Number(scaled.toFixed(scaled < 100 ? 2 : 1))}${SUFFIXES[tier]}`;
 }
 
 /** Rates and small quantities: keeps decimals below 10. */

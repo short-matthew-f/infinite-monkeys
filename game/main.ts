@@ -4,13 +4,19 @@ import { prototypeTuning as t } from '../content/prototype.js';
 import { createCtx, type Screen } from './ctx.js';
 import { startLoop } from './loop.js';
 import * as persist from './persist.js';
+import { departments } from './screens/departments.js';
+import { diorama } from './screens/diorama.js';
+import { feed } from './screens/feed.js';
 import { office } from './screens/office.js';
+import { pool } from './screens/pool.js';
+import { readiness } from './screens/readiness.js';
+import { research } from './screens/research.js';
 import { h, text } from './ui/dom.js';
 import * as f from './ui/format.js';
 
 // Screen registry. Tabs in nav order; chrome screens mount into fixed slots.
-const TABS: Screen[] = [office];
-const CHROME: Record<string, Screen> = {};
+const TABS: Screen[] = [office, pool, departments, research, readiness];
+const CHROME: Record<string, Screen> = { diorama, feed };
 
 const SAVE_EVERY_MS = 5000;
 const TAB_KEY = 'im:tab';
@@ -87,6 +93,7 @@ for (const screen of TABS) {
 let current = '';
 function show(id: string) {
   if (!panes.has(id)) id = TABS[0]?.id ?? '';
+  if (current && current !== id) scrollTo(0, 0);
   current = id;
   for (const [k, pane] of panes) pane.hidden = k !== id;
   for (const [k, btn] of tabButtons) {
@@ -121,6 +128,21 @@ startLoop(() => state, t, sink, () => {
   for (const r of renders) r();
   tabRenders.get(current)?.();
 });
+
+// Dev-only console hook for testing screens at later game states. Stripped from production builds.
+if (import.meta.env.DEV) {
+  Object.assign(globalThis, {
+    im: {
+      state: () => state,
+      setState: (next: GameState) => {
+        state = next;
+        dirty = true;
+      },
+      run: (seconds: number) => catchUp(state, t, sink, seconds),
+      t,
+    },
+  });
+}
 
 // ---------- builds and updates ----------
 

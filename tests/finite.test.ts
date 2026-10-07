@@ -9,6 +9,7 @@ import {
   meters,
   metersFull,
   N,
+  readinessScale,
   run,
   setShares,
   tapHire,
@@ -65,6 +66,19 @@ describe('the finite climb', () => {
     s.desks = N.of(10);
     run(s, T, collector().sink, secs(5));
     expect(N.toNumber(s.monkeys)).toBeLessThanOrEqual(N.toNumber(s.desks) + 1e-9);
+  });
+
+  it('readiness scale is log progress toward the monkey target, capped at 1, and caps every meter', () => {
+    const s = createState(T, 1);
+    expect(readinessScale(s, T)).toBe(0); // one monkey: log10(1) = 0
+    s.monkeys = N.of(Math.sqrt(T.readiness.minMonkeys));
+    expect(readinessScale(s, T)).toBeCloseTo(0.5, 9);
+    s.monkeys = N.of(T.readiness.minMonkeys * 10);
+    expect(readinessScale(s, T)).toBe(1);
+    const late = lateFiniteState();
+    late.monkeys = N.of(Math.sqrt(T.readiness.minMonkeys));
+    const m = meters(late, T);
+    for (const v of Object.values(m)) expect(v).toBeLessThanOrEqual(readinessScale(late, T) + 1e-12);
   });
 
   it('stamps the Infinity Permit only after all meters hold full for the Stability Window', () => {

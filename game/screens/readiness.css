@@ -1,0 +1,41 @@
+.ready-meter { display: grid; gap: 6px; }
+.ready-meter-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.ready-meter-head h3 { font-size: 1.1rem; }
+.ready-reading { display: inline-flex; align-items: baseline; gap: 8px; }
+.ready-word { font: 700 0.85rem var(--font-display); text-transform: uppercase; letter-spacing: 0.1em; border: 2px solid currentColor; padding: 1px 8px; color: var(--ink-muted); }
+[data-state='full'] .ready-word { color: var(--olive); }
+.ready-bar { height: 18px; background: var(--paper); border: 1px solid var(--concrete); position: relative; }
+.ready-bar-fill { display: block; height: 100%; width: var(--fill, 0%); background: var(--mustard); }
+[data-state='full'] .ready-bar-fill { background: var(--olive); }
+.ready-paces { text-transform: none; letter-spacing: 0; font: 400 0.875rem var(--font-body); }
+.ready-pins { display: flex; flex-wrap: wrap; gap: 8px; }
+.ready-pins button { flex: 1 1 8rem; }
+.ready-pins button[aria-pressed='true'] { border-color: var(--olive); box-shadow: inset 0 -4px 0 var(--olive); }
+.ready-declare { width: 100%; min-height: 64px; font-size: 1.6rem; border-radius: 32px; }
+.ready-done p { margin: 0; font-size: 1.1rem; }
+
+/* Infinity Permit: a paper form that takes a rubber stamp. */
+.permit { position: relative; overflow: hidden; background: var(--paper); border: 2px solid var(--walnut); padding: 14px; min-height: 9rem; font-family: var(--font-type); display: grid; gap: 4px; align-content: start; }
+.permit p { margin: 0; }
+.permit-form { font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; border-bottom: 2px solid var(--mustard); padding-bottom: 4px; }
+.permit-line { font-size: 0.9rem; color: var(--ink-muted); }
+.permit-stamp {
+  position: absolute; right: 12px; bottom: 12px;
+  display: grid; justify-items: center;
+  padding: 6px 14px; border: 4px double var(--alert); color: var(--alert);
+  font: 700 1.6rem var(--font-display); text-transform: uppercase; letter-spacing: 0.12em;
+  transform: rotate(-9deg);
+  opacity: 0;
+}
+.permit-stamp small { font-size: 0.6rem; letter-spacing: 0.1em; }
+.permit[data-stamped='true'] .permit-stamp { opacity: 0.9; }
+.permit[data-stamped='false']::after { content: 'Pending'; position: absolute; right: 12px; bottom: 12px; padding: 4px 12px; border: 2px dashed var(--concrete); color: var(--ink-muted); font: 700 1rem var(--font-display); text-transform: uppercase; letter-spacing: 0.12em; }
+.permit-fresh .permit-stamp { animation: permit-thud 0.45s cubic-bezier(0.2, 0.9, 0.3, 1) both; }
+@keyframes permit-thud {
+  0% { transform: rotate(-9deg) scale(2.2); opacity: 0; }
+  70% { transform: rotate(-9deg) scale(0.96); opacity: 0.95; }
+  100% { transform: rotate(-9deg) scale(1); opacity: 0.9; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .permit-fresh .permit-stamp { animation: none; }
+}

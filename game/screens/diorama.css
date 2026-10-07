@@ -1,0 +1,70 @@
+/* Diorama: a wide, short cross-section of the Bureau. Fixed height, so no layout shift. */
+.dio {
+  height: 140px;
+  margin: 0 16px 8px;
+  display: grid;
+  grid-template-rows: 1fr 18px;
+  background: var(--paper-shade);
+  border: 1px solid var(--concrete);
+  overflow: hidden;
+}
+.dio-svg { display: block; width: 100%; height: 100%; min-height: 0; }
+.dio-caption {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 8px;
+  align-items: center;
+  background: var(--concrete);
+  color: var(--paper);
+  font: 500 0.75rem/18px var(--font-display);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.dio-caption span { overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+
+/* Palette only through tokens. */
+.dio-sky { fill: var(--paper-shade); }
+.dio-cloud { fill: var(--paper); }
+.dio-ground { fill: var(--concrete); }
+.dio-slab { fill: var(--concrete); }
+.dio-wall { fill: var(--paper); }
+.dio-bowl { fill: var(--glow); }
+.dio-cone { fill: var(--glow); opacity: 0.35; }
+.dio-tube { fill: none; stroke: var(--ink-muted); stroke-width: 1; opacity: 0.6; }
+.dio-desk { fill: var(--walnut); }
+.dio-leg { stroke: var(--walnut); stroke-width: 2; }
+.dio-chair { fill: var(--concrete); }
+.dio-key { fill: var(--ink-muted); }
+.dio-fur { fill: color-mix(in srgb, var(--walnut) 70%, var(--ink)); }
+.dio-muzzle { fill: var(--paper); }
+.dio-shirt { fill: var(--mustard); }
+.dio-white { fill: var(--paper); stroke: var(--ink-muted); stroke-width: 0.6; }
+.dio-tie { fill: var(--alert); }
+.dio-stampbase { fill: var(--ink); }
+.dio-ink { fill: var(--alert); }
+.dio-arm { stroke: color-mix(in srgb, var(--walnut) 70%, var(--ink)); stroke-width: 2.2; stroke-linecap: round; }
+.dio-reveal { fill: var(--concrete); }
+.dio-glass-bg { fill: var(--glow); }
+.dio-blank { fill: var(--concrete); opacity: 0.5; }
+.dio-notice { fill: var(--paper); }
+.dio-bld { fill: var(--concrete); }
+.dio-bld2 { fill: var(--ink-muted); }
+.dio-sun { fill: var(--mustard); }
+.dio-fade { stop-color: var(--paper-shade); }
+.dio-dots { fill: var(--ink-muted); }
+
+/* Motion: subtle and mechanical; fully static when reduced. */
+.dio-arm, .dio-stamp, .dio-cloudg { transform-box: fill-box; }
+@media (prefers-reduced-motion: no-preference) {
+  .dio-arm { animation: dio-tap 0.6s steps(1, end) infinite; }
+  .dio-stamp { animation: dio-stamp 1.8s ease-in infinite; }
+  .dio-cloudg { animation: dio-drift 60s linear infinite alternate; }
+  .dio-idle .dio-stamp { animation: none; }
+}
+@keyframes dio-tap { 0% { transform: translateY(0); } 50% { transform: translateY(1.6px); } }
+@keyframes dio-stamp { 0%, 62% { transform: translateY(-5px); } 72% { transform: translateY(0); } 80%, 100% { transform: translateY(-5px); } }
+@keyframes dio-drift { to { transform: translateX(24px); } }
+.dio-stamp { transform: translateY(-5px); }
+.dio-idle .dio-stamp { transform: translateY(-5px); }

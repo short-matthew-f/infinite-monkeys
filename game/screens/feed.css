@@ -1,0 +1,71 @@
+/* Feed: a teletype strip in a narrow concrete channel. */
+.feed { position: relative; margin: 0 16px 8px; }
+.feed-tick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 4px 8px;
+  background: var(--concrete);
+  border: 1px solid var(--concrete);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.feed-strip {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 8px;
+  background: var(--paper);
+  border: 1px solid var(--ink-muted);
+}
+.feed-clip { flex: 1 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; }
+.feed-text {
+  display: inline-block;
+  font: 400 0.85rem/1 var(--font-type);
+  color: var(--ink);
+}
+.feed-tick.is-human .feed-strip { border-left: 4px solid var(--mustard); }
+.feed-count { flex: none; font: 500 0.8rem var(--font-display); letter-spacing: 0.1em; text-transform: uppercase; color: var(--paper); }
+.feed-count::after { content: ' \25BE'; }
+.feed-tick[aria-expanded='true'] .feed-count::after { content: ' \25B4'; }
+
+.feed-history {
+  position: absolute;
+  z-index: 5;
+  top: 100%;
+  left: 0;
+  right: 0;
+  max-height: 50vh;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  background: var(--paper);
+  border: 1px solid var(--concrete);
+  border-top: 0;
+  box-shadow: 0 6px 12px rgb(0 0 0 / 0.25);
+}
+.feed-history[hidden] { display: none; }
+.feed-history li { display: grid; grid-template-columns: 4.5rem 1fr; gap: 8px; padding: 6px 10px; border-bottom: 1px dashed var(--concrete); font: 400 0.85rem/1.35 var(--font-type); }
+.feed-history li:last-child { border-bottom: 0; }
+.feed-history time { color: var(--ink-muted); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+.feed-history li.is-human { border-left: 4px solid var(--mustard); }
+.feed-empty { padding: 8px 10px; color: var(--ink-muted); font: 400 0.85rem var(--font-type); }
+
+.feed-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* Printing and long-line panning (motion only). */
+@media (prefers-reduced-motion: no-preference) {
+  .feed-clip.is-printing { animation: feed-print 0.7s steps(28, end) both; }
+  .feed-text.is-panning { animation: feed-pan var(--pan-time, 8s) linear 1.2s forwards; }
+}
+@keyframes feed-print { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes feed-pan { to { transform: translateX(var(--pan, 0)); } }
+@media (prefers-reduced-motion: reduce) {
+  .feed-text { display: block; overflow: hidden; text-overflow: ellipsis; }
+}

@@ -1,0 +1,15 @@
+.research-list { display: grid; gap: 12px; }
+.research-tier { display: grid; gap: 8px; padding: 10px; background: var(--paper); border: 1px solid var(--concrete); border-left: 6px solid var(--concrete); }
+.research-tier[data-state='review'] { border-left-color: var(--mustard); }
+.research-tier[data-state='done'] { border-left-color: var(--olive); }
+.research-tier[hidden], .research-state[hidden] { display: none; }
+.research-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.research-head h3 { font-size: 1.1rem; color: var(--ink); }
+.research-status { font: 700 0.8rem var(--font-display); text-transform: uppercase; letter-spacing: 0.1em; border: 2px solid currentColor; padding: 1px 8px; color: var(--ink-muted); }
+.research-tier[data-state='review'] .research-status { color: var(--phosphor-amber); }
+.research-tier[data-state='done'] .research-status { color: var(--olive); }
+.research-state { display: grid; gap: 8px; }
+.research-state p { margin: 0; }
+.research-bar { height: 16px; background: var(--paper-shade); border: 1px solid var(--concrete); }
+.research-bar-fill { display: block; height: 100%; width: var(--fill, 0%); background: var(--mustard); }
+.research-bar-text { font-size: 1rem; }

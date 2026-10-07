@@ -220,13 +220,18 @@ export function finiteBottleneck(s: GameState, t: Tuning): Bottleneck {
  * Recruiting vs Construction are compared with each other; Editing is
  * compared with the review demand of all discovered finds.
  */
+/** Readiness scale factor, 0..1: log progress of headcount toward `readiness.minMonkeys`. */
+export function readinessScale(s: GameState, t: Tuning): number {
+  return Math.min(1, N.log10(s.monkeys) / Math.log10(t.readiness.minMonkeys));
+}
+
 export function meters(s: GameState, t: Tuning): Meters {
   const R = deptOutput(s, t, 'recruiting');
   const C = deptOutput(s, t, 'construction');
   const pool = N.add(hiredEditingCapacity(s, t), N.of(t.editorInChiefCapacity * reviewSpeedMult(s, t)));
   const demand = certifyTiers(s, t, N.zero, s.tierAllocation).demand;
   const th = t.readiness.ratioThreshold;
-  const scale = Math.min(1, N.log10(s.monkeys) / Math.log10(t.readiness.minMonkeys));
+  const scale = readinessScale(s, t);
   const pace = (num: Num, den: Num) => (N.lte(den, N.zero) ? (N.gt(num, N.zero) ? 1 : 0) : Math.min(1, N.ratio(num, den) / th));
   const stage = (d: DeptId) => s.depts[d].stage / 4;
   return {
