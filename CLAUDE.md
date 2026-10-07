@@ -13,6 +13,8 @@ Read these before any UI work:
 3. `docs/PROTOTYPE.md` §5, §6, §8: end condition, required UI, test protocol.
 4. `docs/Typing Pool Modern Visual Design Guide.md`: visual style and IP limits
    (evoke the retro-bureau era, never copy the TVA/*Loki*).
+5. `docs/MOBILE-UX.md`: the mobile UX standard. Every screen must meet its rules,
+   and subagent prompts for UI work must point to it.
 
 `docs/DESIGN.md` is the full design doc. Search it by section (`## N.`) instead
 of reading all 700 lines.
