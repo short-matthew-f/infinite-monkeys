@@ -16,35 +16,31 @@
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
-    <main>
-      <header>
+    <header class="shell-header">
+      <div class="shell-title">
         <p class="eyebrow">Bureau of Infinite Typing</p>
         <h1>Infinite Monkeys</h1>
-        <p class="note">Placeholder build: proves the engine, loop, saving, and offline install. M3 screens come next.</p>
-      </header>
-
-      <section class="readout" aria-live="polite">
+      </div>
+      <div class="readout" aria-live="off">
         <div><span class="label">Bananas</span><span class="value" id="bananas">0</span></div>
+        <div><span class="label">Income</span><span class="value" id="income">0/s</span></div>
         <div><span class="label">Monkeys</span><span class="value" id="monkeys">1</span></div>
-        <div><span class="label">Desks</span><span class="value" id="desks">1</span></div>
-      </section>
+      </div>
+    </header>
 
-      <section class="actions">
-        <button id="hire" class="primary">Hire</button>
-        <button id="desk">Buy desk <span id="desk-cost"></span></button>
-      </section>
+    <div id="diorama" class="shell-slot"></div>
+    <div id="feed" class="shell-slot"></div>
 
-      <footer>
-        <button id="reset" class="quiet">Reset save</button>
-        <span id="tick" class="label"></span>
-      </footer>
+    <main id="screens"></main>
 
-      <section class="build">
-        <span class="label">Build <span id="build"></span></span>
-        <button id="check-update" class="quiet">Check for updates</button>
-        <span id="update-status" class="label" aria-live="polite"></span>
-      </section>
-    </main>
+    <footer class="shell-footer">
+      <button id="reset" class="quiet">Reset save</button>
+      <span class="label">Build <span id="build"></span></span>
+      <button id="check-update" class="quiet">Check for updates</button>
+      <span id="update-status" class="label" aria-live="polite"></span>
+    </footer>
+
+    <nav id="tabs" class="shell-tabs" aria-label="Screens"></nav>
 
     <div id="update" class="toast" hidden>
       New version available. <button id="reload">Reload</button>

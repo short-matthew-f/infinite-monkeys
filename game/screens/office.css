@@ -1,0 +1,10 @@
+.office-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.office-stats > div { display: grid; }
+.office-hire { position: relative; overflow: hidden; width: 100%; font-size: 1.4rem; padding: 16px; }
+.office-hire > span:last-child { position: relative; }
+.office-cooldown {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--fill, 0%);
+  background: rgb(0 0 0 / 0.25);
+}

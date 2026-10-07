@@ -1,34 +1,41 @@
 import { registerSW } from 'virtual:pwa-register';
-import {
-  N,
-  buyDesk,
-  catchUp,
-  createState,
-  deskCost,
-  nullSink,
-  tapHire,
-  type GameEvent,
-  type GameState,
-  type Num,
-} from '../core/index.js';
+import { catchUp, certifyTiers, createState, editingPool, type EventSink, type GameEvent, type GameState } from '../core/index.js';
 import { prototypeTuning as t } from '../content/prototype.js';
+import { createCtx, type Screen } from './ctx.js';
 import { startLoop } from './loop.js';
 import * as persist from './persist.js';
+import { office } from './screens/office.js';
+import { h, text } from './ui/dom.js';
+import * as f from './ui/format.js';
+
+// Screen registry. Tabs in nav order; chrome screens mount into fixed slots.
+const TABS: Screen[] = [office];
+const CHROME: Record<string, Screen> = {};
 
 const SAVE_EVERY_MS = 5000;
+const TAB_KEY = 'im:tab';
 
-// Events drive UI feedback later and are kept for the M6 export.
+// ---------- events ----------
+
+// Kept for the M6 export, and fanned out to screens (feed, celebrations).
 const events: GameEvent[] = [];
-const sink = (e: GameEvent) => {
+const listeners = new Set<EventSink>();
+const sink: EventSink = (e) => {
   events.push(e);
+  for (const fn of listeners) fn(e);
 };
+const onEvent = (fn: EventSink) => {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+};
+
+// ---------- state and saving ----------
+
+const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
 function newSeed(): number {
   return crypto.getRandomValues(new Uint32Array(1))[0] ?? 1;
 }
-
-const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
-const fmt = (n: Num) => Math.floor(N.toNumber(n)).toLocaleString();
 
 let state: GameState;
 const rec = await persist.load();
@@ -42,39 +49,78 @@ if (rec) {
 const save = () => void persist.save(state);
 setInterval(save, SAVE_EVERY_MS);
 addEventListener('pagehide', save);
-
 // The loop catches up after background time; here we only save on hide.
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) save();
 });
 
-$('hire').addEventListener('click', () => tapHire(state, t, sink));
-$('desk').addEventListener('click', () => buyDesk(state, t, sink));
 $('reset').addEventListener('click', async () => {
   await persist.clear();
   state = createState(t, newSeed());
   events.length = 0;
+  dirty = true;
 });
 
-// Core decides what's allowed: dry-run the action on a clone (HANDOFF rule 3).
-function allowed(action: (s: GameState, tt: typeof t, k: typeof nullSink) => boolean): boolean {
-  return action(structuredClone(state), t, nullSink);
+// ---------- screens ----------
+
+let dirty = true;
+const ctx = createCtx(() => state, t, sink, onEvent, () => (dirty = true));
+const renders: (() => void)[] = [];
+
+for (const [slot, screen] of Object.entries(CHROME)) {
+  renders.push(screen.mount($(slot), ctx));
 }
 
-const hireBtn = $<HTMLButtonElement>('hire');
-const deskBtn = $<HTMLButtonElement>('desk');
-function render() {
-  $('bananas').textContent = fmt(state.bananas);
-  $('monkeys').textContent = fmt(state.monkeys);
-  $('desks').textContent = fmt(state.desks);
-  const cost = deskCost(state, t);
-  $('desk-cost').textContent = `(${fmt(cost)})`;
-  hireBtn.disabled = !allowed(tapHire);
-  deskBtn.disabled = !allowed(buyDesk);
-  $('tick').textContent = `tick ${state.tick}`;
+const tabButtons = new Map<string, HTMLButtonElement>();
+const panes = new Map<string, HTMLElement>();
+const tabRenders = new Map<string, () => void>();
+for (const screen of TABS) {
+  const pane = h('section', { class: 'screen', id: `screen-${screen.id}`, 'aria-label': screen.label });
+  $('screens').append(pane);
+  panes.set(screen.id, pane);
+  tabRenders.set(screen.id, screen.mount(pane, ctx));
+  const btn = h('button', { onclick: () => show(screen.id) }, screen.label);
+  $('tabs').append(btn);
+  tabButtons.set(screen.id, btn);
 }
 
-startLoop(() => state, t, sink, render);
+let current = '';
+function show(id: string) {
+  if (!panes.has(id)) id = TABS[0]?.id ?? '';
+  current = id;
+  for (const [k, pane] of panes) pane.hidden = k !== id;
+  for (const [k, btn] of tabButtons) {
+    if (k === id) btn.setAttribute('aria-current', 'page');
+    else btn.removeAttribute('aria-current');
+  }
+  try {
+    localStorage.setItem(TAB_KEY, id);
+  } catch {}
+  dirty = true;
+}
+let savedTab = '';
+try {
+  savedTab = localStorage.getItem(TAB_KEY) ?? '';
+} catch {}
+show(savedTab);
+if (TABS.length < 2) $('tabs').hidden = true;
+
+function renderHeader() {
+  text($('bananas'), f.count(state.bananas));
+  text($('income'), f.rate(certifyTiers(state, t, editingPool(state, t), state.tierAllocation).income));
+  text($('monkeys'), f.count(state.monkeys));
+}
+
+// Render at most once per tick (10 Hz) or after an action, not every frame.
+let lastTick = -1;
+startLoop(() => state, t, sink, () => {
+  if (!dirty && state.tick === lastTick) return;
+  dirty = false;
+  lastTick = state.tick;
+  renderHeader();
+  for (const r of renders) r();
+  tabRenders.get(current)?.();
+});
 
 // ---------- builds and updates ----------
 
@@ -114,6 +160,7 @@ $('check-update').addEventListener('click', async () => {
   if (registration.installing || registration.waiting) status.textContent = 'Downloading update…';
   else if ($('update').hidden) status.textContent = 'Up to date';
 });
+
 $('reload').addEventListener('click', async () => {
   await persist.save(state);
   await updateSW(true);
