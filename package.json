@@ -1,0 +1,19 @@
+{
+  "name": "infinite-monkeys",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "check:purity": "node scripts/check-purity.mjs",
+    "check": "npm run typecheck && npm run check:purity && npm test",
+    "sim": "tsx sim/report.ts"
+  },
+  "devDependencies": {
+    "@types/node": "*",
+    "tsx": "^4.23.15",
+    "typescript": "^5",
+    "vitest": "^2"
+  }
+}
