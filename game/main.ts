@@ -43,16 +43,9 @@ const save = () => void persist.save(state);
 setInterval(save, SAVE_EVERY_MS);
 addEventListener('pagehide', save);
 
-// Background tabs pause rAF: on return, save time is the baseline for catch-up.
-let hiddenAt = 0;
+// The loop catches up after background time; here we only save on hide.
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) {
-    hiddenAt = Date.now();
-    save();
-  } else if (hiddenAt) {
-    catchUp(state, t, sink, (Date.now() - hiddenAt) / 1000);
-    hiddenAt = 0;
-  }
+  if (document.hidden) save();
 });
 
 $('hire').addEventListener('click', () => tapHire(state, t, sink));
@@ -88,7 +81,7 @@ const updateSW = registerSW({
     $('update').hidden = false;
   },
 });
-$('reload').addEventListener('click', () => {
-  save();
-  void updateSW(true);
+$('reload').addEventListener('click', async () => {
+  await persist.save(state);
+  await updateSW(true);
 });

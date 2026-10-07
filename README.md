@@ -1,12 +1,14 @@
 # Infinite Monkeys — Transition Prototype
 
 Headless game engine (M1) and simulation harness (M2.2) for the transition
-prototype in `docs/PROTOTYPE.md`. No UI yet: M3/M4 start from
-`docs/HANDOFF-M3-M4.md`.
+prototype in `docs/PROTOTYPE.md`, plus a PWA shell in `game/` deployed to
+https://short-matthew-f.github.io/infinite-monkeys/. The shell is a
+placeholder; M3/M4 screens start from `docs/HANDOFF-M3-M4.md`.
 
 ```
 core/      the game engine: pure logic (no DOM, no clock, no unseeded randomness)
 content/   prototype tuning (data only)
+game/      PWA shell (Vite): loop, IndexedDB saves, service worker
 sim/       bots, first-hotel-decision evaluation, metrics, report
 tests/     unit tests and sim assertions (Vitest)
 scripts/   purity check for core/
@@ -19,7 +21,13 @@ docs/      DESIGN.md, PROTOTYPE.md, HANDOFF-M3-M4.md
 npm install
 npm run check     # typecheck + core purity + all tests (~1 min)
 npm run sim       # simulation report
+npm run dev       # dev server for game/
+npm run build     # production build to dist/
+npm run preview   # serve dist/ to test the PWA
 ```
+
+Pushes to `main` run `npm run check`, build, and deploy to GitHub Pages
+(`.github/workflows/deploy.yml`).
 
 If `tsx`'s CLI is blocked in your environment, run the report with
 `node --import tsx sim/report.ts`.
