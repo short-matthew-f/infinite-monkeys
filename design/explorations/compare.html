@@ -1,0 +1,187 @@
+<title>Bureau Art Directions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=Courier+Prime&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600&display=swap" />
+<style>
+  /* Layout: a bureau review folder. One approach at a time: live mockup in a phone frame beside the panel's findings. */
+  :root {
+    --paper: #f2e8d5; --shade: #e4d6bc; --ink: #2b2622; --muted: #5e554c; --walnut: #6b4423;
+    --concrete: #8a8780; --mustard: #c9a227; --olive: #4f5a2e; --alert: #9e2f24; --frame: #2b2622;
+    --display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+    --body: 'IBM Plex Sans', system-ui, sans-serif;
+    --mono: 'IBM Plex Mono', ui-monospace, monospace;
+    --type: 'Courier Prime', 'Courier New', monospace;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --paper: #1f1b17; --shade: #2a241e; --ink: #ede3cf; --muted: #b3a894; --walnut: #c08a5a;
+    --concrete: #5e5b55; --mustard: #d9b23a; --olive: #a3a86b; --alert: #e2786d; --frame: #0f0d0b; color-scheme: dark } }
+  :root[data-theme="dark"] {
+    --paper: #1f1b17; --shade: #2a241e; --ink: #ede3cf; --muted: #b3a894; --walnut: #c08a5a;
+    --concrete: #5e5b55; --mustard: #d9b23a; --olive: #a3a86b; --alert: #e2786d; --frame: #0f0d0b; color-scheme: dark }
+
+  * { box-sizing: border-box; }
+  body { background: var(--paper); color: var(--ink); font: 16px/1.55 var(--body); padding-inline: 16px; padding-block: 24px 48px; }
+  .wrap { max-width: 68rem; margin: 0 auto; display: grid; gap: 28px; }
+  h1, h2, h3 { font-family: var(--display); text-transform: uppercase; letter-spacing: 0.04em; margin: 0; text-wrap: balance; }
+  h1 { font-size: clamp(2rem, 6vw, 3rem); line-height: 1; color: var(--walnut); }
+  h2 { font-size: 1.5rem; color: var(--walnut); }
+  h3 { font-size: 1rem; letter-spacing: 0.08em; color: var(--muted); }
+  p { margin: 0; max-width: 65ch; }
+  .eyebrow { font: 500 0.85rem var(--type); color: var(--muted); }
+  header { display: grid; gap: 10px; border-bottom: 2px solid var(--concrete); padding-bottom: 20px; }
+
+  .tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+  .tabs button {
+    font: 700 1rem var(--display); text-transform: uppercase; letter-spacing: 0.06em;
+    min-height: 48px; padding: 8px 16px; background: var(--shade); color: var(--ink);
+    border: 2px solid var(--concrete); cursor: pointer; display: grid; text-align: left;
+  }
+  .tabs button small { font: 400 0.75rem var(--type); text-transform: none; letter-spacing: 0; color: var(--muted); }
+  .tabs button[aria-selected="true"] { border-color: var(--walnut); background: var(--paper); box-shadow: inset 0 -4px 0 var(--mustard); }
+  button:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+
+  .stage { display: grid; grid-template-columns: minmax(0, 390px) minmax(0, 1fr); gap: 32px; align-items: start; }
+  @media (max-width: 820px) { .stage { grid-template-columns: minmax(0, 1fr); } }
+  .phone { background: var(--frame); padding: 10px; border-radius: 28px; width: 100%; max-width: 410px; justify-self: center; }
+  .phone iframe { display: block; width: 100%; height: 844px; max-height: 80vh; border: 0; border-radius: 20px; background: #f2e8d5; }
+  .phone-note { font: 400 0.8rem var(--type); color: var(--muted); text-align: center; margin-top: 8px; }
+  .phone-note a { color: inherit; }
+
+  .panel { display: grid; gap: 20px; min-width: 0; }
+  .idea { font-size: 1.05rem; }
+  .scores { display: grid; grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr)); gap: 1px; background: var(--concrete); border: 1px solid var(--concrete); }
+  .score { background: var(--shade); padding: 10px 12px; display: grid; gap: 4px; }
+  .score span { font: 500 0.78rem var(--display); text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+  .score b { font: 600 1.4rem var(--mono); font-variant-numeric: tabular-nums; }
+  .score b small { font-size: 0.8rem; color: var(--muted); }
+  .pips { display: flex; gap: 3px; }
+  .pips i { width: 12px; height: 6px; background: var(--concrete); opacity: 0.45; }
+  .pips i.on { background: var(--walnut); opacity: 1; }
+  ul { margin: 0; padding-left: 1.1em; display: grid; gap: 6px; }
+  li { max-width: 65ch; }
+  .best { border-left: 4px solid var(--olive); padding: 4px 0 4px 14px; }
+  .block li::marker { content: '■  '; color: var(--alert); }
+  .checks { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { font: 600 0.8rem var(--mono); padding: 4px 10px; border: 1.5px solid currentColor; }
+  .chip.pass { color: var(--olive); }
+  .chip.fail { color: var(--alert); }
+
+  .verdict { background: var(--shade); border: 1px solid var(--concrete); padding: 20px; display: grid; gap: 14px; }
+  .verdict ol { margin: 0; padding-left: 1.3em; display: grid; gap: 8px; }
+  .stamp { font: 700 0.85rem var(--display); letter-spacing: 0.12em; text-transform: uppercase; color: var(--alert); border: 2px solid currentColor; padding: 2px 8px; justify-self: start; transform: rotate(-2deg); }
+  footer { font: 400 0.85rem var(--type); color: var(--muted); border-top: 2px solid var(--concrete); padding-top: 16px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Form 9-A · Art direction review · Round 1</p>
+    <h1>Bureau Art Directions</h1>
+    <p>Three ways to make the Bureau itself the interface: rooms you tap instead of menus, in a 2.5D paper-cutout style. All three show the same scene with mock data. Tap around inside the phone: open Personnel, press Hire, dismiss Ernest, try the directory.</p>
+  </header>
+
+  <div class="tabs" role="tablist" aria-label="Approaches" id="tabs"></div>
+
+  <section class="stage">
+    <div>
+      <div class="phone"><iframe id="frame" title="Approach mockup" loading="lazy"></iframe></div>
+      <p class="phone-note"><a id="open" href="#" target="_blank" rel="noopener">Open full screen</a> · best on your phone</p>
+    </div>
+    <div class="panel" id="panel" aria-live="polite"></div>
+  </section>
+
+  <section class="verdict">
+    <span class="stamp">Opus summary</span>
+    <h2>What the panel agreed on</h2>
+    <ol>
+      <li><strong>None of them is roomy yet, and that's the brief's fault.</strong> It asked for eight monkeys, four rooms, a header and Ernest in one phone screen. The fix is the same for all three: show less at a time (one room or about 1.5 floors), make monkeys 50–60 px tall instead of about 30, and let scrolling, panning or dollying reveal the rest.</li>
+      <li><strong>Ernest is too big.</strong> In every version his card covers a third of the floor. He should peek in from a corner, point at what he's explaining, and never block the thing he's teaching.</li>
+      <li><strong>Variety reads as accessories, not personalities.</strong> At phone size the behaviours are too small to see. Bigger monkeys, distinct silhouettes (size, ears, posture, profile), and more exaggerated poses.</li>
+      <li><strong>The paper depth is subtle in stills.</strong> They read as clean vector with drop shadows. Visible paper rims, a second shadow tier and more value separation between layers would sell the cutout look.</li>
+      <li><strong>The room sheets are the strongest part of all three.</strong> Numbered forms, the curved tangerine Hire button, and the camera moving to the room before the sheet arrives all landed well.</li>
+    </ol>
+    <h2>My recommendation</h2>
+    <p><strong>Pop-up Floor Plan as the base</strong>: it scored best on whimsy and readability, and it's the closest to the Egg Inc map you described. <strong>Take the Dollhouse's vertical stack for growth</strong>: as the Bureau gains floors, you scroll up the building, and each floor is its own roomy pop-up plan. That also gives the infinity ceremony its climb. The Theater's sideways dolly fits the Hotel's endless corridor better than the finite climb, so I'd keep it in mind for the Hotel phase.</p>
+    <p>Round 2 would rebuild the winner with the fixes above, and the panel reviews it again.</p>
+  </section>
+
+  <footer>Evidence: scripted Chrome screenshots at 390 × 844 (light, dark, reduced motion, animation frames, taps), computed contrast, and static inspection. Not yet tested on a physical phone or by players. Reviewers: a Sonnet agent for taste and a Haiku agent for the checklist on each approach.</footer>
+</div>
+
+<script>
+  const APPROACHES = [
+    {
+      id: 'popup', file: 'popup.html', name: 'Pop-up Floor Plan', tag: 'one floor, 3/4 top-down',
+      idea: 'One office floor laid out like a pop-up book on a table. Walls, desks and monkeys are cutouts standing on the floor sheet with fold tabs and cast shadows. Tap a zone: the camera eases over, its cutouts fold up taller, and the room’s form unfolds.',
+      scores: { Whimsy: 4, Coherence: 4, Readability: 4, Roominess: 3, 'Paper depth': 3 },
+      best: 'The Personnel transition: the camera moves to the zone, a dashed gold ring marks it, Ernest docks to a slim bar at the top, and a tabbed paper form with the Hire button unfolds. It feels like going somewhere.',
+      blocking: ['The floor is packed edge to edge. Not yet the open map you described; it needs a bigger, pannable floor with air between zones.', 'Ernest’s card is the loudest thing on screen and covers Personnel, which is the very place he’s pointing you to.'],
+      fixes: ['Stronger paper edges and cast shadows at rest', 'A visible tap cue on idle zones (lamp glow, a small nudge)', 'Life in the Director’s glass office and the Departments cabinets', 'More varied poses: profiles, leaning, different mouths and gaze'],
+      checks: { 'IP line': true, Accessibility: false, 'Reduced motion': true, Performance: true, Variety: true },
+      checkNote: 'The NOT ISSUED stamp is 4.1:1 (needs 4.5), and the focus ring is faint on the light floor.',
+      scale: 'Rooms become zones and the forms are reusable, but one packed screen doesn’t stretch to many floors by itself. Pair it with vertical floors.',
+    },
+    {
+      id: 'dollhouse', file: 'dollhouse.html', name: 'Cutaway Dollhouse', tag: 'building cross-section, scroll up',
+      idea: 'The Bureau in cross-section like a dollhouse with the front wall off. Floors stack as the building grows and vertical scroll is the map. Tap a room: the building zooms toward it and the room’s form slides up.',
+      scores: { Whimsy: 3, Coherence: 4, Readability: 3, Roominess: 2, 'Paper depth': 3 },
+      best: 'The stack itself: it reads instantly as a place you tap into, the crane on Floor 4 promises growth, and the dark-mode version with lit lamps is the warmest of the three.',
+      blocking: ['Four floors in one view makes monkeys about 30 px tall, too small to show behaviours.', 'Not roomy: it should show about 1.5 floors and let scrolling reveal the rest.', 'Ernest’s card covers the Typing Pool on first load.'],
+      fixes: ['Zoom in about 1.6× so the Typing Pool fills the screen', 'Cut-paper Ernest that points at the room he means', 'Paper rims on furniture and signs', 'Fix the clipped ARCHIVE sign; make plaque text at least 12 px'],
+      checks: { 'IP line': true, Accessibility: true, 'Reduced motion': true, Performance: true, Variety: true },
+      checkNote: 'The round seal and the Director’s wall medallion could be read as a clock face; worth a redesign to stay clear of the IP line.',
+      scale: 'Best fit for growth: new floors appear above, and the ceremony becomes a climb past repeating floors. Needs reused symbols past about 20 floors.',
+    },
+    {
+      id: 'theater', file: 'theater.html', name: 'Paper Theater', tag: 'stage sets, sideways dolly',
+      idea: 'Each room is a toy-theater set of layered flats. Swipe or tap a doorway and the camera dollies sideways to the next room, with the flats moving at different speeds. Forms are lowered from the flies on strings.',
+      scores: { Whimsy: 3, Coherence: 4, Readability: 3, Roominess: 2, 'Paper depth': 3 },
+      best: 'The Personnel form lowered on strings, “Form 3-H, Room 1”, with bureaucratic microcopy. Sincere, tactile and right on tone.',
+      blocking: ['Ernest covers about the bottom 35% of the room.', 'The Typing Pool is overloaded, with desks clipped at both edges.', 'Lower-row monkeys look nearly identical (same olive hat).', 'Weak tap cues: nothing says the desks or board open anything.'],
+      fixes: ['Ernest as a corner peek-in', 'Fewer, 1.3× bigger monkeys per set, with distinct silhouettes', 'Show the vacant desks so the art matches game state', 'A visible foreground flat for depth'],
+      checks: { 'IP line': true, Accessibility: false, 'Reduced motion': true, Performance: true, Variety: true },
+      checkNote: 'Inherits the game’s muted-label contrast miss (4.2:1, already on the M3 fix list), and the NOT ISSUED stamp is low too.',
+      scale: 'A sideways dolly fits a horizontal place. The finite climb is vertical, but the Hotel’s endless corridor might suit it.',
+    },
+  ];
+
+  const tabs = document.getElementById('tabs');
+  const panel = document.getElementById('panel');
+  const frame = document.getElementById('frame');
+  const open = document.getElementById('open');
+  const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  function show(id) {
+    const a = APPROACHES.find((x) => x.id === id) || APPROACHES[0];
+    for (const b of tabs.children) b.setAttribute('aria-selected', String(b.dataset.id === a.id));
+    frame.src = a.file;
+    frame.title = `${a.name} mockup`;
+    open.href = a.file;
+    const scores = Object.entries(a.scores).map(([k, v]) => `
+      <div class="score"><span>${k}</span><b>${v}<small> / 5</small></b>
+      <div class="pips" aria-hidden="true">${[1, 2, 3, 4, 5].map((n) => `<i class="${n <= v ? 'on' : ''}"></i>`).join('')}</div></div>`).join('');
+    const checks = Object.entries(a.checks).map(([k, ok]) => `<span class="chip ${ok ? 'pass' : 'fail'}">${ok ? '✓' : '✗'} ${k}</span>`).join('');
+    panel.innerHTML = `
+      <div><h2>${esc(a.name)}</h2><p class="eyebrow">${esc(a.tag)}</p></div>
+      <p class="idea">${esc(a.idea)}</p>
+      <div class="scores" aria-label="Taste scores">${scores}</div>
+      <p class="best"><strong>Best thing:</strong> ${esc(a.best)}</p>
+      <div><h3>Must fix before it could ship</h3><ul class="block">${a.blocking.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>
+      <div><h3>Next improvements</h3><ul>${a.fixes.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>
+      <div><h3>Checklist</h3><div class="checks">${checks}</div><p style="margin-top:8px">${esc(a.checkNote)}</p></div>
+      <div><h3>Scaling to the full game</h3><p>${esc(a.scale)}</p></div>`;
+    try { localStorage.setItem('bureau-art-tab', a.id); } catch {}
+    if (location.hash !== `#${a.id}`) history.replaceState(null, '', `#${a.id}`);
+  }
+
+  for (const a of APPROACHES) {
+    const b = document.createElement('button');
+    b.role = 'tab';
+    b.dataset.id = a.id;
+    b.innerHTML = `${esc(a.name)}<small>${esc(a.tag)}</small>`;
+    b.addEventListener('click', () => show(a.id));
+    tabs.append(b);
+  }
+  let start = location.hash.slice(1);
+  if (!start) { try { start = localStorage.getItem('bureau-art-tab') || ''; } catch {} }
+  show(start);
+</script>

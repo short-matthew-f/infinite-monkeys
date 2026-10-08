@@ -1,0 +1,828 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bureau of Infinite Typing: Paper Theater</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=Courier+Prime&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* ---------- tokens (copied from game/style.css; --sheet is the only addition: pale paper that stays pale in dark mode) ---------- */
+:root {
+  --paper: #f2e8d5; --paper-shade: #e4d6bc; --ink: #2b2622; --ink-muted: #6b6157;
+  --walnut: #6b4423; --concrete: #8a8780; --mustard: #c9a227; --tangerine: #d9732b;
+  --olive: #6e7046; --alert: #b23a2e; --phosphor-amber: #b87400; --phosphor-green: #3f7d4e;
+  --glow: #ffe9b0; --screen: #14110d; --screen-ink: #ffb000; --screen-muted: #a89c8a;
+  --sheet: #fbf3e2;
+  --font-display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+  --font-body: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --font-type: 'Courier Prime', 'Courier New', monospace;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #1f1b17; --paper-shade: #2a241e; --ink: #ede3cf; --ink-muted: #a89c8a;
+    --walnut: #8a5a33; --concrete: #5e5b55; --mustard: #d9b23a; --tangerine: #e8843a;
+    --olive: #8c8f5a; --alert: #d2554a; --phosphor-amber: #ffb000; --phosphor-green: #7cd992;
+    --glow: #ffd27a; --sheet: #d8ccb2;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #1f1b17; --paper-shade: #2a241e; --ink: #ede3cf; --ink-muted: #a89c8a;
+  --walnut: #8a5a33; --concrete: #5e5b55; --mustard: #d9b23a; --tangerine: #e8843a;
+  --olive: #8c8f5a; --alert: #d2554a; --phosphor-amber: #ffb000; --phosphor-green: #7cd992;
+  --glow: #ffd27a; --sheet: #d8ccb2;
+}
+/* paper grain: tiny inline SVG noise, used behind content only */
+:root { --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' seed='4'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .55 -.12'/></filter><rect width='180' height='180' filter='url(%23g)'/></svg>"); }
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; margin: 0; overflow: clip; background: var(--screen); color: var(--ink); font: 16px/1.45 var(--font-body); }
+button { font: inherit; color: inherit; }
+button:focus-visible { outline: 3px solid var(--tangerine); outline-offset: 3px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+#app { height: 100%; max-width: 430px; margin: 0 auto; display: flex; flex-direction: column; position: relative; background: var(--paper); overflow: clip; }
+
+/* ---------- header: one concrete channel, three tube readouts ---------- */
+.hud {
+  flex: none; height: calc(56px + env(safe-area-inset-top)); padding: env(safe-area-inset-top) 10px 0;
+  background: var(--concrete); display: flex; align-items: center; position: relative; z-index: 6;
+  box-shadow: 0 3px 0 color-mix(in srgb, var(--screen) 45%, transparent);
+}
+.crt { flex: 1; display: grid; grid-template-columns: 1.25fr 1fr .8fr; gap: 2px; background: var(--screen); border-radius: 8px; padding: 4px 6px; border: 2px solid color-mix(in srgb, var(--screen) 70%, var(--walnut)); box-shadow: inset 0 0 8px #000; }
+.crt > div { padding: 0 6px; min-width: 0; }
+.crt > div + div { border-left: 1px solid color-mix(in srgb, var(--screen-muted) 35%, transparent); }
+.crt .l { font: 600 12px/1.1 var(--font-display); letter-spacing: .1em; text-transform: uppercase; color: var(--screen-muted); display: block; }
+.crt .v { font: 600 16px/1.2 var(--font-mono); color: var(--screen-ink); font-variant-numeric: tabular-nums; text-shadow: 0 0 5px color-mix(in srgb, var(--screen-ink) 50%, transparent); white-space: nowrap; }
+.crt .v small { font: 400 12px var(--font-mono); color: var(--screen-muted); text-shadow: none; }
+
+/* ---------- stage ---------- */
+.stage { flex: 1; position: relative; overflow: clip; background: var(--concrete); touch-action: none; user-select: none; -webkit-user-select: none; }
+.world { position: absolute; inset: 0; --cam: 1; }
+.world[inert] { pointer-events: none; }
+.lyr {
+  position: absolute; left: 0; bottom: 0; height: 788px; pointer-events: none;
+  transform: translate3d(calc(var(--cam) * var(--k) * -390px), 0, 0);
+  transition: transform .95s cubic-bezier(.7, 0, .25, 1); will-change: transform;
+}
+.world.drag .lyr { transition: none; }
+.lyr > svg, .lyr .ws { position: absolute; overflow: visible; display: block; }
+.lyr > svg.st { left: 0; top: 0; }
+/* each flat throws a shadow on the one behind; farther forward = longer, softer */
+.l1 > svg, .l1 .ws { filter: drop-shadow(2px 4px 3px color-mix(in srgb, var(--screen) 42%, transparent)); }
+.l2 > svg, .l2 .ws { filter: drop-shadow(3px 7px 5px color-mix(in srgb, var(--screen) 44%, transparent)); }
+.l3 > svg { filter: drop-shadow(6px 12px 9px color-mix(in srgb, var(--screen) 50%, transparent)); }
+.lyr svg text { font-family: var(--font-display); font-weight: 700; letter-spacing: .07em; }
+.ws { contain: paint; }
+.ws .o { stroke: var(--screen); stroke-width: 1.3; stroke-linejoin: round; }
+.ws .ao { fill: none; stroke: var(--screen); stroke-width: 10.2; stroke-linecap: round; }
+.ws .ai { fill: none; stroke-width: 7.4; stroke-linecap: round; }
+.ws .ln { fill: none; stroke: var(--screen); stroke-width: 1.2; stroke-linecap: round; }
+
+/* tappable places: transparent buttons over the art */
+.hot { position: absolute; pointer-events: auto; background: transparent; border: 0; padding: 0; cursor: pointer; border-radius: 6px; }
+.hot::before { /* a lit lamp: the "this is a place" cue */
+  content: ""; position: absolute; width: 12px; height: 12px; border-radius: 50%; background: var(--mustard);
+  border: 2px solid var(--screen); box-shadow: 0 0 10px 4px color-mix(in srgb, var(--glow) 80%, transparent); animation: lamp 3.2s ease-in-out infinite;
+}
+.hot.focal::before { top: -2px; right: 6px; }
+.door { border-radius: 2px; }
+.door::before { display: none; }
+.door::after { /* chevron nudging toward the next room */
+  content: ""; position: absolute; top: 46%; width: 11px; height: 11px; border: solid var(--glow); border-width: 0 4px 4px 0;
+  filter: drop-shadow(0 0 3px var(--screen)); animation: nudgeR 2.6s ease-in-out infinite;
+}
+.door.dl::after { left: 24px; transform: rotate(135deg); animation-name: nudgeL; }
+.door.dr::after { right: 24px; transform: rotate(-45deg); }
+@keyframes nudgeR { 0%, 100% { translate: 0 0; } 50% { translate: 4px 0; } }
+@keyframes nudgeL { 0%, 100% { translate: 0 0; } 50% { translate: -4px 0; } }
+@keyframes lamp { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
+.world:has([data-lift="personnel"]:active) #o-personnel, .world:has([data-lift="pool"]:active) #o-pool,
+.world:has([data-lift="departments"]:active) #o-departments, .world:has([data-lift="director"]:active) #o-director { transform: translateY(-4px); }
+@media (hover: hover) {
+  .world:has([data-lift="personnel"]:hover) #o-personnel, .world:has([data-lift="pool"]:hover) #o-pool,
+  .world:has([data-lift="departments"]:hover) #o-departments, .world:has([data-lift="director"]:hover) #o-director { transform: translateY(-3px); }
+}
+.lyr svg [id^="o-"] { transition: transform .12s ease-out; }
+
+.sign { position: absolute; transform-origin: 50% 0; animation: swing 7s ease-in-out infinite alternate; }
+@keyframes swing { from { transform: rotate(-1.1deg); } to { transform: rotate(1.1deg); } }
+.cap { position: absolute; width: 8px; height: 20px; border-radius: 4px; background: var(--sheet); border: 1.5px solid var(--screen); animation: tube 9s ease-in infinite; opacity: 0; }
+@keyframes tube { 0%, 55% { transform: translateY(0); opacity: 0; } 58% { opacity: 1; } 78% { transform: translateY(-340px); opacity: 1; } 80%, 100% { transform: translateY(-340px); opacity: 0; } }
+.halo { position: absolute; border-radius: 50%; background: radial-gradient(closest-side, var(--glow), transparent); animation: lamp 3.2s ease-in-out infinite; }
+
+.grain { position: absolute; inset: 0; pointer-events: none; z-index: 2; background: var(--grain); opacity: .5; mix-blend-mode: multiply; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .grain { mix-blend-mode: screen; opacity: .22; } }
+:root[data-theme="dark"] .grain { mix-blend-mode: screen; opacity: .22; }
+.dim { position: absolute; inset: 0; z-index: 3; background: color-mix(in srgb, var(--screen) 40%, transparent); opacity: 0; pointer-events: none; transition: opacity .5s ease; }
+.dim.on { opacity: 1; pointer-events: auto; }
+
+/* ---------- foot: the brass directory plate and the room placard ---------- */
+.foot { position: absolute; left: 0; right: 0; bottom: 0; z-index: 8; height: calc(62px + env(safe-area-inset-bottom)); padding: 0 12px env(safe-area-inset-bottom); display: flex; align-items: center; justify-content: space-between; gap: 8px; pointer-events: none; }
+.foot > * { pointer-events: auto; }
+.brass {
+  min-height: 46px; min-width: 132px; padding: 0 14px; display: flex; align-items: center; gap: 10px; border-radius: 6px;
+  border: 2px solid var(--screen); background: var(--mustard); color: var(--screen);
+  font: 700 17px/1 var(--font-display); letter-spacing: .1em; text-transform: uppercase; cursor: pointer;
+  box-shadow: 0 4px 0 color-mix(in srgb, var(--screen) 55%, transparent);
+}
+.brass:active { transform: translateY(3px); box-shadow: 0 1px 0 color-mix(in srgb, var(--screen) 55%, transparent); }
+.brass i { width: 16px; height: 12px; border-top: 3px solid var(--screen); border-bottom: 3px solid var(--screen); position: relative; }
+.brass i::after { content: ""; position: absolute; left: 0; right: 0; top: 1px; height: 3px; background: var(--screen); }
+.placard { background: var(--sheet); color: var(--screen); border: 2px solid var(--screen); border-radius: 3px; padding: 6px 12px; text-align: right; font: 700 15px/1.1 var(--font-display); letter-spacing: .1em; text-transform: uppercase; box-shadow: 0 4px 0 color-mix(in srgb, var(--screen) 55%, transparent); min-width: 0; }
+.placard small { display: block; font: 600 12px/1.1 var(--font-display); letter-spacing: .12em; color: color-mix(in srgb, var(--screen) 70%, var(--sheet)); }
+
+.dir { position: absolute; left: 10px; bottom: calc(72px + env(safe-area-inset-bottom)); z-index: 9; width: 290px; background: var(--paper-shade); border: 2px solid var(--screen); border-radius: 6px; padding: 8px; box-shadow: 0 5px 0 color-mix(in srgb, var(--screen) 55%, transparent), 0 14px 18px color-mix(in srgb, var(--screen) 40%, transparent); transform: translateY(24px); opacity: 0; pointer-events: none; transition: transform .3s cubic-bezier(.2,.8,.2,1), opacity .2s; }
+.dir.open { transform: none; opacity: 1; pointer-events: auto; }
+.dir h2 { margin: 2px 4px 6px; font: 700 13px var(--font-display); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-muted); }
+.dir button { width: 100%; min-height: 48px; display: grid; grid-template-columns: 30px 1fr auto; align-items: center; gap: 6px; text-align: left; padding: 0 8px; border: 0; border-top: 1px solid var(--concrete); background: transparent; color: var(--ink); font: 700 17px var(--font-display); letter-spacing: .06em; text-transform: uppercase; cursor: pointer; }
+.dir button:active { background: var(--mustard); color: var(--screen); }
+.dir button .n { font: 600 14px var(--font-mono); color: var(--ink-muted); }
+.dir button .here { font: 600 12px var(--font-display); letter-spacing: .12em; color: var(--ink); border: 1.5px solid var(--ink); border-radius: 3px; padding: 1px 6px; visibility: hidden; }
+.dir button[aria-current="true"] .here { visibility: visible; }
+
+/* ---------- the sheet: a paper prop lowered from the flies ---------- */
+.rig { position: absolute; left: 0; right: 0; top: 0; z-index: 7; padding: 0 16px; pointer-events: none; transform: translateY(-112%); transition: transform .8s cubic-bezier(.25,.9,.25,1), opacity .3s; }
+.rig.open { transform: none; pointer-events: auto; }
+.rig::before, .rig::after { content: ""; position: absolute; top: -120px; bottom: calc(100% - 22px); width: 2px; background: var(--screen); }
+.rig::before, .rig::after { height: 0; }
+.rig .str { position: absolute; top: -20px; height: 70px; width: 2px; background: var(--screen); }
+.rig .str.a { left: 56px; } .rig .str.b { right: 56px; }
+.card { position: relative; margin-top: 44px; background: var(--paper-shade); color: var(--ink); border: 2px solid var(--screen); border-radius: 4px 4px 10px 10px; padding: 14px 14px 16px; box-shadow: 0 6px 0 color-mix(in srgb, var(--screen) 50%, transparent), 0 20px 24px color-mix(in srgb, var(--screen) 45%, transparent); max-height: calc(100% - 20px); overflow: auto; }
+.card::before { content: ""; position: absolute; inset: 0; background: var(--grain); opacity: .4; mix-blend-mode: multiply; pointer-events: none; border-radius: inherit; }
+:root[data-theme="dark"] .card::before { mix-blend-mode: screen; opacity: .18; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .card::before { mix-blend-mode: screen; opacity: .18; } }
+.card > * { position: relative; }
+.card .clip { position: absolute; top: -12px; left: 50%; width: 64px; height: 18px; margin-left: -32px; border-radius: 4px; background: var(--concrete); border: 2px solid var(--screen); }
+.card header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; padding-right: 0; }
+.eyebrow { font: 600 13px/1.2 var(--font-display); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-muted); }
+.card h2 { margin: 0; font: 700 30px/1 var(--font-display); letter-spacing: .06em; text-transform: uppercase; color: var(--ink); }
+.x { flex: none; width: 46px; height: 46px; margin: -6px -6px 0 0; display: grid; place-items: center; border: 2px solid var(--screen); border-radius: 4px; background: var(--mustard); color: var(--screen); font: 700 26px/1 var(--font-display); cursor: pointer; box-shadow: 0 3px 0 color-mix(in srgb, var(--screen) 50%, transparent); }
+.x:active { transform: translateY(2px); box-shadow: none; }
+.row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-top: 12px; }
+.row .l { font: 600 14px var(--font-display); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-muted); }
+.row .v { font: 600 17px var(--font-mono); font-variant-numeric: tabular-nums; }
+.bar { height: 14px; margin-top: 6px; background: var(--paper); border: 2px solid var(--screen); border-radius: 2px; overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--olive); }
+.bar.w i { background: var(--mustard); }
+.note { margin: 8px 0 0; font: 14px/1.4 var(--font-body); color: var(--ink-muted); }
+.ba { font: 600 14px var(--font-mono); font-variant-numeric: tabular-nums; margin: 8px 2px 0; text-align: center; }
+.hire {
+  display: block; width: 100%; min-height: 64px; margin-top: 12px; cursor: pointer; border: 4px solid var(--mustard); border-radius: 36px 36px 46px 46px / 30px 30px 44px 44px;
+  background: var(--tangerine); color: var(--screen); font: 700 24px/1 var(--font-display); letter-spacing: .12em; text-transform: uppercase;
+  box-shadow: 0 0 0 2px var(--screen), inset 0 -7px 0 color-mix(in srgb, var(--screen) 22%, transparent), 0 7px 0 2px color-mix(in srgb, var(--screen) 55%, transparent);
+}
+.hire:active { transform: translateY(6px); box-shadow: 0 0 0 2px var(--screen), inset 0 -2px 0 color-mix(in srgb, var(--screen) 22%, transparent), 0 1px 0 2px color-mix(in srgb, var(--screen) 55%, transparent); }
+.tab { display: grid; gap: 2px; justify-items: start; text-align: left; align-content: center; width: 100%; min-height: 56px; margin-top: 12px; padding: 6px 14px; border: 2px solid var(--walnut); border-radius: 4px; background: var(--paper); color: var(--ink); font: 700 18px var(--font-display); letter-spacing: .08em; text-transform: uppercase; cursor: pointer; box-shadow: 0 3px 0 color-mix(in srgb, var(--walnut) 60%, transparent); }
+.tab span { font: 600 14px var(--font-mono); letter-spacing: 0; text-transform: none; color: var(--ink-muted); }
+.tab:active { transform: translateY(2px); box-shadow: none; }
+.tab:disabled { cursor: not-allowed; border-style: dashed; box-shadow: none; }
+.stamp { display: inline-block; border: 3px double var(--alert); color: var(--alert); font: 700 18px var(--font-display); letter-spacing: .14em; padding: 2px 10px; transform: rotate(-4deg); text-transform: uppercase; }
+
+/* ---------- Ernest, Orientation Officer ---------- */
+.ernest { position: absolute; z-index: 10; left: 14px; right: 14px; bottom: calc(70px + env(safe-area-inset-bottom)); display: none; transform: translateX(112%); transition: transform .7s cubic-bezier(.25,.8,.25,1); }
+.ernest.show { display: block; }
+.ernest.in { transform: none; }
+.ernest.out { transform: translateX(120%); transition-duration: .5s; transition-timing-function: cubic-bezier(.6,0,.8,.4); }
+.ernest .film { position: relative; margin-left: 66px; background: var(--sheet); color: var(--screen); border: 2px solid var(--screen); border-radius: 4px; padding: 10px 12px 12px 48px; box-shadow: 0 5px 0 color-mix(in srgb, var(--screen) 55%, transparent), 0 14px 18px color-mix(in srgb, var(--screen) 40%, transparent); }
+.ernest .film::before { content: ""; position: absolute; inset: 0; background: var(--grain); opacity: .35; mix-blend-mode: multiply; pointer-events: none; }
+.ernest .film > * { position: relative; }
+.ernest .reel { font: 600 12px/1.1 var(--font-display); letter-spacing: .14em; text-transform: uppercase; color: color-mix(in srgb, var(--screen) 72%, var(--sheet)); margin: 0; }
+.ernest h3 { margin: 2px 0 2px; font: 700 21px/1.05 var(--font-display); letter-spacing: .06em; text-transform: uppercase; }
+.ernest p.t { margin: 0 0 8px; font: 14px/1.35 var(--font-body); }
+.ernest button { min-height: 44px; padding: 0 16px; border: 2px solid var(--screen); border-radius: 4px; background: var(--mustard); color: var(--screen); font: 700 17px var(--font-display); letter-spacing: .12em; text-transform: uppercase; cursor: pointer; box-shadow: 0 3px 0 color-mix(in srgb, var(--screen) 55%, transparent); }
+.ernest button:active { transform: translateY(2px); box-shadow: none; }
+.ernest svg { position: absolute; left: -2px; bottom: -4px; width: 104px; height: 142px; z-index: 2; overflow: visible; filter: drop-shadow(3px 5px 4px color-mix(in srgb, var(--screen) 45%, transparent)); animation: boil .6s steps(2) infinite; }
+@keyframes boil { 50% { transform: translate(.6px, -.5px) rotate(.4deg); } }
+.ernest .wave { transform-origin: 70px 78px; animation: wave 1s steps(2) infinite; }
+@keyframes wave { 0% { transform: rotate(-14deg); } 100% { transform: rotate(10deg); } }
+
+/* ---------- monkey behaviours (offset per desk via --d, tempo via --t) ---------- */
+.ws [class^="a"], .ws .head, .ws .car, .ws .pg, .ws .crank, .ws .zz, .ws .bell, .ws .ink { animation-delay: var(--d, 0s); animation-iteration-count: infinite; animation-timing-function: ease-in-out; }
+.b-touch .al { animation: tapL calc(.23s * var(--t, 1)) alternate infinite; }
+.b-touch .ar { animation: tapR calc(.29s * var(--t, 1)) alternate infinite; }
+.b-touch .head { animation: nod calc(1.7s * var(--t, 1)) alternate infinite; }
+.b-peck .ar { animation: peck calc(3.1s * var(--t, 1)); }
+.b-peck .head { animation: nod calc(3.1s * var(--t, 1)) alternate infinite; }
+.b-slam .al { animation: slam calc(4.8s * var(--t, 1)); }
+.b-slam .ar { animation: tapR calc(.3s * var(--t, 1)) alternate infinite; }
+.b-slam .car { animation: carriage calc(4.8s * var(--t, 1)); }
+.b-sip .ar { animation: sip calc(7s * var(--t, 1)); }
+.b-stretch .al { animation: strL calc(8s * var(--t, 1)); }
+.b-stretch .ar { animation: strR calc(8s * var(--t, 1)); }
+.b-stretch .head { animation: lean calc(8s * var(--t, 1)); }
+.b-read .pg { animation: page calc(6s * var(--t, 1)); }
+.b-doze .head { animation: doze calc(9s * var(--t, 1)); }
+.b-doze .zz { animation: zz calc(9s * var(--t, 1)); }
+.b-sharpen .crank { animation: crank calc(1.6s * var(--t, 1)) linear infinite; }
+.b-sharpen .ar { animation: tapR calc(.4s * var(--t, 1)) alternate infinite; }
+.b-stamp .ar { animation: stampArm 3.4s cubic-bezier(.5, 0, .9, .4); }
+.b-stamp .mark { animation: markIn 3.4s steps(1); animation-delay: var(--d, 0s); animation-iteration-count: infinite; }
+.ink { animation: fadeInk calc(6s * var(--t, 1)) ease-in-out infinite; }
+.bell { transform-origin: 0 0; animation: ring 7s ease-in-out infinite; }
+@keyframes tapL { to { transform: rotate(-16deg); } }
+@keyframes tapR { to { transform: rotate(16deg); } }
+@keyframes nod { to { transform: rotate(2.5deg); } }
+@keyframes peck { 0%, 50% { transform: none; } 55% { transform: rotate(20deg); } 60% { transform: none; } 68% { transform: rotate(20deg); } 73%, 100% { transform: none; } }
+@keyframes slam { 0%, 62% { transform: none; } 68%, 72% { transform: rotate(28deg); } 82%, 100% { transform: none; } }
+@keyframes carriage { 0% { transform: none; } 62% { transform: translateX(-6px); } 70% { transform: translateX(-6px); } 76%, 100% { transform: none; } }
+@keyframes sip { 0%, 52% { transform: none; } 62%, 78% { transform: rotate(112deg); } 88%, 100% { transform: none; } }
+@keyframes strL { 0%, 55% { transform: none; } 66%, 80% { transform: rotate(194deg); } 92%, 100% { transform: none; } }
+@keyframes strR { 0%, 55% { transform: none; } 66%, 80% { transform: rotate(-194deg); } 92%, 100% { transform: none; } }
+@keyframes lean { 0%, 55% { transform: none; } 66%, 80% { transform: rotate(-7deg); } 92%, 100% { transform: none; } }
+@keyframes page { 0%, 65% { transform: none; } 72%, 88% { transform: translateY(9px); } 95%, 100% { transform: none; } }
+@keyframes doze { 0% { transform: none; } 55% { transform: rotate(16deg); } 66% { transform: rotate(16deg); } 69% { transform: rotate(-8deg); } 78% { transform: rotate(-8deg); } 88%, 100% { transform: none; } }
+@keyframes zz { 0%, 12% { opacity: 0; } 40%, 66% { opacity: 1; } 68%, 100% { opacity: 0; } }
+@keyframes crank { to { transform: rotate(360deg); } }
+@keyframes stampArm { 0%, 38% { transform: rotate(-62deg); } 46% { transform: none; } 58% { transform: none; } 72%, 100% { transform: rotate(-62deg); } }
+@keyframes markIn { 0%, 44% { opacity: 0; } 46%, 90% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes fadeInk { 0%, 100% { opacity: .25; } 50% { opacity: .9; } }
+@keyframes ring { 0%, 70%, 100% { transform: none; } 73% { transform: rotate(7deg); } 76% { transform: rotate(-7deg); } 79% { transform: rotate(5deg); } 82% { transform: rotate(-4deg); } 85% { transform: none; } }
+@keyframes needleA { 0%, 100% { transform: rotate(-24deg); } 30% { transform: rotate(-10deg); } 55% { transform: rotate(-20deg); } 80% { transform: rotate(-4deg); } }
+@keyframes needleB { 0%, 100% { transform: rotate(-30deg); } 40% { transform: rotate(-18deg); } 70% { transform: rotate(-26deg); } }
+.needle { animation: needleA 5s ease-in-out infinite; }
+.needle.b { animation: needleB 7s ease-in-out infinite; }
+
+@keyframes swap { from { opacity: .15; } to { opacity: 1; } }
+.world.swap .lyr { animation: swap .35s ease-out; }
+
+/* ---------- reduced motion: same story, calmer: fades and holds, poses instead of loops ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .lyr, .rig, .ernest, .dim, .dir { transition-property: opacity !important; transition-duration: .3s !important; transform: none; }
+  .lyr { transform: translate3d(calc(var(--cam) * var(--k) * -390px), 0, 0) !important; }
+  .rig { transform: none; opacity: 0; } .rig.open { opacity: 1; }
+  .ernest { transform: none; opacity: 0; } .ernest.in { opacity: 1; } .ernest.out { opacity: 0; }
+  .dir { transform: none; }
+  .sign, .hot::before, .door::after, .halo, .cap, .bell, .ws *, .ernest svg, .ernest .wave, .needle { animation: none !important; }
+  .ws .ink { animation: fadeInk 6s ease-in-out infinite !important; animation-delay: var(--d, 0s) !important; } /* a calm fade is still activity */
+  .world.swap .lyr { animation: swap .3s ease-out !important; }
+  .cap { opacity: .9; transform: translateY(-340px); }
+  .b-doze .head { transform: rotate(14deg); }
+  .b-doze .zz { opacity: 1; }
+  .b-sip .ar { transform: rotate(100deg); }
+  .b-stretch .al { transform: rotate(194deg); } .b-stretch .ar { transform: rotate(-194deg); } .b-stretch .head { transform: rotate(-6deg); }
+  .b-slam .al { transform: rotate(26deg); }
+  .b-peck .ar { transform: rotate(18deg); }
+  .b-sharpen .crank { transform: rotate(50deg); }
+  .b-stamp .ar { transform: none; } .b-stamp .mark { opacity: 1; }
+  .needle { transform: rotate(-14deg); } .needle.b { transform: rotate(-24deg); }
+  .ernest .wave { transform: rotate(-4deg); }
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <!-- the "scissors": a hair of displacement so straight edges read as hand-cut -->
+    <filter id="cut" x="-4%" y="-4%" width="108%" height="108%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency=".03" numOctaves="2" seed="7" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="2.8" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+</svg>
+
+<div id="app">
+  <header class="hud" aria-label="Bureau status">
+    <div class="crt">
+      <div><span class="l">Bananas</span><span class="v" id="bn">12,480</span></div>
+      <div><span class="l">Income</span><span class="v">3.4<small>/s</small></span></div>
+      <div><span class="l">Monkeys</span><span class="v">8</span></div>
+    </div>
+  </header>
+
+  <main class="stage" id="stage" aria-label="The Bureau, first floor. Swipe sideways or use the directory to move between rooms.">
+    <div class="world" id="world"></div>
+    <div class="grain" aria-hidden="true"></div>
+    <div class="dim" id="dim"></div>
+
+    <section class="rig" id="rig" role="dialog" aria-labelledby="sheetT" aria-hidden="true">
+      <i class="str a"></i><i class="str b"></i>
+      <div class="card" id="card"></div>
+    </section>
+
+    <aside class="ernest" id="ernest" aria-label="Orientation card">
+      <svg viewBox="0 0 104 142" aria-hidden="true">
+        <!-- Ernest: chimp, short sleeves, narrow tie, pencil behind the ear, clipboard -->
+        <g stroke="var(--screen)" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round">
+          <path d="M26,142 L28,92 Q52,82 76,92 L78,142Z" style="fill:var(--glow)"/>
+          <path d="M60,96 L76,92 L78,142 L62,142Z" style="fill:var(--mustard)" stroke="none" opacity=".55"/>
+          <path d="M50,92 L54,92 L56,126 L52,132 L48,126Z" style="fill:var(--alert)"/>
+          <circle cx="52" cy="48" r="26" style="fill:var(--walnut)"/>
+          <circle cx="24" cy="50" r="9" style="fill:var(--walnut)"/><circle cx="24" cy="50" r="4.5" style="fill:color-mix(in srgb,var(--walnut) 40%,var(--glow))" stroke="none"/>
+          <circle cx="80" cy="50" r="9" style="fill:var(--walnut)"/><circle cx="80" cy="50" r="4.5" style="fill:color-mix(in srgb,var(--walnut) 40%,var(--glow))" stroke="none"/>
+          <path d="M34,54 Q34,36 52,38 Q70,36 70,54 Q70,76 52,76 Q34,76 34,54Z" style="fill:color-mix(in srgb,var(--walnut) 40%,var(--glow))"/>
+          <path d="M82,36 L92,22" stroke-width="4.5" style="stroke:var(--mustard)"/><path d="M82,36 L92,22" stroke-width="2.2" stroke="none"/>
+          <circle cx="44" cy="50" r="6" style="fill:var(--glow)" stroke-width="1.6"/><path d="M44,50 L50,50 A6,6 0 1 0 44,44Z" style="fill:var(--screen)" stroke="none"/>
+          <circle cx="60" cy="50" r="6" style="fill:var(--glow)" stroke-width="1.6"/><path d="M60,50 L66,50 A6,6 0 1 0 60,44Z" style="fill:var(--screen)" stroke="none"/>
+          <path d="M42,64 Q52,73 62,64" fill="none"/>
+          <path d="M26,96 Q12,112 22,128" style="fill:none;stroke:var(--walnut)" stroke-width="12"/><path d="M26,96 Q12,112 22,128" fill="none" stroke-width="1" opacity="0"/>
+          <rect x="6" y="104" width="30" height="38" rx="2" style="fill:var(--walnut)"/><rect x="10" y="110" width="22" height="28" style="fill:var(--sheet)" stroke-width="1.4"/>
+          <path d="M13,118 H29 M13,124 H29 M13,130 H24" fill="none" stroke-width="1.2"/>
+        </g>
+        <g class="wave" stroke="var(--screen)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M72,92 Q92,86 96,60" style="fill:none;stroke:var(--screen)" stroke-width="13"/><path d="M72,92 Q92,86 96,60" style="fill:none;stroke:var(--glow)" stroke-width="9.6"/>
+          <circle cx="96" cy="56" r="7" style="fill:var(--walnut)"/>
+        </g>
+      </svg>
+      <div class="film">
+        <p class="reel">Orientation Reel 1</p>
+        <h3 id="ernT">Your First Hire</h3>
+        <p class="t">Open Personnel and sign the hire requisition. A seated monkey produces bananas.</p>
+        <button id="understood" type="button">Understood</button>
+      </div>
+    </aside>
+
+    <nav class="foot" aria-label="Building">
+      <button class="brass" id="dirBtn" type="button" aria-expanded="false" aria-controls="dir"><i aria-hidden="true"></i>Directory</button>
+      <div class="placard" aria-live="polite" id="placard"></div>
+    </nav>
+    <div class="dir" id="dir" role="group" aria-label="Building directory"><h2>Building directory</h2></div>
+  </main>
+</div>
+
+<script>
+(() => {
+'use strict';
+const SW = 390, SH = 788, K = [.75, .9, 1, 1.35];
+const ROOMS = [
+  { id: 'personnel', name: 'Personnel', form: 'Form 3-H', tint: '--mustard' },
+  { id: 'pool', name: 'Typing Pool', form: 'Form 1-A', tint: '--concrete' },
+  { id: 'departments', name: 'Departments', form: 'Form 5-D', tint: '--olive' },
+  { id: 'director', name: "Director's Office", form: 'Form 9-X', tint: '--walnut' },
+];
+const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+const ox = (L, s) => s * SW * K[L];
+const lw = L => 3 * SW * K[L] + SW;
+const hash = i => { let h = Math.imul(i + 7, 0x9E3779B1) >>> 0; h ^= h >>> 15; h = Math.imul(h, 0x85EBCA6B) >>> 0; h ^= h >>> 13; return h >>> 0; };
+const mix = (a, p, b) => `color-mix(in srgb, ${a} ${p}%, ${b})`;
+
+/* ---------- cut-paper helpers ---------- */
+const rr = (x, y, w, h, r = 0) => `M${x + r},${y}h${w - 2 * r}q${r},0 ${r},${r}v${h - 2 * r}q0,${r} ${-r},${r}h${-(w - 2 * r)}q${-r},0 ${-r},${-r}v${-(h - 2 * r)}q0,${-r} ${r},${-r}z`;
+const ch = (x, y, w, h, c = 6) => `M${x + c},${y}h${w - 2 * c}l${c},${c}v${h - 2 * c}l${-c},${c}h${-(w - 2 * c)}l${-c},${-c}v${-(h - 2 * c)}z`;
+// a flat: dark card edge peeking below, then the face. cut=1 adds the scissor wobble.
+const S = (d, f, t = 3, cut = 1, x = '') => `<path d="${d}" style="fill:var(--screen)" opacity=".42" transform="translate(1,${t})"${cut ? ' filter="url(#cut)"' : ''}/><path d="${d}" style="fill:${f}" stroke="var(--screen)" stroke-opacity=".45" stroke-width="1"${cut ? ' filter="url(#cut)"' : ''} ${x}/>`;
+const T = (x, y, s, txt, f = 'var(--screen)', a = 'middle') => `<text x="${x}" y="${y}" font-size="${s}" text-anchor="${a}" style="fill:${f}">${txt}</text>`;
+const HOT = (x, y, w, h, cls, attrs, label) => `<button type="button" class="hot ${cls}" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px" ${attrs} aria-label="${label}"></button>`;
+
+/* ---------- the parts kit ---------- */
+const FUR = ['var(--walnut)', 'var(--concrete)', mix('var(--walnut)', 62, 'var(--glow)'), 'var(--screen)', 'var(--mustard)'];
+const CLOTH = ['var(--olive)', 'var(--mustard)', 'var(--concrete)', mix('var(--alert)', 68, 'var(--glow)'), 'var(--glow)'];
+const BEH = ['touch', 'peck', 'slam', 'sip', 'stretch', 'read', 'doze', 'sharpen'];
+const ACC = ['glasses', 'visor', 'cardigan', 'tie', 'pencil', 'headphones', 'bow'];
+const PROPS = ['mug', 'plant', 'stack', 'photo', 'lamp', 'flag'];
+const pie = (cx, cy, r, a0) => {
+  const p = a => [cx + r * Math.cos(a * Math.PI / 180), cy + r * Math.sin(a * Math.PI / 180)];
+  const [x0, y0] = p(a0), [x1, y1] = p(a0 + 270);
+  return `M${cx},${cy}L${x0.toFixed(1)},${y0.toFixed(1)}A${r},${r} 0 1 1 ${x1.toFixed(1)},${y1.toFixed(1)}Z`;
+};
+function prop(kind, x, y = 98) {
+  const g = c => `<g transform="translate(${x},${y})">${c}</g>`;
+  const o = 'class="o"';
+  switch (kind) {
+    case 'mug': return g(`<rect ${o} x="-5" y="-10" width="10" height="10" rx="1.5" style="fill:var(--glow)"/><path class="ln" d="M5,-8 q6,0 0,6"/><path d="M-2,-13 q2,-2 0,-4 M2,-13 q2,-2 0,-4" class="ln" opacity=".5"/>`);
+    case 'plant': return g(`<path ${o} d="M-6,0 L-5,-9 L5,-9 L6,0Z" style="fill:${mix('var(--walnut)', 70, 'var(--glow)')}"/><path ${o} d="M0,-9 Q-12,-14 -9,-24 Q0,-20 0,-9Z" style="fill:var(--olive)"/><path ${o} d="M0,-9 Q12,-14 9,-25 Q0,-20 0,-9Z" style="fill:var(--olive)"/><path ${o} d="M0,-9 Q-4,-20 0,-30 Q4,-20 0,-9Z" style="fill:var(--olive)"/>`);
+    case 'stack': return g(`<rect ${o} x="-9" y="-5" width="18" height="5" style="fill:var(--sheet)"/><rect ${o} x="-8" y="-10" width="17" height="5" style="fill:var(--sheet)"/><rect ${o} x="-9" y="-15" width="18" height="5" style="fill:var(--sheet)"/>`);
+    case 'photo': return g(`<path class="ln" d="M-2,0 L0,-6 L2,0"/><rect ${o} x="-8" y="-18" width="16" height="13" style="fill:var(--walnut)"/><rect x="-6" y="-16" width="12" height="9" style="fill:var(--glow)"/><circle cx="-2" cy="-12" r="2" style="fill:var(--screen)"/><circle cx="3" cy="-11.5" r="1.5" style="fill:var(--screen)"/>`);
+    case 'lamp': return g(`<ellipse ${o} cx="0" cy="-1" rx="7" ry="2" style="fill:var(--concrete)"/><path class="ln" style="stroke-width:1.8" d="M0,-1 L-4,-14 L4,-24"/><path ${o} d="M-1,-26 L9,-24 L6,-17Z" style="fill:var(--olive)"/><path d="M5,-17 L14,-1 L-2,-1Z" style="fill:var(--glow)" opacity=".28"/>`);
+    case 'flag': return g(`<rect ${o} x="-5" y="-3" width="10" height="3" style="fill:var(--concrete)"/><path class="ln" style="stroke-width:1.6" d="M0,-3 V-26"/><path ${o} d="M0,-26 L12,-22 L0,-18Z" style="fill:var(--alert)"/>`);
+    case 'sharpener': return g(`<rect ${o} x="-7" y="-10" width="14" height="10" style="fill:var(--concrete)"/><g class="crank" style="transform-origin:${x + 9}px ${y - 5}px"><path class="ln" style="stroke-width:1.8" d="M7,-5 H15 V-1"/><circle cx="15" cy="-1" r="1.8" style="fill:var(--screen)"/></g>`);
+    case 'pad': return g(`<rect ${o} x="-8" y="-4" width="16" height="4" style="fill:var(--screen)"/><rect x="-6" y="-3.5" width="12" height="2" style="fill:var(--alert)"/>`);
+  }
+  return '';
+}
+function deskArt(x0, x1, label = '') {
+  const w = x1 - x0;
+  return `<path d="${rr(x0 + 4, 108, w - 8, 42, 2)}" style="fill:${mix('var(--walnut)', 80, 'var(--screen)')}" stroke="var(--screen)" stroke-width="1.3"/>`
+    + `<path d="${rr(x0, 98, w, 10, 2)}" style="fill:var(--screen)" opacity=".4" transform="translate(1,3)"/>`
+    + `<path d="${rr(x0, 98, w, 10, 2)}" style="fill:var(--walnut)" stroke="var(--screen)" stroke-width="1.3" filter="url(#cut)"/>`
+    + `<path d="M${x0 + 3},100.5 H${x1 - 3}" stroke="var(--glow)" stroke-opacity=".35" stroke-width="1.5"/>`
+    + (w > 40 ? `<rect x="${x0 + 12}" y="116" width="${Math.min(w - 24, 34)}" height="14" fill="none" stroke="var(--screen)" stroke-opacity=".5" stroke-width="1"/><circle cx="${x0 + 12 + Math.min(w - 24, 34) / 2}" cy="123" r="1.8" style="fill:var(--mustard)"/>` : '') + label;
+}
+function accs(a, b) {
+  let p = ACC[a % 7], q = ACC[b % 7];
+  const bad = (m, n) => m === n || (['tie', 'bow'].includes(m) && ['tie', 'bow'].includes(n)) || (['visor', 'headphones'].includes(m) && ['visor', 'headphones'].includes(n));
+  return bad(p, q) ? [p] : [p, q];
+}
+
+/* one workstation = a standalone little paper cutout (desk + monkey + props) */
+function ws(i, o = {}) {
+  const w = o.w || 100, R = k => hash(i * 31 + k);
+  const fur = FUR[R(1) % 5];
+  let cl = CLOTH[R(2) % 5]; if (cl === fur) cl = CLOTH[(CLOTH.indexOf(cl) + 1) % 5];
+  if (o.cloth) cl = o.cloth;
+  const bd = R(3) % 3, tw = [30, 38, 48][bd], hr = [15, 17, 19][bd];
+  const beh = o.beh || BEH[(i * 3 + ((R(9) >> 3) & 1)) % 8];
+  let eyeT = R(4) % 4; if (beh === 'doze') eyeT = 2; if (o.editor) eyeT = 1;
+  const mouthT = R(5) % 3;
+  let ac = accs(R(6), R(7)); if (o.editor) ac = ['visor', 'tie'];
+  const sleeve = cl, fv = fur;
+  const face = mix(fur, 42, 'var(--glow)');
+  const cardi = ac.includes('cardigan');
+  const sx0 = 50 - tw / 2 + 3, sx1 = 50 + tw / 2 - 3;
+  const ey = 44, ex = [5.5, 6, 7][bd];
+  let svg = '';
+  const d = ((R(8) % 1000) / 1000 * 7).toFixed(2), t = (0.85 + (R(10) % 40) / 100).toFixed(2);
+  if (!o.empty) {
+    // chair back
+    svg += `<path class="o" d="${rr(32, 58, 36, 50, 8)}" style="fill:${mix('var(--concrete)', 80, 'var(--screen)')}"/>`;
+    // torso
+    svg += `<path class="o" d="${rr(50 - tw / 2, 62, tw, 48, 12)}" style="fill:${cardi ? 'var(--glow)' : sleeve}"/>`;
+    if (cardi) svg += `<path class="o" d="${rr(50 - tw / 2, 62, tw / 2 - 3, 48, 10)}" style="fill:${sleeve}"/><path class="o" d="${rr(53, 62, tw / 2 - 3, 48, 10)}" style="fill:${sleeve}"/><circle cx="${50 + 6}" cy="80" r="1.6" style="fill:var(--screen)"/><circle cx="${50 + 6}" cy="90" r="1.6" style="fill:var(--screen)"/>`;
+    if (ac.includes('tie')) svg += `<path class="o" d="M48.5,65 L51.5,65 L53.5,88 L50,94 L46.5,88Z" style="fill:${cl === CLOTH[3] ? 'var(--screen)' : 'var(--alert)'}"/>`;
+    if (ac.includes('bow')) svg += `<path class="o" d="M50,66 L40,61 L40,71Z M50,66 L60,61 L60,71Z" style="fill:var(--alert)"/><circle class="o" cx="50" cy="66" r="2.6" style="fill:var(--alert)"/>`;
+    // head
+    let h = `<g class="head" style="transform-origin:50px 64px">`;
+    h += `<circle class="o" cx="${50 - hr}" cy="45" r="6.5" style="fill:${fv}"/><circle cx="${50 - hr}" cy="45" r="3.2" style="fill:${face}"/><circle class="o" cx="${50 + hr}" cy="45" r="6.5" style="fill:${fv}"/><circle cx="${50 + hr}" cy="45" r="3.2" style="fill:${face}"/>`;
+    h += `<circle class="o" cx="50" cy="46" r="${hr}" style="fill:${fv}"/><ellipse cx="50" cy="${50 + (hr - 17) * .3}" rx="${hr * .74}" ry="${hr * .62}" style="fill:${face}"/>`;
+    for (const sd of [-1, 1]) {
+      const cx = 50 + sd * ex;
+      if (eyeT === 0) h += `<circle cx="${cx}" cy="${ey}" r="4.4" style="fill:var(--glow)" stroke="var(--screen)" stroke-width="1"/><path d="${pie(cx, ey, 3.1, -60)}" style="fill:var(--screen)"/>`;
+      else if (eyeT === 1) h += `<circle cx="${cx}" cy="${ey}" r="3.9" style="fill:var(--glow)" stroke="var(--screen)" stroke-width="1"/><circle cx="${cx + sd * -.4}" cy="${ey + .6}" r="2" style="fill:var(--screen)"/>`;
+      else if (eyeT === 2) h += `<path d="M${cx - 4},${ey} A4,4 0 0 0 ${cx + 4},${ey}Z" style="fill:var(--glow)" stroke="var(--screen)" stroke-width="1"/><path d="M${cx - 4.6},${ey - .4} H${cx + 4.6}" class="ln" style="stroke-width:1.6"/>`;
+      else h += `<circle cx="${cx}" cy="${ey}" r="5" style="fill:var(--glow)" stroke="var(--screen)" stroke-width="1"/><path d="${pie(cx, ey, 3.4, -150)}" style="fill:var(--screen)"/>`;
+    }
+    const my = 46 + hr * .6;
+    h += [`<path class="ln" d="M${50 - 5},${my} Q50,${my + 4.5} ${50 + 5},${my}"/>`, `<path class="ln" d="M${50 - 4},${my + 1} H${50 + 4}"/>`, `<ellipse cx="50" cy="${my + 1}" rx="2.2" ry="2.8" style="fill:var(--screen)"/>`][mouthT];
+    if (ac.includes('glasses')) h += `<circle cx="${50 - ex}" cy="${ey}" r="5.8" fill="none" stroke="var(--screen)" stroke-width="1.5"/><circle cx="${50 + ex}" cy="${ey}" r="5.8" fill="none" stroke="var(--screen)" stroke-width="1.5"/><path class="ln" d="M${50 - ex + 5.8},${ey} H${50 + ex - 5.8}"/>`;
+    if (ac.includes('visor')) h += `<path class="o" d="M${50 - hr},40 Q50,${36 - hr * .6} ${50 + hr},40 L${50 + hr + 6},43.5 L${50 - hr - 6},43.5Z" style="fill:var(--olive)"/>`;
+    if (ac.includes('headphones')) h += `<path d="M${50 - hr - 1},46 A${hr + 1},${hr + 3} 0 0 1 ${50 + hr + 1},46" fill="none" stroke="var(--screen)" stroke-width="3.4"/><circle class="o" cx="${50 - hr - 1}" cy="47" r="5.5" style="fill:var(--mustard)"/><circle class="o" cx="${50 + hr + 1}" cy="47" r="5.5" style="fill:var(--mustard)"/>`;
+    if (ac.includes('pencil')) h += `<path d="M${50 + hr - 3},40 L${50 + hr + 7},30" stroke="var(--screen)" stroke-width="5.2" stroke-linecap="round"/><path d="M${50 + hr - 3},40 L${50 + hr + 7},30" stroke="var(--mustard)" stroke-width="3" stroke-linecap="round"/><circle cx="${50 + hr - 4}" cy="41" r="1.6" style="fill:var(--alert)"/>`;
+    h += `</g>`;
+    svg += h;
+    if (beh === 'doze') svg += `<g class="zz" opacity="0"><text x="${50 + hr + 4}" y="30" font-size="11" style="fill:var(--screen);font-family:var(--font-type);font-weight:700">z</text><text x="${50 + hr + 11}" y="20" font-size="8" style="fill:var(--screen);font-family:var(--font-type);font-weight:700">z</text></g>`;
+    if (beh === 'read') svg += `<g class="pg"><path class="o" d="${rr(35, 51, 30, 22, 1)}" style="fill:var(--sheet)"/><path class="ln" opacity=".5" d="M39,57 H61 M39,62 H61 M39,67 H55"/></g>`;
+  } else {
+    svg += `<path class="o" d="${rr(32, 58, 36, 50, 8)}" style="fill:${mix('var(--concrete)', 80, 'var(--screen)')}"/>`;
+  }
+  // desk slab and front
+  svg += deskArt(6, 94, o.empty ? `<rect x="22" y="132" width="56" height="13" rx="1" style="fill:var(--sheet)" stroke="var(--screen)"/>${T(50, 142.5, 11.5, 'VACANT', 'var(--alert)')}` : '');
+  // typewriter / forms
+  if (o.editor) {
+    svg += `<g class="o2"><rect class="o" x="30" y="86" width="22" height="12" style="fill:var(--sheet)"/><rect class="o" x="32" y="82" width="22" height="12" style="fill:var(--sheet)"/><rect class="o" x="34" y="78" width="22" height="12" style="fill:var(--sheet)"/><g class="mark"><rect x="38" y="81" width="14" height="7" fill="none" stroke="var(--alert)" stroke-width="1.6" transform="rotate(-8 45 84)"/></g></g>`;
+  } else {
+    svg += `<g class="car"><rect class="o" x="42" y="64" width="16" height="20" style="fill:var(--sheet)"/><g class="ink" opacity=".5"><path class="ln" style="stroke-width:1" d="M45,69 H55 M45,73 H55 M45,77 H52"/></g></g>`
+      + `<rect class="o" x="36" y="81" width="28" height="5" rx="1" style="fill:var(--screen)"/><path class="o" d="${rr(33, 85, 34, 13, 3)}" style="fill:var(--concrete)"/><circle cx="36" cy="82.5" r="2.4" class="o" style="fill:var(--mustard)"/><circle cx="64" cy="82.5" r="2.4" class="o" style="fill:var(--mustard)"/><path class="ln" opacity=".6" d="M38,92 H62" stroke-dasharray="1.5 2.5"/>`;
+  }
+  // props
+  if (!o.noprops) {
+    let lp = PROPS[R(11) % 6], rp = PROPS[R(12) % 6]; if (rp === lp) rp = PROPS[(PROPS.indexOf(rp) + 2) % 6];
+    if (beh === 'sharpen') rp = 'sharpener'; if (beh === 'sip' && rp === 'mug') rp = 'flag'; if (o.editor) { lp = 'stack'; rp = 'pad'; }
+    svg += prop(lp, 19) + prop(rp, 81);
+  }
+  // arms (drawn last so the hands sit on the keys)
+  if (!o.empty) {
+    const ar = (side, pose) => {
+      const sx = side < 0 ? sx0 : sx1, cls = side < 0 ? 'al' : 'ar';
+      let dpath, hx, hy;
+      if (pose === 'up') { hx = 50 + side * 12; hy = 66; dpath = `M${sx},74 Q${sx + side * 9},64 ${hx},${hy}`; }
+      else if (pose === 'stamp') { hx = 78; hy = 93; dpath = `M${sx},74 Q${sx + 12},84 ${hx},${hy}`; }
+      else { hx = 50 + side * 9; hy = 91; dpath = `M${sx},74 Q${sx + side * 9},88 ${hx},${hy}`; }
+      let extra = '';
+      if (pose === 'mug') extra = `<rect class="o" x="${hx - 4}" y="${hy - 11}" width="10" height="10" rx="1.5" style="fill:var(--glow)"/><path class="ln" d="M${hx + 6},${hy - 9} q5,0 0,5"/>`;
+      if (pose === 'stamp') extra = `<rect class="o" x="${hx - 3}" y="${hy - 13}" width="6" height="9" rx="1" style="fill:var(--walnut)"/><rect class="o" x="${hx - 6}" y="${hy - 5}" width="12" height="4" style="fill:var(--mustard)"/>`;
+      return `<g class="${cls}" style="transform-origin:${sx}px 74px"><path class="ao" d="${dpath}"/><path class="ai" d="${dpath}" style="stroke:${sleeve}"/><circle class="o" cx="${hx}" cy="${hy}" r="4.2" style="fill:${fv}"/>${extra}</g>`;
+    };
+    if (o.editor) svg += ar(-1, 'keys') + ar(1, 'stamp');
+    else if (beh === 'read') svg += ar(-1, 'up') + ar(1, 'up');
+    else if (beh === 'sip') svg += ar(-1, 'keys') + ar(1, 'mug');
+    else svg += ar(-1, 'keys') + ar(1, 'keys');
+  }
+  let inner = svg;
+  const H = 150;
+  let extra = '';
+  if (w > 100) {
+    inner = `<svg x="${(w - 100) / 2}" y="0" width="100" height="150" viewBox="0 0 100 150" overflow="visible">${svg}</svg>`;
+    extra = deskArt(6, (w - 100) / 2 + 6) + deskArt((w - 100) / 2 + 94, w - 6);
+    if (o.clerk) {
+      const bx = w - 46;
+      extra += `<g transform="translate(${bx},98)"><path class="o" d="M-12,0 H12 V-3 H-12Z" style="fill:var(--mustard)"/><g class="bell"><path class="o" d="M-9,-3 A9,9 0 0 1 9,-3Z" style="fill:var(--mustard)"/><rect x="-1.5" y="-14" width="3" height="4" class="o" style="fill:var(--screen)"/></g></g>`
+        + prop('stack', 36) + `<g transform="translate(${w / 2},98)"><path class="o" d="M-22,0 L-20,-6 L0,-4 L20,-6 L22,0Z" style="fill:var(--sheet)"/><path class="ln" opacity=".5" d="M-16,-3 H-3 M4,-3 H17"/></g>`
+        + `<rect x="${w / 2 - 34}" y="124" width="68" height="18" rx="1.5" style="fill:var(--mustard)" stroke="var(--screen)" stroke-width="1.3"/>${T(w / 2, 137.5, 14, 'INTAKE')}`;
+    }
+  }
+  const sc = o.scale || 1;
+  const left = o.x - (w * sc) / 2, top = o.bottom - H * sc;
+  return `<svg class="ws b-${o.editor ? 'stamp' : beh}" viewBox="0 0 ${w} ${H}" style="left:${left}px;top:${top}px;width:${w * sc}px;height:${H * sc}px;--d:-${d}s;--t:${t}" aria-hidden="true">${inner}${extra}</svg>`;
+}
+
+/* ---------- rooms: art per layer ---------- */
+const doors = {
+  // [layer-agnostic] door positions: x of the 60px opening
+  left: 56, right: 296,
+};
+function doorArt(side, label) {
+  const x = doors[side], y = 184, w = 60, h = 176;
+  const lw2 = Math.round(34 + label.length * 6.3), lx = side === 'left' ? x - 12 : x + w - lw2 + 12;
+  let s = S(ch(x - 5, y - 5, w + 10, h + 5, 4), 'var(--walnut)', 4);
+  s += `<path d="${rr(x, y, w, h)}" style="fill:${mix('var(--screen)', 78, 'var(--walnut)')}"/>`;
+  s += `<path d="M${x},${y + 90} L${x + w},${y + 60} V${y + h} H${x}Z" style="fill:var(--glow)" opacity=".28"/>`;
+  s += S(side === 'left' ? `M${x},${y} L${x + 20},${y + 10} V${y + h - 6} L${x},${y + h}Z` : `M${x + w},${y} L${x + w - 20},${y + 10} V${y + h - 6} L${x + w},${y + h}Z`, mix('var(--walnut)', 70, 'var(--glow)'), 2);
+  const px = lx, py = y - 30;
+  s += S(rr(px, py, lw2, 24, 2), 'var(--mustard)', 3);
+  const arrow = side === 'left' ? `<path d="M${px + 9},${py + 12} l7,-6 v12z" style="fill:var(--screen)"/>` : `<path d="M${px + lw2 - 9},${py + 12} l-7,-6 v12z" style="fill:var(--screen)"/>`;
+  s += arrow + T(px + lw2 / 2 + (side === 'left' ? 7 : -7), py + 18, 13, label);
+  return s;
+}
+function bowl(x) {
+  return `<circle cx="${x}" cy="82" r="38" style="fill:var(--glow)" opacity=".28"/>`
+    + `<path d="M${x},58 V66" stroke="var(--screen)" stroke-width="3"/>`
+    + `<path d="M${x - 24},66 H${x + 24} A24,24 0 0 1 ${x - 24},66Z" style="fill:var(--glow)" stroke="var(--screen)" stroke-width="1.5" filter="url(#cut)"/>`
+    + `<path d="M${x - 20},90 L${x + 20},90 L${x + 96},352 L${x - 96},352Z" style="fill:var(--glow)" opacity=".17"/>`;
+}
+function windowArt(x, y, w, h, tint) {
+  // Breuer-style deep trapezoid reveal: frame, two reveal faces, then the view
+  const d = 14;
+  let s = S(ch(x, y, w, h, 5), 'var(--concrete)', 4);
+  s += `<path d="M${x + 6},${y + 6} L${x + w - 6},${y + 6} L${x + w - 6 - d},${y + 6 + d} L${x + 6 + d},${y + 6 + d}Z" style="fill:${mix('var(--concrete)', 70, 'var(--screen)')}"/>`;
+  s += `<path d="M${x + 6},${y + 6} L${x + 6 + d},${y + 6 + d} L${x + 6 + d},${y + h - 6 - d} L${x + 6},${y + h - 6}Z" style="fill:${mix('var(--concrete)', 82, 'var(--screen)')}"/>`;
+  s += `<path d="M${x + 6 + d},${y + 6 + d} L${x + w - 6 - d},${y + 6 + d} V${y + h - 6 - d} H${x + 6 + d}Z" style="fill:${mix('var(--glow)', 55, 'var(--paper-shade)')}"/>`;
+  const vx = x + 6 + d, vy = y + 6 + d, vw = w - 12 - 2 * d, vh = h - 12 - 2 * d;
+  s += `<path d="M${vx},${vy + vh} V${vy + vh * .55} h${vw * .22} v${-vh * .12} h${vw * .2} v${vh * .2} h${vw * .18} v${-vh * .3} h${vw * .2} v${vh * .6}Z" style="fill:${mix(tint, 35, 'var(--concrete)')}" opacity=".7"/>`;
+  s += `<path d="M${vx + vw / 2},${vy} V${vy + vh}" stroke="var(--concrete)" stroke-width="3"/>`;
+  s += `<path d="M${x - 4},${y + h} H${x + w + 4} v6 H${x - 4}Z" style="fill:var(--walnut)" stroke="var(--screen)" stroke-opacity=".5"/>`;
+  return s;
+}
+function layerWrap(L, inner, extra = '') {
+  return `<div class="lyr l${L}" style="--k:${K[L]}"><svg class="st" width="${lw(L)}" height="${SH}" viewBox="0 0 ${lw(L)} ${SH}" aria-hidden="true">${inner}</svg>${extra}</div>`;
+}
+const hotsig = [];
+
+function buildBack() {
+  const W = lw(0);
+  let s = `<rect x="-300" y="-700" width="${W + 600}" height="1060" style="fill:var(--paper-shade)"/>`;
+  s += `<rect x="-300" y="352" width="${W + 600}" height="600" style="fill:${mix('var(--walnut)', 16, 'var(--paper-shade)')}"/>`;
+  for (const yy of [400, 458, 530, 625, 740]) s += `<path d="M-300,${yy} H${W + 300}" stroke="var(--screen)" stroke-opacity=".08" stroke-width="2"/>`;
+  s += `<rect x="-300" y="350" width="${W + 600}" height="12" style="fill:var(--walnut)" stroke="var(--screen)" stroke-opacity=".5"/>`;
+  let extra = '';
+  ROOMS.forEach((r, i) => { s += S(rr(ox(0, i) + 78, 70, 234, 280), mix(`var(${r.tint})`, 22, 'var(--paper-shade)'), 3); });
+  s += S(`M-300,-700 H${W + 300} V58 H-300Z`, mix('var(--concrete)', 100, 'var(--screen)'), 6, 0);
+  s += `<rect x="-300" y="40" width="${W + 600}" height="10" style="fill:var(--glow)" stroke="var(--screen)" stroke-opacity=".6"/>`;
+  ROOMS.forEach((r, i) => {
+    const o = ox(0, i);
+    s += `<g transform="translate(${o},0)">`;
+    s += bowl(120) + bowl(270);
+    if (i === 0) {
+      s += windowArt(84, 160, 112, 170, '--mustard');
+      s += S(rr(212, 170, 62, 116, 3), 'var(--walnut)', 3) + `<rect x="218" y="176" width="50" height="104" style="fill:${mix('var(--mustard)', 30, 'var(--sheet)')}"/>`;
+      [[222, 182], [246, 186], [224, 222], [248, 232], [230, 256]].forEach(([a, b], n) => { s += `<rect x="${a}" y="${b}" width="${n % 2 ? 18 : 22}" height="${n % 2 ? 26 : 20}" style="fill:var(--sheet)" stroke="var(--screen)" stroke-opacity=".6"/><circle cx="${a + 8}" cy="${b + 3}" r="1.8" style="fill:var(--alert)"/>`; });
+    }
+    if (i === 1) {
+      s += `<g id="o-pool">` + S(ch(138, 182, 114, 116, 6), 'var(--walnut)', 4) + `<rect x="145" y="189" width="100" height="102" style="fill:${mix('var(--screen)', 90, 'var(--walnut)')}"/></g>`;
+    }
+    if (i === 2) {
+      s += windowArt(96, 150, 150, 184, '--olive');
+      s += S(rr(262, 168, 40, 100, 2), 'var(--concrete)', 3);
+      for (let a = 0; a < 3; a++) for (let b = 0; b < 4; b++) s += `<rect x="${267 + a * 11}" y="${174 + b * 22}" width="9" height="18" style="fill:${mix('var(--screen)', 70, 'var(--concrete)')}"/><rect x="${268 + a * 11}" y="${175 + b * 22}" width="7" height="${(a + b) % 2 ? 12 : 6}" style="fill:var(--sheet)"/>`;
+    }
+    if (i === 3) {
+      s += `<g id="o-director">` + S(ch(122, 150, 146, 210, 6), 'var(--walnut)', 4) + `<rect x="132" y="160" width="126" height="192" style="fill:${mix('var(--glow)', 45, 'var(--paper-shade)')}"/>`
+        + `<circle cx="195" cy="226" r="19" style="fill:var(--screen)" opacity=".42"/><path d="M160,352 Q160,262 195,258 Q230,262 230,352Z" style="fill:var(--screen)" opacity=".42"/>`
+        + `<path d="M132,200 L258,172" stroke="var(--glow)" stroke-opacity=".5" stroke-width="10"/><path d="M132,262 L258,236" stroke="var(--glow)" stroke-opacity=".4" stroke-width="6"/>`
+        + `<circle cx="248" cy="272" r="5" style="fill:var(--mustard)" stroke="var(--screen)"/>` + `</g>`
+        + S(rr(276, 186, 78, 24, 2), 'var(--screen)', 3) + T(315, 204, 14, 'IN SESSION', 'var(--screen-ink)') + `<circle cx="286" cy="198" r="0"/>`;
+      extra += `<div class="halo" style="left:${o + 178}px;top:112px;width:34px;height:34px;display:none" data-room="director"></div>`;
+    }
+    s += `</g>`;
+  });
+  // Pool gauges (own little svg so the needles don't repaint the wall)
+  const o1 = ox(0, 1);
+  const gaug = `<svg class="gaugesv" viewBox="0 0 130 118" style="left:${o1 + 145}px;top:190px;width:100px;height:91px" aria-hidden="true">`
+    + [[35, 'TYPING', 'needle', 'var(--screen)'], [95, 'EDITING', 'needle b', 'var(--alert)']].map(([cx, nm, cls, nc]) => `<circle cx="${cx}" cy="46" r="28" style="fill:var(--glow)" stroke="var(--screen)" stroke-width="2"/>`
+      + `<path d="M${cx - 21},46 A21,21 0 0 1 ${cx + 21},46" fill="none" stroke="var(--screen)" stroke-width="1.5" stroke-dasharray="1.5 4.2"/>`
+      + (nm === 'EDITING' ? `<path d="M${cx + 8},28 A21,21 0 0 1 ${cx + 21},46" fill="none" stroke="var(--alert)" stroke-width="5"/>` : '')
+      + `<g class="${cls}" style="transform-origin:${cx}px 46px"><path d="M${cx},46 L${cx + 1},22" stroke="${nc}" stroke-width="2.4" stroke-linecap="round"/></g><circle cx="${cx}" cy="46" r="3.4" style="fill:var(--screen)"/>`
+      + `<rect x="${cx - 27}" y="78" width="54" height="16" rx="2" style="fill:var(--mustard)" stroke="var(--screen)"/>` + T(cx, 90.5, 13, nm)).join('')
+    + [0, 1, 2, 3, 4].map(n => `<circle cx="${22 + n * 21.5}" cy="108" r="4.2" style="fill:${n < 3 ? 'var(--glow)' : 'var(--concrete)'}" stroke="var(--screen)" stroke-width="1.3"/>`).join('') + `</svg>`;
+  extra += gaug;
+  extra += HOT(o1 + 130, 176, 130, 130, 'focal', 'data-enter="pool" data-lift="pool" id="hot-pool"', 'Typing Pool: open the gauge board');
+  extra += HOT(ox(0, 3) + 120, 150, 150, 210, 'focal', 'data-enter="director" data-lift="director" id="hot-director"', "Director's Office: open the door");
+  return layerWrap(0, s, extra);
+}
+
+function buildRowB() {
+  const W = lw(1);
+  let s = '', extra = '';
+  { const q = ox(1, 1);
+  // pneumatic tube from the editor's desk to the ceiling
+  s += `<g transform="translate(${q + 294},0)"><rect x="-6" y="52" width="12" height="396" style="fill:var(--glow)" opacity=".5" stroke="var(--screen)" stroke-width="1.5"/><path d="M-3,56 V444" stroke="var(--sheet)" stroke-width="2" opacity=".7"/>` + S(rr(-12, 44, 24, 12, 2), 'var(--concrete)', 2, 0) + S(rr(-12, 444, 24, 10, 2), 'var(--concrete)', 2, 0) + `</g>`;
+  extra += `<div class="cap" style="left:${q + 290}px;top:418px"></div>`;
+  }
+  const dn = n => n.toUpperCase().replace("DIRECTOR'S OFFICE", 'DIRECTOR');
+  ROOMS.forEach((r, i) => {
+    const o = ox(1, i);
+    s += `<g transform="translate(${o},0)">`;
+    if (i > 0) s += doorArt('left', dn(ROOMS[i - 1].name));
+    if (i < 3) s += doorArt('right', dn(ROOMS[i + 1].name));
+    s += `</g>`;
+    if (i > 0) extra += HOT(o + doors.left - 12, 150, 84, 210, 'door dl', `data-enter="${ROOMS[i - 1].id}" id="door-${ROOMS[i - 1].id}-from-${r.id}"`, `Go to ${ROOMS[i - 1].name}`);
+    if (i < 3) extra += HOT(o + doors.right - 12, 150, 84, 210, 'door dr', `data-enter="${ROOMS[i + 1].id}" id="door-${ROOMS[i + 1].id}-from-${r.id}"`, `Go to ${ROOMS[i + 1].name}`);
+  });
+  // Pool back row
+  const o1 = ox(1, 1), bot = 392, sc = .72;
+  [44, 116, 188, 260].forEach((x, n) => { extra += ws(n, { x: o1 + x, bottom: bot, scale: sc }); });
+  // Personnel: a vacant desk and the steel cabinets
+  const o0 = ox(1, 0);
+  extra += ws(10, { x: o0 + 92, bottom: bot, scale: sc, empty: true, noprops: true });
+  [[196, 0], [246, 1]].forEach(([x, n]) => {
+    s += `<g transform="translate(${o0 + x},0)">` + S(rr(0, 300, 46, 108, 2), 'var(--concrete)', 3, 0) + [0, 1, 2].map(k => `<rect x="4" y="${306 + k * 33}" width="38" height="28" style="fill:${mix('var(--concrete)', 80, 'var(--paper)')}" stroke="var(--screen)" stroke-opacity=".6"/><rect x="14" y="${312 + k * 33}" width="18" height="6" style="fill:var(--mustard)" stroke="var(--screen)" stroke-width=".8"/>`).join('') + `</g>`;
+  });
+  // Departments: a reader at the back
+  const o2 = ox(1, 2);
+  extra += ws(9, { x: o2 + 196, bottom: bot, scale: sc, beh: 'read', cloth: 'var(--olive)' });
+  // Director: bookshelf
+  const o3 = ox(1, 3);
+  s += `<g transform="translate(${o3 + 300},0)">` + S(rr(0, 224, 76, 168 - 0, 2), 'var(--walnut)', 3, 0);
+  for (let r = 0; r < 4; r++) {
+    s += `<rect x="4" y="${244 + r * 40}" width="68" height="34" style="fill:${mix('var(--screen)', 40, 'var(--walnut)')}"/>`;
+    let bx = 6; ['--olive', '--mustard', '--alert', '--concrete', '--tangerine', '--olive', '--mustard'].forEach((c, n) => { const bw = 6 + ((n * 5 + r * 3) % 5); s += `<rect x="${bx}" y="${250 + r * 40 + (n + r) % 3 * 2}" width="${bw}" height="${28 - (n + r) % 3 * 2}" style="fill:var(${c})" stroke="var(--screen)" stroke-opacity=".6" stroke-width=".8"/>`; bx += bw + 1; });
+  }
+  s += `</g>`;
+  return layerWrap(1, s, extra);
+}
+
+function signSvg(text, cx, delay) {
+  const w = Math.round(30 + text.length * 11.4), top = 44, bh = 38;
+  return `<svg class="sign" viewBox="0 0 ${w} ${56 + bh + 6}" style="left:${cx - w / 2}px;top:${top}px;width:${w}px;height:${56 + bh + 6}px;animation-delay:-${delay}s" aria-hidden="true">`
+    + `<path d="M${w * .2},0 V56 M${w * .8},0 V56" stroke="var(--screen)" stroke-width="2.4"/>`
+    + S(rr(0, 56, w, bh, 3), 'var(--mustard)', 4, 0)
+    + `<circle cx="9" cy="65" r="2.6" style="fill:var(--concrete)" stroke="var(--screen)"/><circle cx="${w - 9}" cy="65" r="2.6" style="fill:var(--concrete)" stroke="var(--screen)"/>`
+    + T(w / 2, 56 + 27, 23, text) + `</svg>`;
+}
+
+function buildMid() {
+  let s = '', extra = '';
+  const o = i => ox(2, i);
+  // runner floor under each room
+  ROOMS.forEach((r, i) => { s += S(rr(o(i) + 26, 556, 338, 62, 2), mix('var(--concrete)', 30, 'var(--paper-shade)'), 3) + `<path d="M${o(i) + 34},564 H${o(i) + 356} M${o(i) + 34},610 H${o(i) + 356}" stroke="var(--mustard)" stroke-width="3" stroke-dasharray="14 8"/>` + T(o(i) + 195, 593, 15, `FLOOR 1 \u00b7 ${r.name.toUpperCase()}`, 'var(--ink-muted)'); });
+  // ---- Personnel
+  const p = o(0);
+  extra += signSvg('PERSONNEL', p + 195, 0);
+  s += `<g transform="translate(${p + 40},0)"><path d="M0,330 V560" stroke="var(--walnut)" stroke-width="7"/>` + S(rr(-18, 556, 36, 8, 2), 'var(--walnut)', 2, 0)
+    + `<path d="M0,340 l-16,-8 M0,340 l16,-8 M0,372 l-16,-8 M0,372 l16,-8" stroke="var(--walnut)" stroke-width="4" stroke-linecap="round"/>`
+    + S('M-6,372 Q-18,420 -10,470 L14,470 Q22,420 8,372Z', 'var(--olive)', 3) + `</g>`;
+  s += `<g id="o-personnel"></g>`;
+  extra += ws(8, { x: p + 205, bottom: 548, w: 240, clerk: true, beh: 'read', cloth: 'var(--olive)', noprops: true });
+  extra += HOT(p + 100, 434, 210, 120, 'focal', 'data-enter="personnel" data-lift="personnel" id="hot-personnel"', 'Personnel: open the front desk');
+  // ---- Typing pool
+  const q = o(1);
+  extra += signSvg('TYPING POOL', q + 195, 2.3);
+  [58, 146, 234].forEach((x, n) => { extra += ws(4 + n, { x: q + x, bottom: 548 }); });
+  extra += ws(7, { x: q + 330, bottom: 548, w: 108, editor: true, cloth: 'var(--glow)', beh: 'stamp' });
+  // ---- Departments
+  const d = o(2);
+  extra += signSvg('DEPARTMENTS', d + 195, 4.1);
+  s += `<g id="o-departments">`;
+  [['RECRUITING', 38], ['CONSTRUCTION', 150], ['EDITING', 262]].forEach(([nm, x]) => {
+    s += `<g transform="translate(${d + x},0)">` + S(rr(0, 390, 92, 176, 3), mix('var(--concrete)', 78, 'var(--paper)'), 4, 1);
+    for (let k = 0; k < 4; k++) s += `<rect x="6" y="${398 + k * 42}" width="80" height="36" style="fill:${mix('var(--concrete)', 90, 'var(--paper)')}" stroke="var(--screen)" stroke-opacity=".7"/><rect x="${k ? 26 : 8}" y="${406 + k * 42}" width="${k ? 40 : 76}" height="${k ? 8 : 15}" rx="1" style="fill:var(--mustard)" stroke="var(--screen)" stroke-width="1"/><path d="M34,${424 + k * 42} h24" stroke="var(--screen)" stroke-width="3" stroke-linecap="round"/>`;
+    s += `<text x="46" y="418.5" font-size="11.5" text-anchor="middle" style="fill:var(--screen);letter-spacing:.02em">${nm}</text></g>`;
+  });
+  s += `</g>`;
+  extra += HOT(d + 30, 380, 330, 190, 'focal', 'data-enter="departments" data-lift="departments" id="hot-departments"', 'Departments: open the filing cabinets');
+  // ---- Director
+  const r3 = o(3);
+  extra += signSvg("DIRECTOR'S OFFICE", r3 + 195, 6);
+  s += S(rr(r3 + 70, 560, 250, 80, 2), mix('var(--alert)', 40, 'var(--paper-shade)'), 3);
+  s += `<g transform="translate(${r3 + 90},0)">` + S(rr(0, 454, 210, 98, 3), 'var(--walnut)', 4)
+    + `<rect x="8" y="478" width="194" height="12" style="fill:${mix('var(--walnut)', 70, 'var(--glow)')}"/>`
+    + S(rr(60, 452, 56, 22, 2), 'var(--paper)', 2, 0) + `<rect x="66" y="458" width="44" height="3" style="fill:var(--ink-muted)"/>`
+    + S(rr(14, 458, 34, 16, 2), 'var(--concrete)', 2, 0) + S(rr(130, 440, 60, 34, 3), mix('var(--mustard)', 60, 'var(--screen)'), 3)
+    + `<path d="M134,452 h52 M134,458 h52" stroke="var(--screen)" stroke-width="3" stroke-dasharray="6 6"/><rect x="152" y="424" width="16" height="22" rx="2" style="fill:var(--screen)" stroke="var(--glow)" stroke-width="1.5"/>`
+    + `</g>`;
+  return layerWrap(2, s, extra);
+}
+
+function buildFore() {
+  const W = lw(3);
+  let s = S(rr(-400, 708, W + 800, 200), 'var(--walnut)', -5, 0);
+  s += `<rect x="-400" y="708" width="${W + 800}" height="7" style="fill:${mix('var(--walnut)', 62, 'var(--glow)')}"/>`;
+  for (let x = -300; x < W + 300; x += 210) s += `<path d="M${x},740 q40,-5 90,0 t110,0 M${x + 40},764 q50,5 100,0 t60,0" fill="none" stroke="var(--screen)" stroke-opacity=".16" stroke-width="2"/>`;
+  ROOMS.forEach((r, i) => {
+    const o = ox(3, i);
+    s += `<g transform="translate(${o},0)">`;
+    // mushroom columns framing the stage
+    s += S(`M-2,-700 H22 V708 H-2Z`, mix('var(--concrete)', 100, 'var(--paper-shade)'), 5, 1);
+    s += S(`M-30,-20 H44 L22,92 H-2Z`, mix('var(--concrete)', 100, 'var(--paper-shade)'), 6, 1) + `<rect x="-2" y="94" width="6" height="610" style="fill:var(--glow)" opacity=".13"/>`;
+    s += S(`M368,-700 H392 V708 H368Z`, mix('var(--concrete)', 100, 'var(--paper-shade)'), 5, 1);
+    s += S(`M346,-20 H420 L392,92 H368Z`.replace('392,92', '390,92'), mix('var(--concrete)', 100, 'var(--paper-shade)'), 6, 1) + `<rect x="368" y="94" width="6" height="610" style="fill:var(--glow)" opacity=".13"/>`;
+    // a potted plant on the near side
+    const px = [336, 52, 336, 52][i];
+    s += S(`M${px - 22},706 L${px - 17},668 H${px + 17} L${px + 22},706Z`, mix('var(--walnut)', 70, 'var(--glow)'), 3);
+    [[-30, 70, '--olive'], [-6, 96, '--olive'], [22, 66, '--olive']].forEach(([a, l, c], n) => { s += S(`M${px},670 Q${px + a - 18},${670 - l * .6} ${px + a},${670 - l} Q${px + a + 18},${670 - l * .5} ${px},670Z`, `var(${c})`, 3); });
+    s += `</g>`;
+  });
+  return layerWrap(3, s, '');
+}
+
+function build() {
+  document.getElementById('world').innerHTML = buildBack() + buildRowB() + buildMid() + buildFore();
+}
+
+/* ---------- the sheet interiors (mock) ---------- */
+const bar = (v, max, cls = '', txt) => `<div class="bar ${cls}" role="progressbar" aria-valuemin="0" aria-valuemax="${max}" aria-valuenow="${v}" aria-valuetext="${txt}"><i style="width:${v / max * 100}%"></i></div>`;
+const SHEETS = {
+  personnel: () => `
+    <div class="row"><span class="l">Seated</span><span class="v">8 / 10 desks</span></div>
+    ${bar(8, 10, '', '8 of 10 desks seated')}
+    <p class="note">Two desks vacant. A hire is seated at the first vacant desk.</p>
+    <button class="hire" type="button">Hire monkey</button>
+    <p class="ba">40 bananas &middot; 3.4/s &rarr; 3.7/s</p>
+    <button class="tab" type="button">Buy desk <span>120 bananas &middot; 10 &rarr; 11 desks</span></button>`,
+  pool: () => `
+    <div class="row"><span class="l">Typing</span><span class="v">62%</span></div>${bar(62, 100, 'w', 'Typing: 62% of demand')}
+    <div class="row"><span class="l">Editing</span><span class="v">38%</span></div>${bar(38, 100, '', 'Editing: 38% of demand')}
+    <p class="note">Bottleneck: editing capacity. Submissions in excess are discarded.</p>
+    <button class="tab" type="button">Move one monkey to editing <span>3.4/s &rarr; 3.1/s</span></button>`,
+  departments: () => `
+    <div class="row"><span class="l">Recruiting</span><span class="v">3 staff</span></div>${bar(3, 6, '', 'Recruiting: 3 of 6 desks')}
+    <div class="row"><span class="l">Construction</span><span class="v">2 staff</span></div>${bar(2, 6, '', 'Construction: 2 of 6 desks')}
+    <div class="row"><span class="l">Editing</span><span class="v">1 staff</span></div>${bar(1, 6, 'w', 'Editing: 1 of 6 desks')}
+    <button class="tab" type="button">Fund balanced <span>200 bananas</span></button>`,
+  director: () => `
+    <div class="row"><span class="l">Readiness</span><span class="v">41%</span></div>${bar(41, 100, 'w', 'Readiness: 41%')}
+    <div class="row"><span class="l">Infinity Permit</span><span class="stamp">Not issued</span></div>
+    <button class="tab" type="button" disabled>Declare infinity <span>Locked</span></button>
+    <p class="note">Locked until the Permit is stamped. Form 9-X.</p>`,
+};
+
+/* ---------- navigation ---------- */
+const world = document.getElementById('world'), stage = document.getElementById('stage');
+const rig = document.getElementById('rig'), card = document.getElementById('card'), dim = document.getElementById('dim');
+const dirEl = document.getElementById('dir'), dirBtn = document.getElementById('dirBtn'), placard = document.getElementById('placard');
+let cam = 1, drag = null, swallow = false, sheetRoom = null, lastTrigger = null;
+const setCam = v => world.style.setProperty('--cam', v);
+const label = () => { const r = ROOMS[cam]; placard.innerHTML = `<small>Room ${cam + 1} of 4</small>${r.name}`; dirEl.querySelectorAll('button').forEach((b, i) => b.setAttribute('aria-current', i === cam ? 'true' : 'false')); };
+function travel(i) {
+  i = Math.max(0, Math.min(3, i));
+  if (i !== cam) {
+    cam = i;
+    if (reduced.matches) { world.classList.remove('swap'); void world.offsetWidth; world.classList.add('swap'); }
+  }
+  world.classList.remove('drag'); setCam(cam); label();
+}
+function openSheet(id, trigger) {
+  const r = ROOMS.find(x => x.id === id); sheetRoom = id; lastTrigger = trigger || null;
+  card.innerHTML = `<i class="clip"></i><header><div><div class="eyebrow">${r.form} &middot; Room ${ROOMS.indexOf(r) + 1}</div><h2 id="sheetT">${r.name}</h2></div><button class="x" type="button" aria-label="Close sheet" id="close">&times;</button></header>${SHEETS[id]()}`;
+  rig.setAttribute('aria-hidden', 'false'); rig.classList.add('open'); dim.classList.add('on'); world.inert = true;
+  card.querySelector('#close').addEventListener('click', closeSheet);
+  setTimeout(() => card.querySelector('#close').focus({ preventScroll: true }), 400);
+}
+function closeSheet() {
+  if (!sheetRoom) return;
+  sheetRoom = null; rig.classList.remove('open'); dim.classList.remove('on'); world.inert = false; rig.setAttribute('aria-hidden', 'true');
+  if (lastTrigger && document.contains(lastTrigger)) lastTrigger.focus({ preventScroll: true });
+}
+// "enter" = go to the room (dolly) and then lower its sheet; same room = just the sheet
+function enter(id, trigger) {
+  const i = ROOMS.findIndex(r => r.id === id);
+  closeSheet(); dirClose();
+  if (i === cam) { openSheet(id, trigger); return; }
+  travel(i);
+  setTimeout(() => openSheet(id, trigger), reduced.matches ? 350 : 760);
+}
+document.addEventListener('click', e => {
+  if (swallow) { swallow = false; e.stopPropagation(); e.preventDefault(); return; }
+  const b = e.target.closest('[data-enter]'); if (b) enter(b.dataset.enter, b);
+}, true);
+// swipe / drag the dolly
+stage.addEventListener('pointerdown', e => { if (sheetRoom || e.target.closest('.foot,.dir,.ernest')) return; drag = { x: e.clientX, t: performance.now(), moved: false, c0: cam, id: e.pointerId }; });
+stage.addEventListener('pointermove', e => {
+  if (!drag) return; const dx = e.clientX - drag.x;
+  if (!drag.moved && Math.abs(dx) > 10) { drag.moved = true; if (!reduced.matches) world.classList.add('drag'); try { stage.setPointerCapture(drag.id); } catch (_) {} }
+  if (drag.moved && !reduced.matches) setCam(Math.max(-.15, Math.min(3.15, drag.c0 - dx / SW)));
+});
+const endDrag = e => {
+  if (!drag) return; const dx = e.clientX - drag.x, v = dx / Math.max(1, performance.now() - drag.t);
+  const moved = drag.moved; drag = null;
+  if (moved) { swallow = true; setTimeout(() => swallow = false, 60); const dir = (Math.abs(dx) > 60 || Math.abs(v) > .4) ? (dx < 0 ? 1 : -1) : 0; travel(cam + dir); }
+};
+stage.addEventListener('pointerup', endDrag); stage.addEventListener('pointercancel', endDrag);
+stage.addEventListener('keydown', e => { if (sheetRoom) return; if (e.key === 'ArrowRight') travel(cam + 1); if (e.key === 'ArrowLeft') travel(cam - 1); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeSheet(); dirClose(); } });
+dim.addEventListener('click', closeSheet);
+
+// directory (the one non-spatial control)
+dirEl.insertAdjacentHTML('beforeend', ROOMS.map((r, i) => `<button type="button" data-enter="${r.id}"><span class="n">0${i + 1}</span>${r.name}<span class="here">Here</span></button>`).join(''));
+function dirClose() { dirEl.classList.remove('open'); dirBtn.setAttribute('aria-expanded', 'false'); }
+dirBtn.addEventListener('click', () => { const o = !dirEl.classList.contains('open'); dirEl.classList.toggle('open', o); dirBtn.setAttribute('aria-expanded', String(o)); });
+stage.addEventListener('pointerdown', e => { if (!e.target.closest('.dir,#dirBtn')) dirClose(); });
+
+// Ernest
+const ern = document.getElementById('ernest');
+setTimeout(() => { ern.classList.add('show'); requestAnimationFrame(() => requestAnimationFrame(() => ern.classList.add('in'))); }, 350);
+document.getElementById('understood').addEventListener('click', () => {
+  ern.classList.remove('in'); ern.classList.add('out'); setTimeout(() => ern.classList.remove('show'), reduced.matches ? 350 : 600);
+});
+
+// the bananas tick at 1 Hz (text only)
+let bn = 12480; const bnEl = document.getElementById('bn');
+setInterval(() => { bn += 3; bnEl.textContent = bn.toLocaleString('en-US'); }, 1000);
+
+build(); label();
+})();
+</script>
+</body>
+</html>

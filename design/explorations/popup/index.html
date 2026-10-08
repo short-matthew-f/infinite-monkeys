@@ -1,0 +1,820 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#6B4423" />
+<title>Pop-up Floor Plan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=Courier+Prime&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600&display=swap" rel="stylesheet" />
+<style>
+/* ---------- tokens (copied from game/style.css, plus derived paper tokens) ---------- */
+:root {
+  --paper: #f2e8d5; --paper-shade: #e4d6bc; --ink: #2b2622; --ink-muted: #6b6157;
+  --walnut: #6b4423; --concrete: #8a8780; --mustard: #c9a227; --tangerine: #d9732b;
+  --olive: #6e7046; --alert: #b23a2e; --phosphor-amber: #b87400; --phosphor-green: #3f7d4e;
+  --glow: #ffe9b0; --screen: #14110d; --screen-ink: #ffb000; --screen-muted: #a89c8a;
+  --font-display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+  --font-body: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --font-type: 'Courier Prime', 'Courier New', monospace;
+  /* derived for this exploration */
+  --edge: #fffaf0;          /* the white of cut paper */
+  --on-walnut: #f2e8d5;
+  --floor: var(--paper-shade);
+  --sheet: var(--paper);
+  --head: var(--walnut);
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --paper: #1f1b17; --paper-shade: #2a241e; --ink: #ede3cf; --ink-muted: #a89c8a;
+    --walnut: #8a5a33; --concrete: #5e5b55; --mustard: #d9b23a; --tangerine: #e8843a;
+    --olive: #8c8f5a; --alert: #d2554a; --phosphor-amber: #ffb000; --phosphor-green: #7cd992;
+    --glow: #ffd27a; --edge: #cfc3ad; --on-walnut: #f2e8d5; --sheet: #302920; --head: #d9b23a;
+  }
+}
+:root[data-theme='dark'] {
+  --paper: #1f1b17; --paper-shade: #2a241e; --ink: #ede3cf; --ink-muted: #a89c8a;
+  --walnut: #8a5a33; --concrete: #5e5b55; --mustard: #d9b23a; --tangerine: #e8843a;
+  --olive: #8c8f5a; --alert: #d2554a; --phosphor-amber: #ffb000; --phosphor-green: #7cd992;
+  --glow: #ffd27a; --edge: #cfc3ad; --on-walnut: #f2e8d5; --sheet: #302920; --head: #d9b23a;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; margin: 0; overflow: hidden; }
+body {
+  background: color-mix(in srgb, var(--walnut) 38%, var(--paper));
+  color: var(--ink);
+  font: 16px/1.45 var(--font-body);
+  overscroll-behavior: none;
+  position: relative;
+}
+button { font: inherit; color: inherit; }
+button:focus-visible { outline: 3px solid var(--mustard); outline-offset: 2px; }
+h1, h2, h3 { font-family: var(--font-display); text-transform: uppercase; letter-spacing: .04em; margin: 0; font-weight: 700; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* ---------- stage, camera, world ---------- */
+.stage { position: absolute; inset: 0; overflow: hidden; width: 390px; max-width: 100%; margin: 0 auto; }
+@media (min-width: 391px) { .stage { box-shadow: 0 0 0 1px var(--concrete); } }
+.cam {
+  position: absolute; left: 0; top: 0; width: 390px; height: 844px;
+  --tx: 0px; --ty: 0px; --s: 1; --px: 0px; --py: 0px;
+  transform: translate3d(calc(var(--tx) + var(--px)), calc(var(--ty) + var(--py)), 0) scale(var(--s));
+  transform-origin: 0 0;
+  transition: transform 760ms cubic-bezier(.5, .02, .2, 1);
+  touch-action: none; will-change: transform;
+}
+.cam.dragging { transition: none; }
+.world { position: absolute; left: 0; top: 92px; width: 390px; height: 752px; }
+#map { position: absolute; inset: 0; width: 390px; height: 752px; display: block; overflow: visible; }
+.hot {
+  position: absolute; background: transparent; border: 0; padding: 0; margin: 0; cursor: pointer;
+  border-radius: 10px;
+}
+.hot:focus-visible { outline: 3px dashed var(--mustard); outline-offset: -3px; }
+
+/* ---------- map art: paper cutouts ---------- */
+.table-shadow { fill: var(--screen); opacity: .32; }
+.floor { fill: var(--floor); stroke: var(--edge); stroke-width: 1.4; }
+.floor-edge { fill: color-mix(in srgb, var(--floor) 70%, var(--screen)); }
+.grain { mix-blend-mode: overlay; opacity: .5; pointer-events: none; }
+.crease { stroke: var(--concrete); stroke-width: 1; stroke-dasharray: 2 5; opacity: .6; fill: none; }
+.crease-hi { stroke: var(--edge); stroke-width: 1; opacity: .7; fill: none; }
+.route { stroke: var(--mustard); stroke-width: 2; stroke-dasharray: 1 7; stroke-linecap: round; fill: none; opacity: .8; }
+.patch { stroke: var(--edge); stroke-width: 1.1; }
+.patch.pl { fill: color-mix(in srgb, var(--olive) 20%, var(--floor)); }
+.patch.pe { fill: color-mix(in srgb, var(--mustard) 24%, var(--floor)); }
+.patch.dp { fill: color-mix(in srgb, var(--concrete) 26%, var(--floor)); }
+.patch.dr { fill: color-mix(in srgb, var(--walnut) 24%, var(--floor)); }
+.patch-sh { fill: var(--screen); opacity: .13; }
+.ring { fill: none; stroke: var(--mustard); stroke-width: 2.4; stroke-dasharray: 7 5; opacity: 0; transition: opacity .3s; }
+.zone.active .ring { opacity: 1; }
+.tape { fill: var(--mustard); opacity: .85; stroke: var(--edge); stroke-width: .8; }
+
+.up { transition: transform 620ms cubic-bezier(.3, .8, .25, 1); transform: scaleY(1); }
+.zone.pop .up { transform: scaleY(1.2); }
+.zone.pop .seat.up { transform: scaleY(1.13); }
+.stage:has(.hot[data-zone='personnel']:is(:hover, :active)) #z-personnel .up,
+.stage:has(.hot[data-zone='pool']:is(:hover, :active)) #z-pool .up,
+.stage:has(.hot[data-zone='departments']:is(:hover, :active)) #z-departments .up,
+.stage:has(.hot[data-zone='director']:is(:hover, :active)) #z-director .up { transform: scaleY(1.07); transition-duration: 160ms; }
+
+.fr { fill: var(--c, var(--walnut)); stroke: var(--edge); stroke-width: 1.2; stroke-linejoin: round; }
+.tp { fill: color-mix(in srgb, var(--c, var(--walnut)) 72%, var(--glow)); stroke: var(--edge); stroke-width: 1.2; stroke-linejoin: round; }
+.sh { fill: var(--screen); opacity: .22; }
+.tb { fill: var(--paper); stroke: var(--edge); stroke-width: 1; stroke-linejoin: round; }
+.c-walnut { --c: var(--walnut); } .c-concrete { --c: var(--concrete); } .c-mustard { --c: var(--mustard); }
+.c-olive { --c: var(--olive); } .c-alert { --c: var(--alert); } .c-paper { --c: var(--paper); }
+.c-shade { --c: var(--paper-shade); } .c-steel { --c: color-mix(in srgb, var(--concrete) 70%, var(--glow)); }
+.c-glass { --c: var(--glow); }
+.c-paper .fr, .c-shade .fr { stroke: var(--concrete); stroke-width: .9; }
+.c-paper .tp, .c-shade .tp { stroke: var(--concrete); stroke-width: .9; fill: var(--edge); }
+.ink { fill: var(--screen); } .inkl { stroke: var(--screen); fill: none; stroke-linecap: round; }
+.glowf { fill: var(--glow); } .brass { fill: var(--mustard); stroke: var(--screen); stroke-width: .8; }
+.sg { font: 700 12px var(--font-display); letter-spacing: .1em; fill: var(--screen); text-anchor: middle; text-transform: uppercase; }
+.sg.sm { font-size: 11px; letter-spacing: .06em; }
+.halo { fill: url(#halo); }
+.pulse { animation: pulse 3.4s ease-in-out infinite; }
+@keyframes pulse { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+.sway { animation: sway 5s ease-in-out infinite; }
+@keyframes sway { 0%, 100% { transform: rotate(-1.1deg) translateY(0); } 50% { transform: rotate(1.1deg) translateY(-1.5px); } }
+.bob { animation: bobs 3.2s ease-in-out infinite; }
+@keyframes bobs { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+.glass-f { fill: color-mix(in srgb, var(--glow) 24%, transparent); stroke: var(--mustard); stroke-width: 2; stroke-linejoin: round; }
+.glass-t { fill: color-mix(in srgb, var(--glow) 40%, transparent); stroke: var(--mustard); stroke-width: 1.6; stroke-linejoin: round; }
+.leaf { fill: var(--olive); stroke: var(--edge); stroke-width: .8; }
+.page { fill: var(--edge); stroke: var(--concrete); stroke-width: .7; }
+
+/* monkeys */
+.f0 { --fur: var(--walnut); }
+.f1 { --fur: color-mix(in srgb, var(--walnut) 62%, var(--tangerine)); }
+.f2 { --fur: color-mix(in srgb, var(--walnut) 45%, var(--concrete)); }
+.f3 { --fur: color-mix(in srgb, var(--walnut) 68%, var(--screen)); }
+.fur { fill: var(--fur); stroke: var(--edge); stroke-width: 1; }
+.face { fill: color-mix(in srgb, var(--fur) 40%, var(--glow)); }
+.shirt { fill: var(--shirt); stroke: var(--edge); stroke-width: 1; stroke-linejoin: round; }
+.sleeve { stroke: var(--shirt); stroke-width: 6.5; stroke-linecap: round; fill: none; }
+.hand { fill: var(--fur); stroke: var(--edge); stroke-width: .8; }
+.sk-paper { --shirt: var(--edge); } .sk-mustard { --shirt: var(--mustard); }
+.sk-olive { --shirt: var(--olive); } .sk-shade { --shirt: var(--concrete); }
+.vacant .mk, .vacant .hands { display: none; }
+.vacant .tent { display: inline; }
+.tent { display: none; }
+.seat:not(.vacant) .tent { display: none; }
+.arrive { animation: arrive 700ms cubic-bezier(.3, .8, .25, 1) both; }
+@keyframes arrive { from { transform: translateY(-26px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.zz { font: 700 9px var(--font-display); fill: var(--ink); opacity: 0; }
+
+/* behaviours */
+@keyframes tap { 0%, 100% { transform: rotate(-5deg); } 50% { transform: rotate(7deg); } }
+@keyframes hb { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(.8px); } }
+.b-type .armL { animation: tap calc(.2s * var(--t)) ease-in-out infinite; }
+.b-type .armR { animation: tap calc(.23s * var(--t)) ease-in-out infinite reverse; }
+.b-type .head { animation: hb calc(.4s * var(--t)) ease-in-out infinite; }
+@keyframes peck { 0%, 8% { transform: rotate(-16deg); } 15% { transform: rotate(3deg); } 22%, 46% { transform: rotate(-16deg); } 53% { transform: rotate(-1deg); } 60%, 100% { transform: rotate(-14deg); } }
+@keyframes look { 0%, 100% { transform: rotate(0); } 15% { transform: rotate(4deg); } 53% { transform: rotate(-4deg); } 80% { transform: rotate(1deg); } }
+.b-peck .armR { animation: peck calc(3.6s * var(--t)) linear infinite; animation-delay: var(--d); }
+.b-peck .head { animation: look calc(3.6s * var(--t)) ease-in-out infinite; animation-delay: var(--d); }
+@keyframes slam { 0%, 58%, 100% { transform: rotate(0); } 64% { transform: rotate(-34deg); } 74% { transform: rotate(-34deg); } 82% { transform: rotate(0); } }
+@keyframes feed { 0%, 70% { transform: translateY(0); } 71%, 98% { transform: translateY(-3px); } 100% { transform: translateY(0); } }
+.b-slam .armR { animation: slam calc(3.4s * var(--t)) ease-in-out infinite; animation-delay: var(--d); }
+.b-slam .armL { animation: tap calc(.3s * var(--t)) ease-in-out infinite; }
+.b-slam .sheet { animation: feed calc(3.4s * var(--t)) steps(1) infinite; animation-delay: var(--d); }
+@keyframes sip { 0%, 16% { transform: rotate(0); } 30%, 52% { transform: rotate(96deg); } 66%, 100% { transform: rotate(0); } }
+@keyframes mugt { 0%, 16% { transform: rotate(0); } 30%, 52% { transform: rotate(-64deg); } 66%, 100% { transform: rotate(0); } }
+.b-sip .armR { animation: sip calc(6s * var(--t)) ease-in-out infinite; animation-delay: var(--d); }
+.b-sip .mug { animation: mugt calc(6s * var(--t)) ease-in-out infinite; animation-delay: var(--d); }
+@keyframes stL { 0%, 30%, 100% { transform: rotate(0); } 42%, 68% { transform: rotate(150deg); } 80% { transform: rotate(0); } }
+@keyframes stR { 0%, 30%, 100% { transform: rotate(0); } 42%, 68% { transform: rotate(-150deg); } 80% { transform: rotate(0); } }
+@keyframes stH { 0%, 30%, 100% { transform: translateY(0); } 42%, 68% { transform: translateY(-3px); } 80% { transform: translateY(0); } }
+.b-stretch .armL { animation: stL calc(7s * var(--t)) ease-in-out infinite; animation-delay: var(--d); }
+.b-stretch .armR { animation: stR calc(7s * var(--t)) ease-in-out infinite; animation-delay: var(--d); }
+.b-stretch .head { animation: stH calc(7s * var(--t)) ease-in-out infinite; animation-delay: var(--d); }
+@keyframes flip { 0%, 66%, 100% { transform: scaleX(1); } 72% { transform: scaleX(.12); } 78% { transform: scaleX(1); } }
+@keyframes scan { 0%, 100% { transform: translateX(-1.2px); } 50% { transform: translateX(1.2px); } }
+.b-read .rpage { animation: flip calc(5s * var(--t)) ease-in-out infinite; animation-delay: var(--d); }
+.b-read .eyes { animation: scan calc(1.6s * var(--t)) ease-in-out infinite; }
+@keyframes doze { 0% { transform: rotate(0); } 12%, 46% { transform: rotate(17deg) translateY(3px); } 52% { transform: rotate(-6deg); } 58% { transform: rotate(0); } 66%, 92% { transform: rotate(17deg) translateY(3px); } 100% { transform: rotate(0); } }
+@keyframes lids { 0%, 6% { transform: scaleY(1); } 12%, 46% { transform: scaleY(.12); } 52%, 60% { transform: scaleY(1); } 66%, 92% { transform: scaleY(.12); } 98%, 100% { transform: scaleY(1); } }
+@keyframes zzf { 0%, 10% { opacity: 0; transform: translate(0, 0); } 24%, 40% { opacity: 1; transform: translate(3px, -5px); } 48%, 62% { opacity: 0; } 76%, 88% { opacity: 1; transform: translate(3px, -5px); } 96%, 100% { opacity: 0; } }
+.b-doze .head { animation: doze calc(9s * var(--t)) ease-in-out infinite; animation-delay: var(--d); }
+.b-doze .eyes { animation: lids calc(9s * var(--t)) ease-in-out infinite; animation-delay: var(--d); }
+.b-doze .zz { animation: zzf calc(9s * var(--t)) ease-in-out infinite; animation-delay: var(--d); }
+@keyframes crank { 0%, 44%, 100% { transform: rotate(0); } 48% { transform: rotate(-7deg); } 52% { transform: rotate(3deg); } 56% { transform: rotate(-7deg); } 60% { transform: rotate(3deg); } 64% { transform: rotate(-7deg); } 68% { transform: rotate(3deg); } 72% { transform: rotate(0); } }
+@keyframes spin { 0%, 44% { transform: rotate(0); } 72%, 100% { transform: rotate(720deg); } }
+.b-sharpen .armL { animation: crank calc(4s * var(--t)) linear infinite; animation-delay: var(--d); }
+.b-sharpen .cr { animation: spin calc(4s * var(--t)) linear infinite; animation-delay: var(--d); }
+/* editor */
+@keyframes stampT { 0%, 30% { transform: translateY(-13px); } 38%, 50% { transform: translateY(0); } 62%, 100% { transform: translateY(-13px); } }
+@keyframes stampA { 0%, 30% { transform: scaleY(.55); } 38%, 50% { transform: scaleY(1); } 62%, 100% { transform: scaleY(.55); } }
+@keyframes mark { 0%, 37% { opacity: 0; } 39%, 96% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes tube { 0%, 52% { transform: translateY(0); opacity: 0; } 54% { opacity: 1; } 80% { transform: translateY(-58px); opacity: 1; } 84%, 100% { transform: translateY(-62px); opacity: 0; } }
+.ed .stampT { animation: stampT 3.4s cubic-bezier(.6, 0, .4, 1) infinite; }
+.ed .armR { animation: stampA 3.4s cubic-bezier(.6, 0, .4, 1) infinite; }
+.ed .mark { animation: mark 3.4s steps(1) infinite; }
+.ed .cap { animation: tube 3.4s ease-in infinite; }
+/* candidate + ernest figure */
+@keyframes foot { 0%, 70%, 100% { transform: rotate(0); } 78% { transform: rotate(-12deg); } 86% { transform: rotate(0); } 92% { transform: rotate(-12deg); } }
+.foot { animation: foot 2.6s ease-in-out infinite; }
+.cand { transition: opacity .6s; }
+.cand.gone { opacity: 0; }
+
+/* reduced motion: keep each monkey's activity as a held pose */
+@media (prefers-reduced-motion: reduce) {
+  .cam, .up { transition: none !important; }
+  .pulse, .sway, .bob, .foot, .arrive, [class*='b-'] *, .ed * { animation: none !important; }
+  .b-peck .armR { transform: rotate(-14deg); } .b-slam .armR { transform: rotate(-30deg); }
+  .b-sip .armR { transform: rotate(96deg); } .b-sip .mug { transform: rotate(-64deg); }
+  .b-stretch .armL { transform: rotate(150deg); } .b-stretch .armR { transform: rotate(-150deg); }
+  .b-doze .head { transform: rotate(17deg) translateY(3px); } .b-doze .eyes { transform: scaleY(.12); }
+  .b-doze .zz { opacity: 1; transform: translate(3px, -5px); }
+  .b-sharpen .armL { transform: rotate(-5deg); } .ed .mark { opacity: 1; } .ed .stampT { transform: translateY(0); }
+  .ed .cap { opacity: 1; transform: translateY(-30px); }
+}
+
+/* ---------- header ---------- */
+.hdr {
+  position: absolute; left: 0; right: 0; top: 0; z-index: 30;
+  padding: max(8px, env(safe-area-inset-top)) 12px 8px; background: var(--walnut);
+  border-bottom: 2px solid var(--mustard); color: var(--on-walnut);
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--screen) 40%, transparent);
+  display: grid; grid-template-columns: 1fr auto; gap: 6px 10px; align-items: center;
+}
+.hdr .seal { width: 36px; height: 36px; flex: none; }
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.brand .eb { font: 500 .75rem var(--font-display); letter-spacing: .12em; text-transform: uppercase; opacity: .92; margin: 0; line-height: 1.1; }
+.brand h1 { font-size: 1.45rem; line-height: 1; color: var(--on-walnut); }
+.dirbtn {
+  min-width: 44px; min-height: 44px; border: 2px solid var(--mustard); background: var(--paper); color: var(--ink);
+  font: 700 .95rem var(--font-display); letter-spacing: .08em; text-transform: uppercase; padding: 4px 10px;
+  display: flex; align-items: center; gap: 6px; border-radius: 6px 6px 14px 6px;
+}
+.dirbtn:active { transform: translateY(2px); }
+.readout { grid-column: 1 / -1; display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 1px; background: var(--concrete); border: 1px solid var(--concrete); }
+.readout > div { background: var(--screen); padding: 3px 8px; display: flex; align-items: baseline; justify-content: space-between; gap: 6px; min-width: 0; }
+.readout .lb { font: 500 .7rem var(--font-display); letter-spacing: .1em; text-transform: uppercase; color: var(--screen-muted); }
+.readout .v { font: 600 .98rem var(--font-mono); color: var(--screen-ink); font-variant-numeric: tabular-nums; text-shadow: 0 0 6px color-mix(in srgb, var(--screen-ink) 45%, transparent); }
+
+/* directory (elevator panel) */
+.dir {
+  position: absolute; z-index: 40; right: 10px; top: calc(max(8px, env(safe-area-inset-top)) + 50px); width: 232px;
+  background: var(--mustard); border: 2px solid var(--edge); border-radius: 8px; padding: 8px 8px 10px; color: var(--screen);
+  box-shadow: 4px 6px 0 color-mix(in srgb, var(--screen) 35%, transparent);
+  transform-origin: 90% 0; transition: transform .28s cubic-bezier(.3, .8, .25, 1), opacity .2s, visibility 0s;
+}
+.dir[hidden] { display: block; visibility: hidden; opacity: 0; transform: perspective(500px) rotateX(-60deg); pointer-events: none; transition: transform .22s, opacity .2s, visibility 0s .22s; }
+.dir h3 { font-size: .85rem; letter-spacing: .14em; margin: 0 4px 6px; }
+.dir ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; }
+.dir button { width: 100%; min-height: 46px; display: grid; grid-template-columns: 30px 1fr; align-items: center; gap: 8px; text-align: left; background: var(--paper); border: 2px solid var(--screen); border-radius: 5px; padding: 3px 8px 3px 4px; color: var(--ink); }
+.dir button:active { background: var(--glow); transform: translateY(1px); }
+.dir .fl { width: 28px; height: 28px; border-radius: 50%; background: var(--screen); color: var(--screen-ink); font: 600 .95rem var(--font-mono); display: grid; place-items: center; }
+.dir .nm { font: 700 1.02rem var(--font-display); letter-spacing: .06em; text-transform: uppercase; line-height: 1; }
+.dir .hn { display: block; font: 400 .78rem var(--font-body); letter-spacing: 0; text-transform: none; color: var(--ink-muted); margin-top: 2px; }
+.dir button[aria-current='true'] { box-shadow: inset 0 -4px 0 var(--tangerine); }
+
+/* ---------- sheet (paper card that unfolds) ---------- */
+.sheetwrap { position: absolute; left: 0; right: 0; bottom: 0; z-index: 20; perspective: 900px; pointer-events: none; }
+.sheet {
+  position: relative; pointer-events: auto; background: var(--sheet); color: var(--ink);
+  border: 1.5px solid var(--edge); border-bottom: 0; border-radius: 6px 6px 0 0; margin: 0 6px;
+  padding: 18px 14px calc(12px + env(safe-area-inset-bottom));
+  box-shadow: 0 -10px 26px color-mix(in srgb, var(--screen) 42%, transparent);
+  transform-origin: 50% 100%; transform: rotateX(78deg) translateY(30px); opacity: 0; visibility: hidden;
+  transition: transform 560ms cubic-bezier(.3, .8, .25, 1), opacity 300ms, visibility 0s 560ms;
+}
+.sheet.open { transform: none; opacity: 1; visibility: visible; transition-delay: 220ms, 220ms, 0s; }
+.sheetgrain { position: absolute; inset: 0; pointer-events: none; opacity: .5; mix-blend-mode: multiply; border-radius: inherit;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' seed='5'/><feColorMatrix type='saturate' values='0'/></filter><rect width='160' height='160' filter='url(%23n)' opacity='.16'/></svg>"); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .sheetgrain { mix-blend-mode: screen; opacity: .35; } }
+.sheet > * { position: relative; }
+.sbody { max-height: 470px; overflow: auto; overscroll-behavior: contain; }
+.sheet > .sheetgrain { position: absolute; }
+.fold-tab {
+  position: absolute; top: -29px; left: 14px; height: 30px; padding: 0 14px 0 10px; display: flex; align-items: center; gap: 8px;
+  background: var(--mustard); color: var(--screen); border: 1.5px solid var(--edge); border-bottom: 0;
+  clip-path: polygon(0 100%, 0 22%, 8px 0, calc(100% - 8px) 0, 100% 22%, 100% 100%);
+  font: 700 .88rem var(--font-display); letter-spacing: .12em; text-transform: uppercase;
+}
+.fold-tab b { font: 600 .85rem var(--font-mono); background: var(--screen); color: var(--screen-ink); border-radius: 50%; width: 20px; height: 20px; display: grid; place-items: center; }
+.sheet-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.sheet h2 { font-size: 1.7rem; line-height: 1; color: var(--head); }
+.form { font: 400 .88rem var(--font-type); color: var(--ink-muted); margin: 3px 0 0; }
+.close {
+  min-height: 44px; min-width: 44px; background: var(--paper-shade); border: 2px solid var(--walnut); border-radius: 4px 4px 14px 4px;
+  font: 700 .95rem var(--font-display); letter-spacing: .08em; text-transform: uppercase; padding: 4px 10px; display: flex; align-items: center; gap: 6px; white-space: nowrap; flex: none;
+}
+.close:active { transform: translateY(2px); }
+.panel { background: var(--paper-shade); border: 1px solid var(--concrete); padding: 10px 12px; margin-top: 12px; display: grid; gap: 6px; }
+.panel.sheetinner { background: color-mix(in srgb, var(--paper-shade) 55%, var(--sheet)); }
+.lab { font: 500 .85rem var(--font-display); letter-spacing: .1em; text-transform: uppercase; color: var(--ink); margin: 0; }
+.big { font: 600 1.5rem var(--font-mono); font-variant-numeric: tabular-nums; line-height: 1.1; }
+.big small { font: 400 .9rem var(--font-body); }
+.desks { display: flex; gap: 4px; margin-top: 2px; }
+.desks i { flex: 1; height: 16px; border: 1.5px solid var(--walnut); background: transparent; position: relative; border-radius: 2px; }
+.desks i.on { background: var(--walnut); }
+.desks i.on::after { content: ''; position: absolute; left: 50%; top: 2px; width: 6px; height: 6px; margin-left: -3px; border-radius: 50%; background: var(--edge); }
+.note { font: 400 .9rem var(--font-body); margin: 0; }
+.delta { font: 400 .88rem var(--font-mono); font-variant-numeric: tabular-nums; margin: 0; color: var(--ink); }
+.why { font: 400 .88rem var(--font-body); color: var(--ink-muted); margin: 0; }
+.hirebox { display: grid; gap: 6px; justify-items: center; margin-top: 14px; }
+.hire {
+  --d: 6px; width: min(100%, 300px); min-height: 62px; border: 4px solid var(--mustard); background: var(--tangerine); color: var(--screen);
+  font: 700 1.45rem var(--font-display); letter-spacing: .1em; text-transform: uppercase; cursor: pointer;
+  border-radius: 44px 44px 30px 30px / 40px 40px 26px 26px; box-shadow: 0 var(--d) 0 var(--walnut), 0 calc(var(--d) + 4px) 8px color-mix(in srgb, var(--screen) 40%, transparent);
+  position: relative; transition: transform 90ms, box-shadow 90ms; padding: 4px 18px;
+}
+.hire::before { content: ''; position: absolute; left: 22%; right: 22%; top: 6px; height: 10px; border-radius: 50%; background: var(--glow); opacity: .5; }
+.hire:active:not(:disabled) { transform: translateY(5px); --d: 1px; }
+.hire:disabled { background: var(--concrete); color: var(--screen); border-color: var(--paper-shade); cursor: not-allowed; }
+.hire.nudge { animation: nudge 2s ease-in-out infinite; }
+@keyframes nudge { 0%, 100% { outline: 0 solid transparent; } 50% { outline: 6px solid color-mix(in srgb, var(--mustard) 50%, transparent); outline-offset: 2px; } }
+.row2 { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; }
+.btn2 { min-height: 44px; padding: 6px 14px; background: var(--paper); border: 2px solid var(--walnut); font: 700 .98rem var(--font-display); letter-spacing: .08em; text-transform: uppercase; border-radius: 3px; cursor: pointer; color: var(--ink); }
+.btn2:active:not(:disabled) { transform: translateY(2px); background: var(--paper-shade); }
+.btn2:disabled { border-color: var(--concrete); color: var(--ink-muted); cursor: not-allowed; }
+.gauges { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.gauge { text-align: center; }
+.gauge svg { width: 100%; height: auto; max-width: 112px; }
+.gauge .gv { font: 600 1rem var(--font-mono); font-variant-numeric: tabular-nums; }
+.bar { height: 12px; border: 1.5px solid var(--walnut); background: var(--paper); position: relative; }
+.bar > i { position: absolute; inset: 0 auto 0 0; background: var(--olive); }
+.drow { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; padding: 8px 0; border-top: 1px dashed var(--concrete); }
+.drow:first-child { border-top: 0; }
+.drow .nm { font: 700 1.05rem var(--font-display); letter-spacing: .06em; text-transform: uppercase; }
+.stamp { display: inline-block; border: 2px solid var(--alert); color: var(--alert); font: 700 .85rem var(--font-display); letter-spacing: .14em; padding: 1px 6px; transform: rotate(-3deg); }
+.stamp.ok { border-color: var(--olive); color: var(--olive); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .stamp.ok { color: var(--olive); } }
+
+/* ---------- Ernest ---------- */
+.ernest {
+  position: absolute; z-index: 35; left: 150px; right: 10px; bottom: 12px; padding: 12px 12px 10px 34px;
+  background: var(--paper); color: var(--ink); border: 1.5px solid var(--edge); border-radius: 4px;
+  box-shadow: 4px 6px 0 color-mix(in srgb, var(--screen) 38%, transparent);
+  transform-origin: 50% 100%; transform: perspective(700px) translateY(60px) rotateX(-70deg); opacity: 0; visibility: hidden;
+  transition: transform 620ms cubic-bezier(.3, .8, .25, 1), opacity 260ms, visibility 0s 620ms;
+}
+.ernest::before { content: ''; position: absolute; inset: 4px; border: 1.5px dashed var(--concrete); pointer-events: none; opacity: .7; }
+.ernest.in { transform: none; opacity: 1; visibility: visible; transition-delay: 0s; }
+.ernest.docked { bottom: auto; top: 112px; left: 10px; }
+.ernest .fig { position: absolute; left: -52px; top: -34px; width: 74px; height: 84px; }
+.ernest .reel { font: 700 .8rem var(--font-display); letter-spacing: .14em; text-transform: uppercase; color: var(--ink); margin: 0 0 2px; padding-left: 0; }
+.ernest h2 { font-size: 1.15rem; color: var(--head); line-height: 1.05; }
+.ernest p.say { margin: 4px 0 8px; font-size: .92rem; line-height: 1.3; }
+.ernest.docked .say { margin-bottom: 6px; }
+.ernest .ok { min-height: 44px; width: 100%; background: var(--walnut); color: var(--on-walnut); border: 2px solid var(--screen); border-radius: 3px; font: 700 1rem var(--font-display); letter-spacing: .1em; text-transform: uppercase; cursor: pointer; }
+.ernest .ok:active { transform: translateY(2px); }
+.ernest.docked { display: grid; grid-template-columns: 1fr auto; gap: 0 10px; align-items: center; left: 66px; padding-left: 14px; }
+.ernest.docked .fig { left: -56px; top: 0; }
+.ernest.docked .tx { grid-column: 1; } .ernest.docked .ok { grid-column: 2; grid-row: 1; width: auto; padding: 0 12px; }
+.ernest.docked .say { display: none; }
+.boil { animation: boil .9s steps(1) infinite; transform-origin: 50% 90%; }
+@keyframes boil { 0% { transform: rotate(-.8deg); } 33% { transform: rotate(.7deg) translateY(-.6px); } 66% { transform: rotate(0); } }
+@keyframes wave { 0%, 60%, 100% { transform: rotate(0); } 70% { transform: rotate(-14deg); } 80% { transform: rotate(6deg); } 90% { transform: rotate(-12deg); } }
+.wave { animation: wave 3s steps(2, jump-none) infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .ernest, .sheet, .dir { transform: none !important; transition: opacity .2s, visibility 0s .2s !important; }
+  .ernest.in, .sheet.open, .dir:not([hidden]) { transition: opacity .2s !important; }
+  .boil, .wave, .hire.nudge { animation: none !important; }
+}
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+  <div class="cam" id="cam">
+    <div class="world" id="world">
+      <svg id="map" viewBox="0 0 390 752" role="img" aria-label="Floor plan of the Bureau's first floor: Personnel by the entrance, the Typing Pool in the middle, Departments and the Director's Office along the back wall."></svg>
+      <button class="hot" data-zone="personnel" style="left:6px;top:592px;width:146px;height:154px" aria-label="Personnel: hire monkeys and manage desks"></button>
+      <button class="hot" data-zone="pool" style="left:12px;top:186px;width:366px;height:340px" aria-label="Typing Pool: typing versus editing"></button>
+      <button class="hot" data-zone="departments" style="left:8px;top:70px;width:212px;height:112px" aria-label="Departments: Recruiting, Construction, Editing"></button>
+      <button class="hot" data-zone="director" style="left:226px;top:70px;width:156px;height:116px" aria-label="Director's Office: readiness, permit, declare"></button>
+    </div>
+  </div>
+
+  <header class="hdr">
+    <div class="brand">
+      <svg class="seal" viewBox="0 0 40 40" aria-hidden="true">
+        <circle cx="20" cy="20" r="18" fill="var(--mustard)" stroke="var(--edge)" stroke-width="1.5"/>
+        <circle cx="20" cy="20" r="13.5" fill="none" stroke="var(--screen)" stroke-width="1.2" stroke-dasharray="2 2"/>
+        <path d="M9 20c0-5 5-5 11 0s11 5 11 0-5-5-11 0-11 5-11 0z" fill="none" stroke="var(--screen)" stroke-width="2.6" stroke-linejoin="round" transform="translate(0 0)"/>
+      </svg>
+      <div><p class="eb">Bureau of Infinite Typing</p><h1>First Floor</h1></div>
+    </div>
+    <button class="dirbtn" id="dirbtn" aria-expanded="false" aria-controls="dir" aria-label="Building directory">
+      <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="3" y="1" width="12" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="9" cy="6" r="1.8" fill="currentColor"/><circle cx="9" cy="12" r="1.8" fill="currentColor"/></svg>
+      <span>Directory</span>
+    </button>
+    <div class="readout" role="group" aria-label="Bureau totals">
+      <div><span class="lb">Bananas</span><span class="v" id="r-ban">1,284</span></div>
+      <div><span class="lb">Income</span><span class="v" id="r-inc">12.4/s</span></div>
+      <div><span class="lb">Monkeys</span><span class="v" id="r-mon">8</span></div>
+    </div>
+  </header>
+
+  <nav class="dir" id="dir" hidden aria-label="Building directory">
+    <h3>Building directory</h3>
+    <ul id="dirlist"></ul>
+  </nav>
+
+  <div class="sheetwrap"><section class="sheet" id="sheet" role="dialog" aria-modal="false" tabindex="-1" aria-label="Room"><div class="sheetgrain"></div><div class="fold-tab" id="foldtab"></div><div class="sbody" id="sheetbody"></div></section></div>
+
+  <aside class="ernest" id="ernest" aria-label="Orientation Reel 1">
+    <svg class="fig boil" viewBox="0 0 74 84" aria-hidden="true">
+      <!-- Ernest: chimpanzee, short-sleeved shirt, narrow tie, pencil behind the ear, clipboard -->
+      <path d="M16 84V58q0-10 12-12h18q12 2 12 12v26z" fill="var(--edge)" stroke="var(--concrete)" stroke-width="1.2"/>
+      <path d="M31 47l6 6 6-6v6l-3 22h-6l-3-22z" fill="var(--screen)"/>
+      <rect x="6" y="50" width="12" height="14" rx="5" fill="var(--edge)" stroke="var(--concrete)" stroke-width="1.2" transform="rotate(8 12 56)"/>
+      <circle cx="12" cy="68" r="4.5" fill="var(--walnut)" stroke="var(--edge)"/>
+      <g class="wave" style="transform-origin:60px 54px"><rect x="55" y="50" width="12" height="13" rx="5" fill="var(--edge)" stroke="var(--concrete)" stroke-width="1.2"/><rect x="58" y="60" width="7" height="14" rx="3.4" fill="var(--walnut)" stroke="var(--edge)"/><g><rect x="52" y="64" width="19" height="19" rx="2" fill="var(--walnut)" stroke="var(--edge)"/><rect x="55" y="67" width="13" height="14" fill="var(--edge)"/><rect x="58" y="63" width="7" height="4" fill="var(--mustard)" stroke="var(--screen)" stroke-width=".7"/><path d="M57 72h9M57 75h9M57 78h6" stroke="var(--concrete)" stroke-width="1"/></g></g>
+      <circle cx="14" cy="30" r="8" fill="var(--walnut)" stroke="var(--edge)" stroke-width="1.2"/><circle cx="14" cy="30" r="4.6" fill="color-mix(in srgb, var(--walnut) 40%, var(--glow))"/>
+      <circle cx="60" cy="30" r="8" fill="var(--walnut)" stroke="var(--edge)" stroke-width="1.2"/><circle cx="60" cy="30" r="4.6" fill="color-mix(in srgb, var(--walnut) 40%, var(--glow))"/>
+      <ellipse cx="37" cy="30" rx="22" ry="22" fill="var(--walnut)" stroke="var(--edge)" stroke-width="1.2"/>
+      <path d="M20 34q0-14 17-14t17 14q0 14-17 15T20 34z" fill="color-mix(in srgb, var(--walnut) 38%, var(--glow))"/>
+      <path d="M60 15l8-12" stroke="var(--mustard)" stroke-width="3.4" stroke-linecap="round"/><path d="M60 15l-1.4 3" stroke="var(--screen)" stroke-width="3.4" stroke-linecap="round"/>
+      <circle cx="29" cy="28" r="5.6" fill="var(--glow)" stroke="var(--screen)" stroke-width=".8"/><circle cx="45" cy="28" r="5.6" fill="var(--glow)" stroke="var(--screen)" stroke-width=".8"/>
+      <path d="M29 28l5.6-1.2a5.6 5.6 0 0 1-1 5.6a5.6 5.6 0 0 1-4.6 1.8z" fill="var(--screen)"/><path d="M45 28l5.6-1.2a5.6 5.6 0 0 1-1 5.6a5.6 5.6 0 0 1-4.6 1.8z" fill="var(--screen)"/>
+      <path d="M28 40q9 8 18 0" fill="none" stroke="var(--screen)" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="35" cy="35.5" r="1" fill="var(--screen)"/><circle cx="39" cy="35.5" r="1" fill="var(--screen)"/>
+    </svg>
+    <div class="tx">
+      <p class="reel">Orientation Reel 1</p>
+      <h2>Your First Hire</h2>
+      <p class="say">Open Personnel, the desk by the door, and seat one monkey.</p>
+    </div>
+    <button class="ok" id="ernest-ok">Understood</button>
+  </aside>
+  <div class="sr" id="live" aria-live="polite"></div>
+</div>
+
+<script>
+(() => {
+'use strict';
+const HDR = 92, VH = 844;
+const $ = (s, r = document) => r.querySelector(s);
+const reduce = matchMedia('(prefers-reduced-motion: reduce)');
+
+/* ===== deterministic parts kit ===== */
+function hash(i) { let h = Math.imul(i + 1, 0x9E3779B1); h ^= h >>> 15; h = Math.imul(h, 0x85EBCA77); h ^= h >>> 13; h = Math.imul(h, 0xC2B2AE3D); h ^= h >>> 16; return h >>> 0; }
+const BEH = ['type', 'peck', 'slam', 'sip', 'stretch', 'read', 'doze', 'sharpen'];
+const BEH_LABEL = ['touch-typing', 'hunt-and-peck', 'carriage-return slam', 'sipping from a mug', 'stretching', 'reading a page', 'dozing', 'sharpening a pencil'];
+const PERM = [5, 0, 6, 3, 2, 1, 4, 7]; // the first eight desks cover all eight behaviours
+function parts(i) {
+  const r = (k, n) => hash(i * 31 + k * 977) % n;
+  return {
+    fur: r(1, 4), build: r(2, 3), eyes: r(3, 4), mouth: r(4, 3), headAcc: r(5, 6), bodyAcc: r(6, 4), prop: r(7, 6), shirt: r(8, 4),
+    side: r(9, 2) ? 1 : -1, beh: i < 8 ? PERM[i] : r(10, 8),
+    d: -(r(11, 40) / 10).toFixed(1), t: (0.85 + r(12, 30) / 100).toFixed(2)
+  };
+}
+const f1 = n => Math.round(n * 10) / 10;
+
+/* ===== svg helpers ===== */
+function pbox({ x, yb, w, h, d = 8, c = 'walnut', extra = '', before = '', cls = '', tabs = true, shadow = true, glass = false }) {
+  const i = d * .2, cx = x + w / 2;
+  const sh = shadow ? `<polygon class="sh" points="${x},${yb} ${x + w},${yb} ${f1(x + w + h * .36)},${f1(yb + h * .2)} ${f1(x + h * .36)},${f1(yb + h * .2)}"/>` : '';
+  const tb = tabs ? `<polygon class="tb" points="${f1(x + w * .1)},${yb - 1} ${f1(x + w * .3)},${yb - 1} ${f1(x + w * .3 + 3)},${yb + 5} ${f1(x + w * .1 - 3)},${yb + 5}"/><polygon class="tb" points="${f1(x + w * .7)},${yb - 1} ${f1(x + w * .9)},${yb - 1} ${f1(x + w * .9 + 3)},${yb + 5} ${f1(x + w * .7 - 3)},${yb + 5}"/>` : '';
+  const fr = glass ? `<rect class="glass-f" x="${x}" y="${yb - h}" width="${w}" height="${h}"/>` : `<rect class="fr" x="${x}" y="${yb - h}" width="${w}" height="${h}" rx="1.5"/>`;
+  const tp = `<polygon class="${glass ? 'glass-t' : 'tp'}" points="${f1(x + i)},${yb - h - d} ${f1(x + w - i)},${yb - h - d} ${x + w},${yb - h} ${x},${yb - h}"/>`;
+  return `<g class="up c-${c} ${cls}" style="transform-origin:${cx}px ${yb}px">${sh}${before}${tb}${fr}${tp}${extra}</g>`;
+}
+function plate(cx, top, w, h, text, c = 'mustard', legs = 14, cls = 'sg') {
+  const x = cx - w / 2;
+  return `<g class="up" style="transform-origin:${cx}px ${top + h + legs}px"><g class="sway" style="transform-origin:${cx}px ${top}px">` +
+    `<rect class="tb" x="${x + 6}" y="${top + h - 1}" width="5" height="${legs}"/><rect class="tb" x="${x + w - 11}" y="${top + h - 1}" width="5" height="${legs}"/>` +
+    `<rect class="fr c-${c}" style="--c:var(--${c})" x="${x}" y="${top}" width="${w}" height="${h}" rx="2"/><text class="${cls}" x="${cx}" y="${top + h / 2 + 4.2}">${text}</text></g></g>`;
+}
+function bowl(x, y, cord = 12) {
+  return `<g><line x1="${x}" y1="${y - cord}" x2="${x}" y2="${y - 7}" stroke="var(--edge)" stroke-width="1.2"/><circle class="halo pulse" cx="${x}" cy="${y}" r="26"/><path d="M${x - 9} ${y - 3}a9 9 0 0 0 18 0z" class="glowf" stroke="var(--edge)" stroke-width="1.1"/><rect x="${x - 4}" y="${y - 8}" width="8" height="5" rx="1.5" class="brass"/></g>`;
+}
+function plant(cx, yb, s = 1) {
+  const leaves = [-40, -18, 0, 18, 40].map((a, k) => `<ellipse class="leaf" cx="${cx}" cy="${yb - 24 * s}" rx="${3.4 * s}" ry="${11 * s}" transform="rotate(${a} ${cx} ${yb - 14 * s})"/>`).join('');
+  return `<g class="up" style="transform-origin:${cx}px ${yb}px"><polygon class="sh" points="${cx - 7 * s},${yb} ${cx + 7 * s},${yb} ${cx + 24 * s},${yb + 5 * s} ${cx + 10 * s},${yb + 5 * s}"/>${leaves}<polygon class="fr" style="--c:var(--concrete)" points="${cx - 7 * s},${yb - 12 * s} ${cx + 7 * s},${yb - 12 * s} ${cx + 5 * s},${yb} ${cx - 5 * s},${yb}"/></g>`;
+}
+
+/* ===== monkey parts ===== */
+function wedge(x, y, r, a1, a2) { const p = a => [f1(x + r * Math.cos(a * Math.PI / 180)), f1(y + r * Math.sin(a * Math.PI / 180))]; const [x1, y1] = p(a1), [x2, y2] = p(a2); return `M${x} ${y}L${x1} ${y1}A${r} ${r} 0 0 1 ${x2} ${y2}Z`; }
+function eye(x, y, type) {
+  const r = type === 2 ? 3.9 : 3.3;
+  const off = type === 3 ? [1.2, .2] : type === 1 ? [0, .8] : [0, .2];
+  const pw = [[-70, -10], [-50, 10], [-130, -50], [-40, 20]][type];
+  const lid = type === 1 ? `<path d="M${x - r} ${y}a${r} ${r} 0 0 1 ${2 * r} 0z" class="fur" stroke="none"/>` : '';
+  return `<circle cx="${x}" cy="${y}" r="${r}" class="glowf" stroke="var(--screen)" stroke-width=".7"/><circle cx="${f1(x + off[0])}" cy="${f1(y + off[1])}" r="${f1(r * .72)}" class="ink"/><path d="${wedge(f1(x + off[0]), f1(y + off[1]), r * .72, pw[0], pw[1])}" class="glowf"/>${lid}`;
+}
+function headSVG(cx, cy, hr, p) {
+  const e = hr * .38;
+  let acc = '';
+  switch (p.headAcc) {
+    case 1: acc = `<g class="inkl" stroke-width="1.1"><circle cx="${cx - e}" cy="${cy - .5}" r="4.9"/><circle cx="${cx + e}" cy="${cy - .5}" r="4.9"/><path d="M${cx - e + 4.9} ${cy - .5}h${2 * e - 9.8}"/></g>`; break;
+    case 2: acc = `<path d="M${cx - hr + 1} ${cy - 3}Q${cx} ${cy - hr - 2} ${cx + hr - 1} ${cy - 3}L${cx + hr + 4} ${cy - 1.5}H${cx - hr - 4}z" style="fill:var(--olive);stroke:var(--edge);stroke-width:1" />`; break;
+    case 3: acc = `<path d="M${cx - hr - 1} ${cy}a${hr + 1} ${hr + 2} 0 0 1 ${2 * hr + 2} 0" fill="none" stroke="var(--screen)" stroke-width="2.4"/><rect x="${cx - hr - 4}" y="${cy - 3}" width="5" height="8" rx="2" fill="var(--concrete)" stroke="var(--edge)" stroke-width=".8"/><rect x="${cx + hr - 1}" y="${cy - 3}" width="5" height="8" rx="2" fill="var(--concrete)" stroke="var(--edge)" stroke-width=".8"/>`; break;
+    case 4: acc = `<path d="M${cx + hr - 2} ${cy - 3}l4 -10" stroke="var(--mustard)" stroke-width="2.6" stroke-linecap="round"/><path d="M${cx + hr + 2} ${cy - 13}l.6 -1.8" stroke="var(--screen)" stroke-width="2.6" stroke-linecap="round"/>`; break;
+    case 5: acc = `<path d="M${cx + 2} ${cy - hr + 1}l-7 -4v8z M${cx + 2} ${cy - hr + 1}l7 -4v8z" fill="var(--alert)" stroke="var(--edge)" stroke-width=".9" stroke-linejoin="round"/>`; break;
+  }
+  const mouth = [`<path d="M${cx - 3} ${cy + hr * .55}Q${cx} ${cy + hr * .55 + 3} ${cx + 3} ${cy + hr * .55}" class="inkl" stroke-width="1.2"/>`,
+    `<path d="M${cx - 2.6} ${cy + hr * .6}h5.2" class="inkl" stroke-width="1.2"/>`,
+    `<circle cx="${cx}" cy="${cy + hr * .62}" r="1.5" class="ink"/>`][p.mouth];
+  return `<circle class="fur" cx="${cx - hr}" cy="${cy}" r="4.2"/><circle class="fur" cx="${cx + hr}" cy="${cy}" r="4.2"/><circle class="fur" cx="${cx}" cy="${cy}" r="${hr}"/><ellipse class="face" cx="${cx}" cy="${cy + 2.2}" rx="${f1(hr * .74)}" ry="${f1(hr * .64)}"/><g class="eyes" style="transform-origin:${cx}px ${cy}px">${eye(cx - e, cy, p.eyes)}${eye(cx + e, cy, p.eyes)}</g>${mouth}${acc}`;
+}
+const SHIRTS = ['sk-paper', 'sk-mustard', 'sk-olive', 'sk-shade'];
+function prop(kind, px, y) {
+  switch (kind) {
+    case 0: return `<g><rect x="${px - 3.5}" y="${y - 7}" width="7" height="7" rx="1" class="page" style="fill:var(--paper-shade)"/><path d="M${px + 3.5} ${y - 5}h2.4a2 2 0 0 1 0 4h-2.4" class="inkl" stroke-width="1"/><path d="M${px - 1} ${y - 9}q1 -2 0 -3" class="inkl" stroke-width=".8" opacity=".6"/></g>`;
+    case 1: return `<g><polygon points="${px - 4},${y - 5} ${px + 4},${y - 5} ${px + 3},${y} ${px - 3},${y}" fill="var(--concrete)" stroke="var(--edge)" stroke-width=".8"/><ellipse class="leaf" cx="${px - 3}" cy="${y - 9}" rx="2" ry="4.5" transform="rotate(-25 ${px - 3} ${y - 6})"/><ellipse class="leaf" cx="${px + 3}" cy="${y - 9}" rx="2" ry="4.5" transform="rotate(25 ${px + 3} ${y - 6})"/><ellipse class="leaf" cx="${px}" cy="${y - 11}" rx="2" ry="4.5"/></g>`;
+    case 2: return `<g><rect class="page" x="${px - 6}" y="${y - 2}" width="12" height="2.4"/><rect class="page" x="${px - 5}" y="${y - 4.6}" width="12" height="2.4"/><rect class="page" x="${px - 6.5}" y="${y - 7.2}" width="12" height="2.4"/></g>`;
+    case 3: return `<g><rect x="${px - 4.5}" y="${y - 10}" width="9" height="10" fill="var(--walnut)" stroke="var(--edge)" stroke-width=".8"/><rect x="${px - 3}" y="${y - 8.5}" width="6" height="7" fill="var(--mustard)"/><circle cx="${px}" cy="${y - 6}" r="1.4" class="ink"/><path d="M${px - 2.4} ${y - 2.4}q2.4 -2.4 4.8 0z" class="ink"/></g>`;
+    case 4: return `<g><path d="M${px - 4} ${y}h8M${px} ${y}V${y - 6}L${px + 4} ${y - 10}" class="inkl" stroke-width="1.2"/><path d="M${px + 1} ${y - 9}h7l-2 4h-3z" fill="var(--mustard)" stroke="var(--edge)" stroke-width=".8"/><circle class="halo" cx="${px + 5}" cy="${y - 4}" r="9"/></g>`;
+    default: return `<g><path d="M${px} ${y}V${y - 13}" stroke="var(--screen)" stroke-width="1"/><path d="M${px} ${y - 13}l8 2.6l-8 2.6z" fill="var(--alert)" stroke="var(--edge)" stroke-width=".7"/></g>`;
+  }
+}
+function seatSVG(i, cx, yb, o = {}) {
+  const p = Object.assign(parts(i), o.override || {});
+  const bw = [24, 28, 32][p.build], bh = [28, 34, 40][p.build], hr = [10, 11, 12][p.build];
+  const bBot = yb - 26, bTop = bBot - bh, hy = bTop - hr + 4, sy = bTop + 7;
+  const sxL = cx - bw / 2 + 2, sxR = cx + bw / 2 - 2;
+  const hL = [cx - 8, yb - 30], hR = [cx + 8, yb - 30];
+  let handR = hR, handL = hL;
+  if (p.beh === 3) handR = [cx + 17, yb - 31];
+  if (p.beh === 7) handL = [cx - 19, yb - 32];
+  if (p.beh === 5) { handL = [cx - 8, hy + hr + 8]; handR = [cx + 8, hy + hr + 8]; }
+  const body = p.bodyAcc;
+  let bodyAcc = '';
+  if (body === 1) bodyAcc = `<path d="M${cx - bw / 2} ${bTop + 3}h${bw * .3}l3 ${bh}h-${bw * .3 + 3}z M${cx + bw / 2} ${bTop + 3}h-${bw * .3}l-3 ${bh}h${bw * .3 + 3}z" fill="var(--olive)" stroke="var(--edge)" stroke-width=".9" stroke-linejoin="round"/><circle cx="${cx - 2}" cy="${bTop + 14}" r="1.1" class="brass"/><circle cx="${cx - 2}" cy="${bTop + 21}" r="1.1" class="brass"/>`;
+  if (body === 2) bodyAcc = `<path d="M${cx - 2} ${bTop + 3}h4l1.6 16l-3.6 4l-3.6 -4z" fill="var(--alert)" stroke="var(--edge)" stroke-width=".8" stroke-linejoin="round"/>`;
+  if (body === 3) bodyAcc = `<path d="M${cx} ${bTop + 4}l-6 -3v6z M${cx} ${bTop + 4}l6 -3v6z" fill="var(--mustard)" stroke="var(--screen)" stroke-width=".8" stroke-linejoin="round"/>`;
+  const sleeveCol = body === 1 ? 'style="stroke:var(--olive)"' : '';
+  const arm = (cls, sx, hx, extra = '') => `<g class="${cls}" style="transform-origin:${sx}px ${sy}px"><line class="sleeve" ${sleeveCol} x1="${sx}" y1="${sy}" x2="${f1(hx[0])}" y2="${f1(hx[1] - 2)}"/>${extra}<circle class="hand" cx="${f1(hx[0])}" cy="${f1(hx[1])}" r="3.3"/></g>`;
+  const mugAtHand = p.beh === 3 ? `<g class="mug" style="transform-origin:${handR[0]}px ${handR[1]}px"><rect x="${handR[0] - 3.6}" y="${handR[1] - 8}" width="7.2" height="8" rx="1" fill="var(--paper)" stroke="var(--screen)" stroke-width=".8"/><path d="M${handR[0] + 3.6} ${handR[1] - 6}h2.2a2 2 0 0 1 0 4h-2.2" class="inkl" stroke-width="1"/></g>` : '';
+  const armR = arm('armR', sxR, handR, mugAtHand), armL = arm('armL', sxL, handL);
+  const pside = (p.beh === 3 || p.beh === 2) ? -1 : p.beh === 7 ? 1 : p.side;
+  const propX = cx + pside * 23;
+  const writing = p.beh === 7 ? `<g><rect x="${cx - 24}" y="${yb - 36}" width="10" height="8" rx="1" fill="var(--concrete)" stroke="var(--edge)" stroke-width=".8"/><g class="cr" style="transform-origin:${cx - 19}px ${yb - 32}px"><circle cx="${cx - 19}" cy="${yb - 32}" r="2.4" class="brass"/><path d="M${cx - 19} ${yb - 32}h4" class="inkl" stroke-width="1"/></g></g>` : '';
+  const readPage = p.beh === 5 ? `<g class="rpage" style="transform-origin:${cx}px ${hy + 10}px"><rect class="page" x="${cx - 10}" y="${hy + 1.5}" width="20" height="${hr + 7}" rx="1"/><path d="M${cx - 6} ${hy + 6}h12M${cx - 6} ${hy + 9.5}h12M${cx - 6} ${hy + 13}h8" stroke="var(--concrete)" stroke-width="1"/></g>` : '';
+  const typer = `<rect class="sheet page" x="${cx - 6}" y="${yb - 42}" width="12" height="9"/><rect x="${cx - 10}" y="${yb - 34}" width="20" height="8" rx="1.4" fill="var(--concrete)" stroke="var(--edge)" stroke-width=".9"/><path d="M${cx - 7} ${yb - 29}h14" stroke="var(--screen)" stroke-width="1.2" stroke-dasharray="1.6 1.2"/>`;
+  const deskTop = pbox({ x: cx - 31, yb, w: 62, h: 22, d: 12, c: 'walnut', cls: 'dk', before: '', extra: `<rect x="${cx - 4}" y="${yb - 14}" width="8" height="2.6" rx="1" class="brass"/>`, shadow: true });
+  const hideAcc = p.beh === 5 ? '' : '';
+  const headAnim = `<g class="head" style="transform-origin:${cx}px ${bTop + 2}px">${headSVG(cx, hy, hr, p)}<text class="zz" x="${cx + hr + 3}" y="${hy - hr + 1}" aria-hidden="true">z</text></g>`;
+  const inner = `<g class="mk"><rect class="fur" style="fill:var(--concrete)" x="${cx - bw / 2 - 4}" y="${bTop + 5}" width="${bw + 8}" height="${bh - 3}" rx="6"/><rect class="shirt" x="${cx - bw / 2}" y="${bTop}" width="${bw}" height="${bh + 2}" rx="8"/>${bodyAcc}${headAnim}</g>`;
+  // draw order: monkey, desk, props, hands. Desk shadow is inside deskTop group, so the desk is its own .up; we wrap everything in a seat group instead.
+  const deskPlain = deskTop.replace('class="up ', 'class="');
+  const tent = `<polygon class="tb tent" points="${cx - 6},${yb - 26} ${cx + 6},${yb - 26} ${cx},${yb - 38}"/>`;
+  return `<g class="up seat ${p.beh >= 0 ? 'b-' + BEH[p.beh] : ''} f${p.fur} ${SHIRTS[p.shirt]}${o.vacant ? ' vacant' : ''}" data-i="${i}" style="transform-origin:${cx}px ${yb}px;--t:${p.t};--d:${p.d}s">` +
+    `${inner}${deskPlain}${typer}${writing}${o.vacant && false ? '' : ''}${prop(p.prop, propX, yb - 27)}<g class="hands">${readPage}${armL}${armR}</g>${tent}</g>`;
+}
+
+/* ===== editor ===== */
+function editorSVG(cx, yb) {
+  const p = { fur: 1, build: 1, eyes: 0, mouth: 1, headAcc: 2, bodyAcc: 2, prop: 2, shirt: 0, side: -1, beh: -1, d: 0, t: 1 };
+  const bw = 28, bh = 34, hr = 11, bBot = yb - 28, bTop = bBot - bh, hy = bTop - hr + 4, sy = bTop + 7;
+  const sxL = cx - bw / 2 + 2, sxR = cx + bw / 2 - 2;
+  const handR = [cx + 12, yb - 32], handL = [cx - 10, yb - 30];
+  const deskW = 112;
+  const desk = pbox({ x: cx - deskW / 2, yb, w: deskW, h: 24, d: 14, c: 'walnut', extra: `<rect x="${cx - 12}" y="${yb - 15}" width="24" height="2.8" rx="1" class="brass"/><rect x="${cx - deskW / 2 + 8}" y="${yb - 18}" width="22" height="12" fill="none" stroke="var(--edge)" stroke-width="1"/><rect x="${cx + deskW / 2 - 30}" y="${yb - 18}" width="22" height="12" fill="none" stroke="var(--edge)" stroke-width="1"/>` }).replace('class="up ', 'class="');
+  const tubeX = cx + deskW / 2 + 14;
+  const tube = `<g class="up" style="transform-origin:${tubeX}px ${yb}px"><polygon class="sh" points="${tubeX - 6},${yb} ${tubeX + 6},${yb} ${tubeX + 30},${yb + 10} ${tubeX + 18},${yb + 10}"/><rect class="fr" style="--c:var(--concrete)" x="${tubeX - 6}" y="${yb - 92}" width="12" height="92" rx="2"/><rect x="${tubeX - 8}" y="${yb - 96}" width="16" height="8" rx="2" class="brass"/><rect x="${tubeX - 8}" y="${yb - 6}" width="16" height="8" rx="2" class="brass"/><rect x="${tubeX - 8}" y="${yb - 48}" width="16" height="4" rx="1.5" class="brass"/><g class="cap"><rect x="${tubeX - 3}" y="${yb - 22}" width="6" height="11" rx="2.6" fill="var(--paper)" stroke="var(--screen)" stroke-width=".8"/></g></g>`;
+  const markX = cx - 28;
+  const stamper = `<g class="stampT"><rect x="${handR[0] - 1.5}" y="${handR[1] - 18}" width="3" height="12" fill="var(--walnut)" stroke="var(--edge)" stroke-width=".7"/><rect x="${handR[0] - 7}" y="${handR[1] - 8}" width="14" height="7" rx="1.5" fill="var(--screen)" stroke="var(--edge)" stroke-width=".8"/></g>`;
+  const garter = (sx) => `<rect x="${sx - 4}" y="${sy + 8}" width="8" height="2.4" fill="var(--concrete)"/>`;
+  return `<g class="up seat ed f${p.fur}" data-editor style="transform-origin:${cx}px ${yb}px;--t:1;--d:0s">` +
+    `<g class="mk"><rect class="fur" style="fill:var(--concrete)" x="${cx - bw / 2 - 4}" y="${bTop + 5}" width="${bw + 8}" height="${bh - 3}" rx="6"/><rect class="shirt" style="--shirt:var(--edge);stroke:var(--concrete)" x="${cx - bw / 2}" y="${bTop}" width="${bw}" height="${bh + 2}" rx="8"/><path d="M${cx - 2} ${bTop + 3}h4l1.6 16l-3.6 4l-3.6 -4z" fill="var(--screen)"/><g class="head" style="transform-origin:${cx}px ${bTop + 2}px">${headSVG(cx, hy, hr, p)}</g></g>` +
+    `${desk}<rect class="page" x="${markX}" y="${yb - 33}" width="22" height="10"/><rect class="mark" x="${markX + 3}" y="${yb - 31}" width="16" height="6" fill="none" stroke="var(--alert)" stroke-width="1.4"/>` +
+    `<rect x="${cx + 8}" y="${yb - 40}" width="22" height="16" rx="2" fill="var(--paper-shade)" stroke="var(--edge)" stroke-width=".9"/><rect x="${cx + 10}" y="${yb - 38}" width="18" height="12" rx="1.4" class="ink"/><path d="M${cx + 12} ${yb - 34}h8M${cx + 12} ${yb - 31}h12" stroke="var(--screen-ink)" stroke-width="1.3"/>` +
+    `<g class="hands"><g class="armL" style="transform-origin:${sxL}px ${sy}px"><line class="sleeve" style="stroke:var(--edge)" x1="${sxL}" y1="${sy}" x2="${handL[0]}" y2="${handL[1] - 2}"/>${garter(sxL)}<circle class="hand" cx="${handL[0]}" cy="${handL[1]}" r="3.3"/></g>` +
+    `<g class="armR" style="transform-origin:${sxR}px ${sy}px"><line class="sleeve" style="stroke:var(--edge)" x1="${sxR}" y1="${sy}" x2="${handR[0]}" y2="${handR[1] - 2}"/><circle class="hand" cx="${handR[0]}" cy="${handR[1]}" r="3.3"/></g>${stamper}</g></g>${tube}`;
+}
+
+/* ===== candidate at the door ===== */
+function candidateSVG(cx, yb) {
+  const p = { fur: 2, build: 1, eyes: 3, mouth: 0, headAcc: 5, bodyAcc: 2, prop: 0, shirt: 1, side: 1, beh: -1, d: 0, t: 1 };
+  const hr = 11, hy = yb - 58;
+  return `<g class="cand f2 sk-mustard" id="cand"><polygon class="sh" points="${cx - 12},${yb} ${cx + 12},${yb} ${cx + 34},${yb + 7} ${cx + 8},${yb + 7}"/>` +
+    `<rect x="${cx - 8}" y="${yb - 12}" width="6" height="12" rx="2" class="fur"/><g class="foot" style="transform-origin:${cx + 5}px ${yb - 12}px"><rect x="${cx + 2}" y="${yb - 12}" width="6" height="12" rx="2" class="fur"/></g>` +
+    `<rect class="shirt" x="${cx - 12}" y="${yb - 40}" width="24" height="30" rx="8"/><path d="M${cx - 2} ${yb - 38}h4l1.6 14l-3.6 4l-3.6 -4z" fill="var(--alert)" stroke="var(--edge)" stroke-width=".8"/>` +
+    `<rect x="${cx + 16}" y="${yb - 20}" width="18" height="14" rx="2" fill="var(--walnut)" stroke="var(--edge)" stroke-width="1"/><path d="M${cx + 21} ${yb - 20}v-3h8v3" fill="none" stroke="var(--edge)" stroke-width="1.4"/><rect x="${cx + 23}" y="${yb - 15}" width="4" height="3" class="brass"/>` +
+    `<line x1="${cx + 11}" y1="${yb - 36}" x2="${cx + 22}" y2="${yb - 20}" class="sleeve"/><circle class="hand" cx="${cx + 22}" cy="${yb - 19}" r="3.3"/><line x1="${cx - 11}" y1="${yb - 36}" x2="${cx - 14}" y2="${yb - 17}" class="sleeve"/><circle class="hand" cx="${cx - 14}" cy="${yb - 15}" r="3.3"/>` +
+    `<g>${headSVG(cx, hy + 14, hr, p)}</g></g>`;
+}
+
+/* ===== build the map ===== */
+function build() {
+  const defs = `<defs><radialGradient id="halo"><stop offset="0" style="stop-color:var(--glow);stop-opacity:.8"/><stop offset="1" style="stop-color:var(--glow);stop-opacity:0"/></radialGradient>` +
+    `<filter id="paperfx" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".8" numOctaves="2" seed="7" result="n"/><feColorMatrix in="n" type="saturate" values="0"/></filter></defs>`;
+  let s = defs;
+  // floor sheet on the table
+  s += `<rect class="table-shadow" x="14" y="76" width="374" height="676" rx="5" opacity=".28"/>`;
+  s += `<rect class="floor-edge" x="8" y="66" width="374" height="682" rx="4"/><rect class="floor" x="8" y="66" width="374" height="676" rx="4"/>`;
+  s += `<rect class="grain" x="8" y="66" width="374" height="676" filter="url(#paperfx)"/>`;
+  s += `<path class="crease-hi" d="M10 549.5H380"/><path class="crease" d="M10 548.5H380"/>`;
+  s += `<path class="route" d="M206 706C206 640 196 600 196 540"/><path class="route" d="M150 690C168 690 190 700 200 706"/>`;
+  s += [[16, 70, -35], [364, 70, 35], [16, 736, 35], [364, 736, -35]].map(([x, y, a]) => `<rect class="tape" x="${x - 9}" y="${y - 4}" width="18" height="8" transform="rotate(${a} ${x} ${y})"/>`).join('');
+  // back wall (standing cutout)
+  const wall = pbox({ x: 8, yb: 66, w: 374, h: 60, d: 6, c: 'shade', tabs: false, shadow: true, extra:
+    [34, 150, 266].map((wx, k) => `<polygon points="${wx},${14 + 3} ${wx + 62},${14 + 3} ${wx + 54},${58} ${wx + 8},${58}" fill="var(--concrete)" stroke="var(--edge)" stroke-width="1"/><polygon points="${wx + 6},${19} ${wx + 56},${19} ${wx + 50},${54} ${wx + 12},${54}" fill="var(--glow)" opacity="${k === 1 ? .95 : .8}"/><path d="M${wx + 31} 19V54" stroke="var(--concrete)" stroke-width="1.4"/>`).join('') +
+    `<path d="M8 26H382" stroke="var(--edge)" stroke-width=".8" stroke-dasharray="2 4" opacity=".7"/>` });
+  s += wall.replace('class="up ', 'class="');
+  s += bowl(114, 22, 14) + bowl(304, 22, 14);
+  // ---- zone: departments
+  s += `<g class="zone" id="z-departments"><rect class="patch-sh" x="14" y="78" width="204" height="108" rx="4"/><rect class="patch dp" x="10" y="72" width="208" height="110" rx="4"/>`;
+  s += plate(114, 78, 118, 20, 'Departments', 'mustard', 16);
+  const cab = (x, nm) => {
+    const icon = nm === 0 ? `<circle cx="${x + 29}" cy="${112}" r="2.6" class="ink"/><path d="M${x + 24} 120a5 5 0 0 1 10 0z" class="ink"/>` : nm === 1 ? `<path d="M${x + 24} 120l5 -9l5 9z" fill="none" stroke="var(--screen)" stroke-width="1.8" stroke-linejoin="round"/><path d="M${x + 24} 123h10" class="inkl" stroke-width="1.8"/>` : `<path d="M${x + 25} 121l8 -9" class="inkl" stroke-width="2.6"/><path d="M${x + 24} 123l1.4 -3.4l2 2z" class="ink"/>`;
+    const dr = [0, 1, 2].map(k => `<rect x="${x + 5}" y="${108 + k * 20 - (k ? 0 : 0)}" width="${48}" height="${17}" rx="1.2" fill="none" stroke="var(--edge)" stroke-width=".9" transform="translate(0 ${k * 0})"/>`).join('');
+    return pbox({ x, yb: 172, w: 58, h: 60, d: 10, c: 'steel', extra:
+      `<rect x="${x + 5}" y="${116}" width="48" height="22" rx="1.2" fill="none" stroke="var(--edge)" stroke-width=".9"/><rect x="${x + 5}" y="${140}" width="48" height="22" rx="1.2" fill="none" stroke="var(--edge)" stroke-width=".9"/>` +
+      `<rect x="${x + 15}" y="${122}" width="28" height="12" rx="1.6" class="brass"/>${icon.replace(/112|120|121|123|111/g, m => m)}` +
+      `<rect x="${x + 23}" y="${146}" width="12" height="3.4" rx="1.4" class="brass"/><rect x="${x + 23}" y="${156}" width="12" height="3.4" rx="1.4" class="brass"/>` });
+  };
+  s += cab(18, 0) + cab(80, 1) + cab(142, 2);
+  s += `<rect class="ring" x="8" y="70" width="212" height="114" rx="8"/></g>`;
+  // ---- zone: director's office (glass-walled)
+  const ox = 240, ow = 128, oyb = 174, oh = 60;
+  s += `<g class="zone" id="z-director"><rect class="patch-sh" x="232" y="78" width="148" height="108" rx="4"/><rect class="patch dr" x="228" y="72" width="152" height="110" rx="4"/>`;
+  s += plate(304, 78, 96, 20, 'Director', 'mustard', 16);
+  s += `<g class="up" style="transform-origin:${ox + ow / 2}px ${oyb}px"><polygon class="sh" points="${ox},${oyb} ${ox + ow},${oyb} ${ox + ow + 20},${oyb + 12} ${ox + 20},${oyb + 12}"/>` +
+    `<rect x="${ox}" y="${oyb - oh}" width="${ow}" height="${oh}" fill="color-mix(in srgb, var(--walnut) 45%, var(--paper-shade))" stroke="var(--edge)" stroke-width="1.2"/>` +
+    `<polygon points="${ox + 84},${oyb - 52} ${ox + 120},${oyb - 52} ${ox + 116},${oyb - 28} ${ox + 88},${oyb - 28}" fill="var(--glow)" stroke="var(--edge)" stroke-width="1"/>` +
+    `<rect x="${ox + 8}" y="${oyb - 50}" width="30" height="24" fill="var(--paper)" stroke="var(--edge)" stroke-width="1"/><path d="M${ox + 12} ${oyb - 44}h22M${ox + 12} ${oyb - 40}h22M${ox + 12} ${oyb - 36}h12" stroke="var(--concrete)" stroke-width="1"/><rect x="${ox + 27}" y="${oyb - 33}" width="8" height="5" fill="none" stroke="var(--alert)" stroke-width="1.2"/>` +
+    `<rect class="fr" style="--c:var(--olive)" x="${ox + 70}" y="${oyb - 46}" width="30" height="36" rx="9"/>` +
+    `<rect class="fr c-walnut" x="${ox + 22}" y="${oyb - 22}" width="84" height="18" rx="1.5"/><polygon class="tp c-walnut" points="${ox + 26},${oyb - 32} ${ox + 102},${oyb - 32} ${ox + 106},${oyb - 22} ${ox + 22},${oyb - 22}"/>` +
+    `<rect x="${ox + 56}" y="${oyb - 17}" width="16" height="3" rx="1.2" class="brass"/><rect x="${ox + 36}" y="${oyb - 38}" width="16" height="6" fill="var(--paper)" stroke="var(--edge)" stroke-width=".8"/>` +
+    `<path d="M${ox + 96} ${oyb - 32}l6 -8l-2 -5" class="inkl" stroke-width="1.4"/><path d="M${ox + 98} ${oyb - 48}h9l-2 5h-5z" fill="var(--mustard)" stroke="var(--edge)" stroke-width=".8"/><circle class="halo pulse" cx="${ox + 102}" cy="${oyb - 42}" r="16"/></g>`;
+  s += `<g class="up" style="transform-origin:${ox + ow / 2}px ${oyb}px">` +
+    `<polygon class="glass-f" points="${ox},${oyb + 3} ${ox + 30},${oyb + 3} ${ox + 30},${oyb + 3 - oh} ${ox},${oyb + 3 - oh}"/><polygon class="glass-f" points="${ox + 54},${oyb + 3} ${ox + ow},${oyb + 3} ${ox + ow},${oyb + 3 - oh} ${ox + 54},${oyb + 3 - oh}"/>` +
+    `<path d="M${ox + 8} ${oyb - 6}l14 -34M${ox + 62} ${oyb - 6}l22 -34M${ox + 98} ${oyb - 6}l22 -34" stroke="var(--edge)" stroke-width="3" opacity=".6"/>` +
+    `<path d="M${ox + 91} ${oyb + 3}V${oyb + 3 - oh}" stroke="var(--mustard)" stroke-width="2"/>` +
+    `<polygon class="glass-t" points="${ox + 6},${oyb + 3 - oh - 8} ${ox + ow - 6},${oyb + 3 - oh - 8} ${ox + ow},${oyb + 3 - oh} ${ox},${oyb + 3 - oh}"/>` +
+    `<polygon class="glass-f" points="${ox + 30},${oyb + 3} ${ox + 46},${oyb + 9} ${ox + 46},${oyb + 9 - oh + 6} ${ox + 30},${oyb + 3 - oh}" style="fill:color-mix(in srgb, var(--glow) 40%, transparent)"/></g>`;
+  s += `<rect class="ring" x="226" y="70" width="156" height="114" rx="8"/></g>`;
+  // ---- zone: typing pool
+  s += `<g class="zone" id="z-pool"><rect class="patch-sh" x="18" y="196" width="362" height="326" rx="5"/><rect class="patch pl" x="14" y="190" width="362" height="326" rx="5"/>`;
+  s += plate(195, 196, 118, 20, 'Typing Pool', 'mustard', 12);
+  s += `<g><circle class="halo pulse" cx="120" cy="206" r="18"/><circle class="halo pulse" cx="270" cy="206" r="18" style="animation-delay:-1.6s"/><path d="M114 208a6 6 0 0 0 12 0z M264 208a6 6 0 0 0 12 0z" class="glowf" stroke="var(--edge)" stroke-width="1"/></g>`;
+  const xs = [56.6, 125.8, 195, 264.2, 333.4];
+  const seats = [];
+  for (let i = 0; i < 10; i++) seats.push(seatSVG(i, xs[i % 5], i < 5 ? 318 : 410, { vacant: i >= 8 }));
+  s += seats.slice(0, 5).join('') + seats.slice(5).join('');
+  s += editorSVG(96, 502);
+  s += pbox({ x: 288, yb: 502, w: 40, h: 66, d: 10, c: 'steel', extra: `<rect x="293" y="${440}" width="30" height="20" rx="1.2" fill="none" stroke="var(--edge)" stroke-width=".9"/><rect x="293" y="${464}" width="30" height="20" rx="1.2" fill="none" stroke="var(--edge)" stroke-width=".9"/><rect x="298" y="446" width="20" height="8" rx="1.4" class="brass"/><rect x="298" y="470" width="20" height="8" rx="1.4" class="brass"/>` });
+  s += plant(350, 502, 1.3);
+  s += `<rect class="ring" x="12" y="188" width="366" height="332" rx="8"/></g>`;
+  // ---- zone: personnel + entrance
+  s += `<g class="zone" id="z-personnel"><rect class="patch-sh" x="14" y="600" width="140" height="146" rx="4"/><rect class="patch pe" x="10" y="594" width="142" height="148" rx="4"/>`;
+  const pcx = 80, pyb = 714;
+  const officer = seatSVG(21, pcx, pyb, { override: { beh: 2, prop: 4, headAcc: 5, bodyAcc: 3, side: 1, fur: 3, shirt: 0, build: 1, eyes: 0, mouth: 0, d: -1.1, t: 1 } });
+  s += plate(pcx, 606, 104, 20, 'Personnel', 'mustard', 12);
+  s += officer.replace(/(<rect class="up|class="up seat)/, '$1');
+  s += `<g class="up" style="transform-origin:130px 728px"><rect class="fr c-paper" style="--c:var(--paper)" x="116" y="708" width="20" height="14" rx="1.5"/><rect class="fr c-paper" style="--c:var(--paper)" x="118" y="703" width="20" height="14" rx="1.5"/><path d="M121 709h12M121 713h9" stroke="var(--concrete)" stroke-width="1"/></g>`;
+  s += `<g class="bob"><path d="M30 700a5 5 0 0 1 10 0z" class="glowf" stroke="var(--edge)"/><circle cx="35" cy="696" r="1.8" class="brass"/></g>`;
+  s += `<rect class="ring" x="6" y="592" width="150" height="152" rx="8"/></g>`;
+  // entrance: mat + door
+  s += `<rect class="patch pe" x="168" y="716" width="72" height="22" rx="2"/><path d="M174 727h60" stroke="var(--screen)" stroke-width="1.4" stroke-dasharray="3 3" opacity=".6"/>`;
+  s += pbox({ x: 178, yb: 716, w: 52, h: 70, d: 8, c: 'concrete', extra: `<rect x="184" y="652" width="40" height="64" fill="var(--glow)" stroke="var(--edge)" stroke-width="1"/><polygon points="184,652 184,716 168,722 168,648" fill="var(--olive)" stroke="var(--edge)" stroke-width="1" /><circle cx="172" cy="684" r="1.6" class="brass"/><polygon points="184,716 224,716 242,742 166,742" fill="var(--glow)" opacity=".35"/>` });
+  s += candidateSVG(244, 736);
+  s += plant(30, 560, .9);
+  s += plant(352, 700, 1.1);
+  // arrow mat label
+  s += `<text class="sg sm" x="204" y="733" style="fill:var(--screen)">ENTRANCE</text>`;
+  $('#map').innerHTML = s;
+}
+build();
+
+/* ===== state + readout ===== */
+const state = { seated: 8, desks: 10, bananas: 1284, income: 12.4, monkeys: 8, hireCost: 40, deskCost: 120, open: null, ernest: false };
+const fmt = n => n.toLocaleString('en-US');
+function paintReadout() { $('#r-ban').textContent = fmt(Math.floor(state.bananas)); $('#r-inc').textContent = state.income.toFixed(1) + '/s'; $('#r-mon').textContent = state.monkeys; }
+setInterval(() => { state.bananas += state.income; paintReadout(); }, 1000);
+const say = t => { const l = $('#live'); l.textContent = ''; setTimeout(() => (l.textContent = t), 30); };
+
+/* ===== zones ===== */
+const Z = {
+  personnel: { n: 1, name: 'Personnel', form: 'Form 3-H · Hiring', cx: 80, cy: 650, s: 1.3, hint: () => `${state.desks - state.seated} desk${state.desks - state.seated === 1 ? '' : 's'} free` },
+  pool: { n: 2, name: 'Typing Pool', form: 'Form 7-T · Output', cx: 195, cy: 290, s: 1.12, hint: () => 'Typing and editing' },
+  departments: { n: 3, name: 'Departments', form: 'Form 5-D · Funding', cx: 114, cy: 128, s: 1.55, hint: () => 'Three departments' },
+  director: { n: 4, name: "Director's Office", form: 'Form 9-R · Readiness', cx: 303, cy: 130, s: 1.75, hint: () => 'Readiness and Permit' }
+};
+function dial(label, val, max, word) {
+  const a = -180 + 180 * (val / max);
+  return `<div class="gauge"><svg viewBox="0 0 100 62" role="img" aria-label="${label}: ${word}"><path d="M10 54A40 40 0 0 1 90 54" fill="none" stroke="var(--concrete)" stroke-width="8"/><path d="M62 21.5A40 40 0 0 1 90 54" fill="none" stroke="var(--mustard)" stroke-width="8"/><path d="M10 54A40 40 0 0 1 90 54" fill="none" stroke="var(--ink)" stroke-width="1" stroke-dasharray="1 7" transform="translate(0 -9)" opacity=".0"/><line x1="50" y1="54" x2="50" y2="22" stroke="var(--ink)" stroke-width="3" stroke-linecap="round" transform="rotate(${a + 90} 50 54)"/><circle cx="50" cy="54" r="5" fill="var(--walnut)" stroke="var(--edge)"/></svg><p class="lab">${label}</p><div class="gv">${word}</div></div>`;
+}
+const SHEETS = {
+  personnel() {
+    const free = state.desks - state.seated, full = free <= 0;
+    const desks = Array.from({ length: state.desks }, (_, i) => `<i class="${i < state.seated ? 'on' : ''}"></i>`).join('');
+    return `<div class="panel"><p class="lab">Seated</p><div class="big" id="seatnum">${state.seated} / ${state.desks} <small>desks</small></div>
+      <div class="desks" role="progressbar" aria-label="Desks seated" aria-valuemin="0" aria-valuemax="${state.desks}" aria-valuenow="${state.seated}" aria-valuetext="${state.seated} of ${state.desks} desks seated">${desks}</div>
+      <p class="note">${full ? 'Every desk is taken. Buy a desk before the next hire.' : `${free} free desk${free === 1 ? '' : 's'}. A monkey is waiting at the entrance.`}</p></div>
+      <div class="hirebox"><button class="hire ${state.ernest ? 'nudge' : ''}" id="hire" ${full ? 'disabled' : ''}>Hire monkey</button>
+      <p class="delta" id="hiredelta">${full ? '' : `Monkeys ${state.monkeys} → ${state.monkeys + 1} · Income ${state.income.toFixed(1)} → ${(state.income + 1.1).toFixed(1)}/s`}</p>
+      <p class="why">${full ? 'No free desk. Buy one below.' : `Cost ${state.hireCost} bananas. You have ${fmt(Math.floor(state.bananas))}.`}</p></div>
+      <div class="panel sheetinner" style="margin-top:14px"><div class="row2"><div><p class="lab">Desk ${state.desks + 1}</p><p class="delta">Desks ${state.desks} → ${state.desks + 1} · ${state.deskCost} bananas</p></div><button class="btn2" id="buydesk">Buy desk</button></div></div>`;
+  },
+  pool() {
+    return `<div class="panel"><div class="gauges">${dial('Typing', 7, 10, 'Partial')}${dial('Editing', 9, 10, 'Full')}</div>
+      <p class="note"><b>Bottleneck:</b> editing capacity is fully committed. Submissions in excess are discarded.</p></div>
+      <div class="hirebox" style="margin-top:12px"><div class="row2" style="width:100%"><div><p class="lab">Move one monkey to Editing</p><p class="delta">Certified 4.0/s → 5.1/s</p></div><button class="btn2">Reassign</button></div></div>
+      <p class="why" style="margin-top:8px">Seated: 8 typing, 1 Editor at the stamping desk.</p>`;
+  },
+  departments() {
+    const row = (nm, lv, pct, cost) => `<div class="drow"><div><span class="nm">${nm}</span> <span class="delta">Level ${lv} → ${lv + 1}</span><div class="bar" role="progressbar" aria-label="${nm} output" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}" aria-valuetext="${pct} percent of demand"><i style="width:${pct}%"></i></div></div><button class="btn2">${cost}</button></div>`;
+    return `<div class="panel">${row('Recruiting', 3, 70, '90 🍌')}${row('Construction', 2, 40, '120 🍌')}${row('Editing', 4, 90, '150 🍌')}</div><p class="why" style="margin-top:8px">Funding split: balanced. Each purchase is signed once on a single requisition form.</p>`;
+  },
+  director() {
+    return `<div class="panel"><div class="gauges">${dial('Scale', 6, 10, 'Partial')}${dial('Stability', 2, 10, 'Building')}</div>
+      <p class="note">Infinity Permit: <span class="stamp">NOT ISSUED</span></p></div>
+      <div class="hirebox" style="margin-top:12px"><button class="btn2" style="min-height:50px;width:100%" disabled>Declare Infinity</button><p class="why">Locked: the Permit is not issued. Hold Full readiness for 60 s.</p></div>`;
+  }
+};
+
+/* ===== camera ===== */
+const cam = $('#cam'), sheet = $('#sheet'), ernest = $('#ernest');
+let panX = 0, panY = 0;
+function setCam(tx, ty, s) { cam.style.setProperty('--tx', tx + 'px'); cam.style.setProperty('--ty', ty + 'px'); cam.style.setProperty('--s', s); }
+function setPan(x, y) { panX = x; panY = y; cam.style.setProperty('--px', x + 'px'); cam.style.setProperty('--py', y + 'px'); }
+function frameZone(id) {
+  const z = Z[id];
+  const sh = sheet.offsetHeight || 420, bottom = VH - sh - 38;
+  const top = state.ernest ? 226 : HDR + 8;
+  const ty = (top + bottom) / 2 - z.s * (z.cy + HDR);
+  setCam(195 - z.s * z.cx, ty, z.s);
+}
+function open(id) {
+  const z = Z[id];
+  if (state.open && state.open !== id) { $(`#z-${state.open}`).classList.remove('pop', 'active'); }
+  state.open = id;
+  $('#foldtab').innerHTML = `<b>${z.n}</b>${z.name}`;
+  renderBody(id);
+  sheet.setAttribute('aria-label', z.name + ' sheet');
+  $(`#z-${id}`).classList.add('pop', 'active');
+  setPan(0, 0);
+  ernest.classList.toggle('docked', state.ernest);
+  sheet.classList.add('open');
+  frameZone(id);
+  document.querySelectorAll('#dirlist button').forEach(b => b.setAttribute('aria-current', b.dataset.zone === id ? 'true' : 'false'));
+  say(z.name + ' opened.');
+  wire();
+  setTimeout(() => { if (state.open === id) frameZone(id); }, 60);
+}
+function close() {
+  if (!state.open) return;
+  const id = state.open; state.open = null;
+  $(`#z-${id}`).classList.remove('pop', 'active');
+  sheet.classList.remove('open');
+  setCam(0, 0, 1); setPan(0, 0);
+  ernest.classList.remove('docked');
+  document.querySelectorAll('#dirlist button').forEach(b => b.setAttribute('aria-current', 'false'));
+  const hot = $(`.hot[data-zone="${id}"]`); if (hot) hot.focus({ preventScroll: true });
+  say('Back on the floor.');
+}
+function wire() {
+  const c = $('#closebtn'); if (c) c.onclick = close;
+  const h = $('#hire'); if (h) h.onclick = hire;
+  const b = $('#buydesk'); if (b) b.onclick = buyDesk;
+}
+function renderBody(id) {
+  const z = Z[id];
+  $('#sheetbody').innerHTML = `<div class="sheet-head"><div><h2>${z.name}</h2><p class="form">${z.form}</p></div><button class="close" id="closebtn" aria-label="Fold down ${z.name}"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 5l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.4"/></svg>Fold down</button></div>` + SHEETS[id]();
+  wire();
+}
+function hire() {
+  if (state.seated >= state.desks) return;
+  const idx = state.seated;
+  state.seated++; state.monkeys++; state.income += 1.1; state.bananas -= state.hireCost;
+  const seat = $(`.seat[data-i="${idx}"]`);
+  if (seat) { seat.classList.remove('vacant'); seat.classList.add('arrive'); setTimeout(() => seat.classList.remove('arrive'), 800); }
+  const cand = $('#cand'); if (cand) cand.classList.add('gone');
+  if (state.seated < state.desks) setTimeout(() => cand && cand.classList.remove('gone'), 2200);
+  paintReadout(); say(`Monkey seated at desk ${idx + 1}. ${state.seated} of ${state.desks} desks seated.`);
+  const h = $('#hire'); const focusHire = document.activeElement === h;
+  renderBody('personnel'); if (focusHire && $('#hire') && !$('#hire').disabled) $('#hire').focus(); else if ($('#buydesk')) $('#buydesk').focus();
+}
+function buyDesk() {
+  state.desks++; state.bananas -= state.deskCost; paintReadout();
+  say(`Desk ${state.desks} installed.`);
+  renderBody('personnel'); $('#buydesk').focus();
+}
+
+/* hotspots */
+document.querySelectorAll('.hot').forEach(h => h.addEventListener('click', () => { if (dragMoved) return; closeDir(); open(h.dataset.zone); }));
+/* directory */
+const dir = $('#dir'), dirbtn = $('#dirbtn');
+$('#dirlist').innerHTML = Object.entries(Z).map(([id, z]) => `<li><button data-zone="${id}" aria-current="false"><span class="fl" aria-hidden="true">${z.n}</span><span class="nm">${z.name}<span class="hn">${z.hint()}</span></span></button></li>`).join('');
+function closeDir() { dir.hidden = true; dirbtn.setAttribute('aria-expanded', 'false'); }
+dirbtn.addEventListener('click', () => { const o = dir.hidden; dir.hidden = !o; dirbtn.setAttribute('aria-expanded', String(o)); if (o) { document.querySelectorAll('#dirlist button').forEach(b => { const z = Z[b.dataset.zone]; b.querySelector('.hn').textContent = z.hint(); }); } });
+$('#dirlist').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; closeDir(); open(b.dataset.zone); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (!dir.hidden) { closeDir(); dirbtn.focus(); } else close(); } });
+document.addEventListener('pointerdown', e => { if (!dir.hidden && !e.target.closest('#dir, #dirbtn')) closeDir(); });
+
+/* Ernest */
+function showErnest() { state.ernest = true; ernest.classList.toggle('docked', !!state.open); ernest.classList.add('in'); if (state.open === 'personnel') { const h = $('#hire'); if (h) h.classList.add('nudge'); } }
+$('#ernest-ok').addEventListener('click', () => {
+  state.ernest = false; ernest.classList.remove('in');
+  const h = $('#hire'); if (h) h.classList.remove('nudge');
+  if (state.open) frameZone(state.open);
+  say('Orientation card dismissed.');
+});
+setTimeout(showErnest, 650);
+
+/* gentle drag-to-pan */
+let dragMoved = false;
+(() => {
+  let sx = 0, sy = 0, ox = 0, oy = 0, down = false, moved = false;
+  cam.addEventListener('pointerdown', e => { down = true; moved = false; sx = e.clientX; sy = e.clientY; ox = panX; oy = panY; });
+  window.addEventListener('pointermove', e => {
+    if (!down) return;
+    const dx = e.clientX - sx, dy = e.clientY - sy;
+    if (!moved && Math.hypot(dx, dy) < 7) return;
+    if (!moved) { moved = true; cam.classList.add('dragging'); }
+    const lim = state.open ? 70 : 22;
+    setPan(Math.max(-lim, Math.min(lim, ox + dx)), Math.max(-lim, Math.min(lim, oy + dy)));
+  });
+  window.addEventListener('pointerup', () => { if (!down) return; down = false; cam.classList.remove('dragging'); if (moved) { dragMoved = true; setTimeout(() => (dragMoved = false), 60); if (!state.open) { setPan(0, 0); } } });
+})();
+
+window.__beh = Array.from({ length: 8 }, (_, i) => BEH[parts(i).beh]);
+paintReadout();
+})();
+</script>
+</body>
+</html>
