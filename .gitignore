@@ -4,3 +4,4 @@ dist/
 *.log
 .env*
 design/**/shots/
+design/explorations/dist/

@@ -83,7 +83,9 @@ with a written reason.
 ### 5. Accept (Opus; Matt for hero assets)
 Opus reviews the final screenshots and the panel summary and integrates the
 asset into `game/`. **Hero assets need Matt's sign-off** (gate 2), shown as a
-private artifact he can open on his phone. Accepted assets ship in the next
+private artifact he can open on his phone. Publish the mockup itself as the
+whole page (`node scripts/artifact-page.mjs` strips its skeleton), never
+inside a phone frame or iframe. Accepted assets ship in the next
 build with a "what to look for" guide.
 
 ## Definition of done
