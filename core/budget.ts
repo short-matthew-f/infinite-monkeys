@@ -19,6 +19,8 @@ import type { BudgetLines, EventSink, QuarterReport } from './events.js';
 import { capability, certifyTiers, deptLevelCost, deptOutput, editingPool, finiteBottleneck, hiredEditingCapacity, reviewSpeedMult, secondsToTicks, suggestShares } from './model.js';
 import type { BudgetState, GameState } from './state.js';
 import { DEPTS, type DeptId, type Tuning } from './tuning.js';
+import { run } from './step.js';
+import { nullSink } from './events.js';
 
 const LINES = [...DEPTS, 'discretionary'] as const;
 /** Department auto-buys per tick are capped so one tick stays cheap after a large lump. */
@@ -280,6 +282,43 @@ export function declineRequisition(s: GameState, t: Tuning, sink: EventSink): bo
   if (!b?.requisition) return false;
   closeRequisition(s, t, b, sink, 'declined');
   return true;
+}
+
+// ---------- review preview ----------
+
+export interface QuarterPreview {
+  /** Levels each department would buy from its account by quarter end. */
+  levels: Record<DeptId, number>;
+  /** Wallet at quarter end, before the sweep, if nothing is bought by hand. */
+  wallet: number;
+  /** Income per second at quarter end. */
+  income: number;
+  /** Review demand and the editing pool at quarter end (finds per second). */
+  demand: number;
+  pool: number;
+}
+
+/**
+ * What signing `lines` now would do by quarter end if the player bought
+ * nothing by hand: clone, sign, run the quarter out, read. Null when no
+ * review is open or the lines aren't valid. The review shows these as facts.
+ */
+export function previewQuarter(s: GameState, t: Tuning, lines: BudgetLines): QuarterPreview | null {
+  const b = activeBudget(s, t);
+  if (!b || !b.reviewDue || !validLines(t, lines)) return null;
+  const p = JSON.parse(JSON.stringify(s)) as GameState;
+  if (!signBudget(p, t, nullSink, lines)) return null;
+  const before = Object.fromEntries(DEPTS.map((d) => [d, p.depts[d].level])) as Record<DeptId, number>;
+  // Stop one tick short of the quarter end so the sweep hasn't run.
+  run(p, t, nullSink, Math.max(0, secondsToTicks(t, quarterSecondsLeft(p, t)) - 1));
+  const cert = certifyTiers(p, t, editingPool(p, t), p.tierAllocation);
+  return {
+    levels: Object.fromEntries(DEPTS.map((d) => [d, p.depts[d].level - before[d]])) as Record<DeptId, number>,
+    wallet: N.toNumber(p.bananas),
+    income: N.toNumber(cert.income),
+    demand: N.toNumber(certifyTiers(p, t, N.zero, p.tierAllocation).demand),
+    pool: N.toNumber(editingPool(p, t)),
+  };
 }
 
 /** At the ceremony the budget closes: accounts and the pot return to the wallet. */

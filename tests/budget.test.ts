@@ -11,6 +11,7 @@ import {
   grantRequisition,
   headShares,
   levelsListPrice,
+  previewQuarter,
   N,
   nullSink,
   requisitionPrice,
@@ -159,6 +160,22 @@ describe('quarterly budget', () => {
     // The live shares follow the heads every tick.
     run(s, TB, nullSink, 1);
     expect(s.shares).toEqual(headShares(s, TB));
+  });
+
+  it('previews a signature by running the quarter on a clone', () => {
+    const s = opened();
+    run(s, TB, nullSink, ticks(20));
+    const before = JSON.stringify(s);
+    const p = previewQuarter(s, TB, LINES)!;
+    expect(JSON.stringify(s)).toBe(before); // the live state is untouched
+    // The same signature, actually played out with no manual buys, lands on the preview.
+    const levels = { recruiting: s.depts.recruiting.level, construction: s.depts.construction.level, editing: s.depts.editing.level };
+    signBudget(s, TB, nullSink, LINES);
+    run(s, TB, nullSink, s.budget!.quarterStartTick + ticks(Q) - s.tick - 1); // to one tick before quarter end
+    expect(p.levels.editing).toBe(s.depts.editing.level - levels.editing);
+    expect(p.wallet).toBeCloseTo(N.toNumber(s.bananas), 6);
+    expect(previewQuarter(s, TB, LINES)).toBeNull(); // no review open
+    expect(previewQuarter(opened(), TB, { ...LINES, discretionary: 0.9 })).toBeNull(); // invalid lines
   });
 
   describe('requisitions', () => {
