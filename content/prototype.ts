@@ -103,5 +103,6 @@ export const prototypeTuning: Tuning = {
 // lines; the shipped game still runs `prototypeTuning` until it's adopted.
 export const prototypeBudgetTuning: Tuning = {
   ...prototypeTuning,
-  budget: { quarterSeconds: 180, suggestedDiscretionary: 0.7, minDiscretionary: 0.1, sweepShare: 1 },
+  budget: { quarterSeconds: 180, suggestedDiscretionary: 0.7, minDiscretionary: 0.1, sweepShare: 1, editingShareCap: 0.35, readinessEditingShareCap: 0.8,
+    requisitions: { levels: 3, priceFactor: 0.8, openSeconds: 45, cooldownSeconds: 40 } },
 };

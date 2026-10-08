@@ -13,11 +13,10 @@ import {
   hotelPool,
   meters,
   metersFull,
-  suggestShares,
   secondsToTicks,
 } from './model.js';
 import type { GameState } from './state.js';
-import { activeBudget, autoBuy, bankIncome, maybeEndQuarter, maybeOpenBudget } from './budget.js';
+import { activeBudget, autoBuy, headShares, maybeRequisition, bankIncome, maybeEndQuarter, maybeOpenBudget } from './budget.js';
 import { DEPTS, type Tuning } from './tuning.js';
 
 /** Advances the game by exactly one tick. The only way time passes in core. */
@@ -48,7 +47,7 @@ function stepFinite(s: GameState, t: Tuning, sink: EventSink): void {
   maybeOpenBudget(s, t, sink);
   const b = activeBudget(s, t);
   // Budget mode: the heads coordinate how hard each department works.
-  if (b) s.shares = suggestShares(s, t);
+  if (b) s.shares = headShares(s, t);
 
   // Recruiting fills free desks; anything beyond waits in the lobby (waste).
   const free = N.max(N.zero, N.sub(s.desks, s.monkeys));
@@ -80,6 +79,7 @@ function stepFinite(s: GameState, t: Tuning, sink: EventSink): void {
     b.stats.certifiedFinds += N.toNumber(N.sum(Object.values(cert.certified))) * dt;
     b.stats.discardedFinds += N.toNumber(cert.discarded) * dt;
     autoBuy(s, t, b, sink);
+    maybeRequisition(s, t, b, sink);
   } else {
     s.bananas = N.add(s.bananas, N.mul(cert.income, dt));
   }

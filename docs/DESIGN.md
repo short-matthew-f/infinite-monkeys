@@ -704,8 +704,20 @@ rhythm.
   closes on the previous lines (`missedReviews`). Offline catch-up runs the
   same ticks.
 - The heads coordinate how hard each department works: funding shares follow
-  `suggestShares` every tick, and `setShares` is refused in this mode. The
-  budget decides growth; the free slider is gone.
+  `headShares` every tick, and `setShares` is refused in this mode. That's the
+  `suggestShares` rule with the budget's own Editing cap (`editingShareCap`,
+  0.35), raised to `readinessEditingShareCap` (0.8) once every department is
+  at stage 4. The raise keys on stages, not on pinning Readiness, because the
+  game never asks the player to pin. The budget decides growth; the free
+  slider is gone.
+- **Requisitions.** Mid-quarter, the head of the short department files a
+  requisition: `levels` levels (3) at `priceFactor` (0.8) of their list price,
+  paid from the wallet. Short means Editing while review demand outruns the
+  pool, otherwise the lower-capability of Recruiting and Construction. One is
+  open at a time. It expires after `openSeconds` (45 s) and never outlives its
+  quarter. The next one waits `cooldownSeconds` (40 s) after the last closes.
+  Grant (`grantRequisition`) or decline (`declineRequisition`). Outcomes go in
+  the quarter report. The memo states the need and the price, never advice.
 - Each quarter keeps a report (`QuarterReport`: income, hires, desks, finds
   certified and discarded, auto-levels, wallet spent, swept), so the review
   and the heads' presentations are a pure snapshot from core.
@@ -717,31 +729,43 @@ rhythm.
   together. It's a suggestion. Reports and heads state facts and never say
   which lines to sign.
 
-**Not built yet (proposed with it).** Requisitions (paid mid-quarter requests
-from heads), an emergency review, and growth-triggered quarters.
+**Not built.** A separate emergency review. Lifting the Editing cap at stage 4
+closed the Readiness drag that it was meant to fix, and requisitions are the
+mid-quarter lever. Growth-triggered quarters are not built either.
 
 **Alternative noted, not built.** Lines as operating funding only (today's
 multiplier, locked per quarter, with no department accounts).
 
-**Sim, casual bot (Oct 8 2026).** Run with `node --import tsx sim/budget-report.ts casual [grid|sweep]`.
-- **Today's economy:** declare at 25.2 min, longest dead gap 190 s counting
-  rebalances.
-- **Best budget variant** (180 s quarters, 70% discretionary): declare at
-  33 min, stage 4 at 20 min, longest gap 630 s.
-- **Where the time goes:** the slowdown sits in Readiness. With output shares
-  automatic and growth money locked per quarter, Editing lags demand for
-  minutes at a time.
-- **Lower discretionary is slower.** At 30% it often never declares, because
-  departments' mechanical auto-buys are worse spenders than the player's own
-  purchases.
-- **Sweeping matters less than expected:** sweep 0, ½ or 1 changes declare by
-  under 2 minutes.
-- **Reviews are rubber stamps for a bot:** only 2 of 11 move the suggested
-  lines by 5% or more. The decision has to come from the player's own
-  trade-off (wallet vs growth), requisitions and the reports, not from
-  following the suggestion.
-- **Before adoption:** retune Readiness under the budget (or add the
-  emergency review), then rerun §10.
+**Sim (Oct 8 2026).** Run with `node --import tsx sim/budget-report.ts <bot> [grid|sweep|caps|requisitions]`.
+
+| Bot | Today: declare | Today: gap (purchases / all decisions) | Budget: declare | Budget: gap |
+|---|---|---|---|---|
+| casual | 25.2 min | 350 s / 190 s | 25.5 min | 270 s |
+| hard | 24.6 min | 348 s / 184 s | 25.5 min | 284 s |
+| idler | 24.7 min | 310 s / 180 s | 27.0 min | 290 s |
+
+- **The Readiness drag was the Editing cap.** With heads at the free-shares
+  cap (0.5), Editing sat pinned at half the effort through Readiness.
+  Recruiting and Construction meters were full, and Editing crawled for about
+  10 minutes (declare at 33 min). Raising the cap to 0.8 at stage 4 brings
+  Readiness back to about 5 minutes. A lower cap before stage 4 (0.35) gives
+  growth more effort and saves another 2 minutes (`caps` mode).
+- **Discretionary stays high (0.7).** At 30% the game often never declares,
+  because departments' mechanical auto-buys are worse spenders than the
+  player's own purchases.
+- **Sweeping matters little:** sweep 0, ½ or 1 changes declare by under
+  2 minutes.
+- **Reviews are rubber stamps for a bot:** only 2 of 9 move the suggested
+  lines by 5% or more.
+- **Requisitions are pacing-neutral, and bots mostly decline them** (0 to 2
+  paid of 17). Varying levels (3, 5 or 10) and price (0.6 to 1×) changes
+  declare by under 20 s. The lookahead bot spends its wallet every decision,
+  so a lump price rarely fits. For a player they're a prompt and a wallet
+  trade-off, not a pacing lever. Whether people answer them is a playtest
+  question.
+- **The budget's dead gap is shorter than today's purchases-only gap.** Today's
+  "all decisions" figure counts rebalancing the free slider, which no longer
+  exists in this mode.
 
 ## Appendix A: Playthrough (Hypothesis)
 

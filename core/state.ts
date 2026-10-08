@@ -93,6 +93,16 @@ export interface BudgetState {
   stats: QuarterReport;
   /** The last finished quarter, for the review. */
   lastReport: QuarterReport | null;
+  /** A head's open requisition: pay from the wallet for levels at a bulk rate. */
+  requisition: Requisition | null;
+  /** When the last requisition closed (the next waits a cooldown). */
+  lastRequisitionTick: number;
+}
+
+export interface Requisition {
+  dept: DeptId;
+  openedTick: number;
+  expiresTick: number;
 }
 
 /** Persists across runs (Publish). */

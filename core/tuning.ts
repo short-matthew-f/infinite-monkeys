@@ -85,6 +85,23 @@ export interface BudgetDef {
   minDiscretionary: number;
   /** Share of the unspent wallet swept into the pot at quarter end (1 = all of it; the rest stays in the wallet). */
   sweepShare: number;
+  /** The heads' cap on Editing's output share (the free-shares suggestion caps it at suggestedEditingShareCap). */
+  editingShareCap: number;
+  /** Once every department is at stage 4, the heads' cap on Editing's output share. */
+  readinessEditingShareCap: number;
+  /** Requisitions: the short department's head asks the wallet for levels at a bulk rate. Null turns them off. */
+  requisitions: RequisitionDef | null;
+}
+
+export interface RequisitionDef {
+  /** Levels one requisition buys. */
+  levels: number;
+  /** Price as a share of those levels' list price. */
+  priceFactor: number;
+  /** An unanswered requisition expires after this long (or at quarter end, whichever is first). */
+  openSeconds: number;
+  /** Quiet time after one closes before the next can open. */
+  cooldownSeconds: number;
 }
 
 export interface Milestone {

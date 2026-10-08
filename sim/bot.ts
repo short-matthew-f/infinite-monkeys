@@ -26,6 +26,7 @@ import {
   deskCost,
   DEPTS,
   editingPool,
+  grantRequisition,
   meters,
   nullSink,
   N,
@@ -108,6 +109,8 @@ export function candidates(s: GameState, t: Tuning, bot: BotConfig): Candidate[]
     unlock: s.depts.recruiting.level === 0,
   });
   out.push({ id: 'research:typing', apply: buyTypingResearch, unlock: false });
+  // Budget mode: an open requisition is weighed like any other purchase.
+  if (s.budget?.requisition) out.push({ id: 'requisition', apply: grantRequisition, unlock: false });
   const next = t.tiers.find((x) => !s.tiers[x.id]?.discoverable);
   if (next) out.push({ id: `research:${next.id}`, apply: (x, tt, k) => researchTier(x, tt, k, next.id), unlock: true });
   return out;
@@ -129,7 +132,7 @@ function allStage4(s: GameState): boolean {
 function upkeep(s: GameState, t: Tuning, bot: BotConfig, sink: EventSink, log?: DecisionLog): void {
   applySuggestedAllocation(s, t, sink);
   if (t.budget && s.phase === 'finite') {
-    // Budget mode: shares are fixed; at an open review the bot signs the suggested lines.
+    // Budget mode: the heads set shares; at an open review the bot signs the suggested lines.
     if (s.budget?.reviewDue) {
       const prev = { ...s.budget.lines };
       const next = suggestBudget(s, t);

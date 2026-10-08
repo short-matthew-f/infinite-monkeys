@@ -7,12 +7,18 @@ import {
   buyDeptLevel,
   createState,
   declareInfinity,
+  declineRequisition,
+  grantRequisition,
+  headShares,
+  levelsListPrice,
   N,
   nullSink,
+  requisitionPrice,
   run,
   setShares,
   signBudget,
   suggestBudget,
+  suggestShares,
   type BudgetLines,
   type GameState,
 } from '../core/index.js';
@@ -142,5 +148,87 @@ describe('quarterly budget', () => {
     expect(declareInfinity(s, TB, nullSink)).toBe(true);
     expect(s.budget).toBeNull();
     expect(N.toNumber(s.bananas)).toBeCloseTo(total, 6);
+  });
+
+  it("heads cap Editing's share by the budget's own caps, raised once every department is at stage 4", () => {
+    const s = opened();
+    const bd = TB.budget!;
+    expect(headShares(s, TB)).toEqual(suggestShares(s, { ...TB, suggestedEditingShareCap: bd.editingShareCap }));
+    for (const d of ['recruiting', 'construction', 'editing'] as const) s.depts[d].stage = 4;
+    expect(headShares(s, TB)).toEqual(suggestShares(s, { ...TB, suggestedEditingShareCap: bd.readinessEditingShareCap }));
+    // The live shares follow the heads every tick.
+    run(s, TB, nullSink, 1);
+    expect(s.shares).toEqual(headShares(s, TB));
+  });
+
+  describe('requisitions', () => {
+    const R = TB.budget!.requisitions!;
+    /** A signed budget with a requisition open. */
+    function filed(): GameState {
+      const s = opened();
+      signBudget(s, TB, nullSink, LINES);
+      s.depts.editing.level = Math.max(1, s.depts.editing.level);
+      run(s, TB, nullSink, ticks(R.cooldownSeconds) + 1);
+      expect(s.budget!.requisition).not.toBeNull();
+      return s;
+    }
+
+    it('a head files one after the cooldown, priced at the bulk rate of its list price', () => {
+      const { events, sink } = collector();
+      const s = opened();
+      signBudget(s, TB, nullSink, LINES);
+      run(s, TB, sink, ticks(R.cooldownSeconds) - 2);
+      expect(ofType(events, 'requisitionOpened')).toHaveLength(0);
+      run(s, TB, sink, 4);
+      const opened_ = ofType(events, 'requisitionOpened');
+      expect(opened_).toHaveLength(1);
+      const q = s.budget!.requisition!;
+      expect(N.toNumber(requisitionPrice(s, TB)!)).toBeCloseTo(N.toNumber(levelsListPrice(s, TB, q.dept, R.levels)) * R.priceFactor, 6);
+      expect(s.budget!.stats.requisitions.offered).toBe(1);
+    });
+
+    it('list price is the sum of the next levels', () => {
+      const s = opened();
+      let sum = 0;
+      const p = { ...s, depts: { ...s.depts, editing: { ...s.depts.editing } } };
+      for (let i = 0; i < 3; i++) { sum += N.toNumber(levelsListPrice(p, TB, 'editing', 1)); p.depts.editing.level++; }
+      expect(N.toNumber(levelsListPrice(s, TB, 'editing', 3))).toBeCloseTo(sum, 6);
+    });
+
+    it('granting pays from the wallet and adds the levels at once', () => {
+      const s = filed();
+      const q = s.budget!.requisition!;
+      const price = N.toNumber(requisitionPrice(s, TB)!);
+      s.bananas = N.of(price - 1);
+      expect(grantRequisition(s, TB, nullSink)).toBe(false);
+      s.bananas = N.of(price + 10);
+      const level = s.depts[q.dept].level;
+      const { events, sink } = collector();
+      expect(grantRequisition(s, TB, sink)).toBe(true);
+      expect(s.depts[q.dept].level).toBe(level + R.levels);
+      expect(N.toNumber(s.bananas)).toBeCloseTo(10, 6);
+      expect(ofType(events, 'requisitionClosed')[0]!.outcome).toBe('granted');
+      expect(s.budget!.requisition).toBeNull();
+      expect(grantRequisition(s, TB, nullSink)).toBe(false);
+    });
+
+    it('declined or unanswered, it closes and the next waits a cooldown', () => {
+      const s = filed();
+      expect(declineRequisition(s, TB, nullSink)).toBe(true);
+      expect(s.budget!.stats.requisitions.declined).toBe(1);
+      run(s, TB, nullSink, ticks(R.cooldownSeconds) - 2);
+      expect(s.budget!.requisition).toBeNull();
+      const { events, sink } = collector();
+      run(s, TB, sink, 4 + ticks(R.openSeconds));
+      expect(ofType(events, 'requisitionClosed').map((e) => e.outcome)).toContain('expired');
+    });
+
+    it('never outlives its quarter', () => {
+      const s = filed();
+      run(s, TB, nullSink, ticks(Q));
+      const b = s.budget!;
+      expect(b.requisition === null || b.requisition.openedTick >= b.quarterStartTick).toBe(true);
+      if (b.requisition) expect(b.requisition.expiresTick).toBeLessThanOrEqual(b.quarterStartTick + ticks(Q));
+    });
   });
 });

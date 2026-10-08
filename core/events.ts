@@ -40,6 +40,8 @@ export interface QuarterReport {
   autoLevels: Record<DeptId, number>;
   /** Bananas spent from the wallet. */
   walletSpent: number;
+  /** Requisitions the heads filed this quarter, and how each closed. */
+  requisitions: { offered: number; granted: number; declined: number; expired: number };
   /** Unspent wallet swept back into the pot at quarter end. */
   swept: number;
 }
@@ -70,7 +72,9 @@ export type GameEvent =
   | { type: 'rewardUsed'; tick: number; commission: string; how: string }
   | { type: 'budgetOpened'; tick: number }
   | { type: 'quarterEnded'; tick: number; report: QuarterReport; pot: number; missedReview: boolean }
-  | { type: 'budgetSigned'; tick: number; quarter: number; previous: BudgetLines; next: BudgetLines; pot: number };
+  | { type: 'budgetSigned'; tick: number; quarter: number; previous: BudgetLines; next: BudgetLines; pot: number }
+  | { type: 'requisitionOpened'; tick: number; dept: DeptId; levels: number; price: number }
+  | { type: 'requisitionClosed'; tick: number; dept: DeptId; outcome: 'granted' | 'declined' | 'expired'; price: number };
 
 export type EventSink = (e: GameEvent) => void;
 
