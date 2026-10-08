@@ -1,4 +1,4 @@
-// Typed boundary for floor-art.js (art code, kept as plain JS so art agents can edit it).
+// Typed boundary for floor-art.js and tower-art.js (art code, kept as plain JS so art agents can edit it).
 
 export type TierArtState = 'locked' | 'researching' | 'discovered';
 
@@ -18,40 +18,54 @@ export interface FloorProps {
   permit: boolean;
   /** First hire not made yet: the pointing hand on Personnel. */
   tutorial: boolean;
+  /** Readiness meters from core (0..1). The building patches these in place. */
+  meters: Record<'recruiting' | 'construction' | 'editing', number>;
+  /** What limits income right now (core's finiteBottleneck), or null outside the finite phase. */
+  bottleneck: 'typing' | 'editing' | null;
 }
 
-export interface FloorZone {
-  id: 'personnel' | 'pool' | 'departments' | 'research' | 'director';
-  label: string;
-  /** Hot area, world coordinates [x, y, w, h]. */
-  box: [number, number, number, number];
-  extra?: [number, number, number, number][];
-  /** The part of the room that must show above an open sheet. */
-  frame: [number, number, number, number];
-  /** Play-view camera anchor [x, y, where the anchor sits on screen]. */
-  cam: [number, number, 'top' | 'mid'];
-  centre: [number, number];
-  /** Plan-view tag anchor; `a` is which side of the anchor the tag sits on. */
-  chip: { x: number; y: number; a: 'l' | 'r' | 'c' };
-}
+export type RoomId = 'personnel' | 'pool' | 'departments' | 'research' | 'director';
 
-export interface Floor {
+export interface RoomScene {
+  /** Markup for an <svg> with the given viewBox. */
   svg: string;
-  zones: FloorZone[];
+  viewBox: [number, number, number, number];
   /** Changes only when the picture can change; rebuild the SVG only then. */
   key: string;
-  size: [number, number];
 }
 
-export const FLOOR_W: number;
-export const FLOOR_H: number;
 /** Desks drawn in the Typing Pool; past this a placard carries the true count. */
 export const CAP: number;
-export const PERS_DY: number;
-export function buildFloor(props: FloorProps): Floor;
+/** One room's full-width scene (the pop-up room), as a function of state. */
+export function buildRoom(id: RoomId, props: FloorProps): RoomScene;
+/** Shared <defs> (lamp-glow gradient). Put once in the document. */
+export function roomDefs(): string;
 export function normalize(props: FloorProps): unknown;
 /** Patches the headcount placard text in place (it changes more often than the picture). */
 export function updateHeadcount(root: Element, seated: number): void;
-/** World point in front of drawn desk i, for the hire walk. */
-export function deskSpot(i: number): [number, number];
-export function installRouteCSS(): void;
+
+// parts kit (used by tower-art.js)
+export function f1(n: number): number;
+export function hash(i: number): number;
+export const CAST: Record<string, unknown>[];
+export const EDITOR: Record<string, unknown>;
+export const CANDIDATE: Record<string, unknown>;
+export function pbox(o: { x: number; yb: number; w: number; h: number; d?: number; c?: string; extra?: string; before?: string; cls?: string; tabs?: boolean; shadow?: boolean; glass?: boolean; sk?: number }): string;
+export function sign(cx: number, top: number, w: number, h: number, text: string, nd?: number): string;
+export function lamp(x: number, yb: number, dl?: number, breathe?: boolean): string;
+export function nextCue(x: number, y: number): string;
+export function ficus(cx: number, yb: number, s?: number): string;
+export function snake(cx: number, yb: number, s?: number): string;
+export function cactus(cx: number, yb: number, s?: number): string;
+export function umbrellaStand(cx: number, yb: number): string;
+export function wasteBin(cx: number, yb: number): string;
+export function noticeBoard(cx: number, yb: number): string;
+export const T: (x: number, y: number, inner: string, cls?: string, st?: string) => string;
+export function headSVG(s: Record<string, unknown>, hx: number, hy: number, hr: number): string;
+export function seatSVG(i: number, cx: number, yb: number, o?: { over?: Record<string, unknown>; dw?: number; vacant?: boolean; arrive?: boolean }): string;
+export function stand(s: Record<string, unknown>, pose?: { hl?: [number, number]; hr?: [number, number]; xl?: string; xr?: string; body?: string; front?: string }): string;
+export function deskMark(cx: number, yb: number, dw: number, faint: boolean, label: string): string;
+export const stagePlate: (cx: number, y: number, stage: number) => string;
+export const drawers: (x: number, y0: number, w: number, n: number, rh: number, hasLabel?: boolean) => string;
+export function shelfBooks(x: number, yb: number, w: number, seed: number, hmax: number): string;
+export function volume(x: number, yb: number, state: TierArtState, id: string, w?: number, h?: number): string;

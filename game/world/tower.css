@@ -1,0 +1,114 @@
+/* The Bureau Tower: the whole Bureau as one building of floors that fits the screen.
+   Performance (design/STYLE.md): ambient animation uses one transform per moving element;
+   it pauses while a room is open and under reduced motion; the soft-shadow blur is a flat tint here. */
+.tower {
+  position: absolute; left: 0; right: 0; top: var(--hdr, 138px); bottom: 0;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 0 10px calc(10px + env(safe-area-inset-bottom));
+  transition: visibility 0s;
+}
+.roof { flex: none; width: 100%; max-width: 520px; height: 26px; }
+.roof svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.bldg {
+  flex: 1 1 0; min-height: 0; width: 100%; max-width: 520px; display: flex; flex-direction: column;
+  background: var(--floor); border: 3px solid var(--edge); border-top-width: 0; border-radius: 0 0 4px 4px;
+  box-shadow: 0 0 0 1.5px var(--concrete), 0 8px 18px var(--soft-sh);
+}
+.flr { position: relative; flex: 1 1 0; min-height: 44px; overflow: hidden; border-top: 3px solid var(--edge); }
+.flr:first-child { border-top: 0; }
+/* a soft shade under the ceiling, drawn once in CSS */
+.flr::before { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none; box-shadow: inset 0 12px 10px -10px color-mix(in srgb, var(--screen) 55%, transparent); }
+.flr-personnel { flex-grow: 1.5; }
+.flr-art { position: absolute; inset: 0; width: 100%; height: 100%; display: block; overflow: visible; }
+
+/* art: wall, wainscot, floor strip, ceiling */
+.tw-wall { fill: color-mix(in srgb, var(--tint, var(--concrete)) 16%, var(--pad)); }
+.tw-wain { fill: color-mix(in srgb, var(--tint, var(--concrete)) 30%, var(--paper-shade)); }
+.tw-wain-rim { fill: none; stroke: var(--edge); stroke-width: 1.4; opacity: .8; }
+.tw-floor { fill: var(--floor); }
+.tw-edge { fill: none; stroke: var(--edge); stroke-width: 1.6; opacity: .85; }
+.tw-walk { fill: color-mix(in srgb, var(--paper-shade) 60%, var(--concrete)); }
+.tw-road { fill: color-mix(in srgb, var(--concrete) 62%, var(--screen)); }
+.tw-rug { fill: color-mix(in srgb, var(--alert) 30%, var(--pad)); stroke: var(--edge); stroke-width: 1.2; }
+.tw-roof { fill: color-mix(in srgb, var(--concrete) 60%, var(--screen)); }
+.tw-pe { --tint: var(--mustard); } .tw-pl { --tint: var(--olive); } .tw-dp { --tint: var(--concrete); } .tw-lb { --tint: var(--phosphor-green); } .tw-dr { --tint: var(--walnut); }
+.tw-wing { fill: color-mix(in srgb, var(--tint, var(--concrete)) 12%, var(--pad)); }
+.tw-wing.w-r { --tint: var(--tangerine); } .tw-wing.w-c { --tint: var(--mustard); } .tw-wing.w-e { --tint: var(--olive); }
+.mbar { transform-box: fill-box; transform-origin: 50% 100%; }
+.walker .wb { animation: wbob .28s steps(2, jump-none) infinite; }
+@keyframes hammer { 0%, 58%, 100% { transform: rotate(0); } 68% { transform: rotate(-38deg); } 78% { transform: rotate(10deg); } }
+.hammer { animation: hammer 1.6s ease-in-out infinite; }
+/* the small scenes use flat shadows: a live blur filter per prop costs frames on a phone */
+.flr-art .shl, .room-art .shl, .room-art .pad-sh2, .room-art .curl-sh { filter: none; }
+
+/* floor plate, status tag, cue tag */
+.fplate {
+  position: absolute; left: 6px; top: 5px; z-index: 2; pointer-events: none; display: inline-flex; align-items: center; gap: 5px; min-height: 26px;
+  padding: 1px 10px 0 3px; background: var(--mustard); color: var(--screen); border: 2px solid var(--edge); border-radius: 3px 3px 10px 3px;
+  font: 700 .88rem/1 var(--font-display); letter-spacing: .08em; text-transform: uppercase; white-space: nowrap;
+  box-shadow: 0 2px 0 var(--lift-sh), 0 5px 8px var(--soft-sh);
+}
+.fplate .disc.sm { width: 20px; height: 20px; font-size: .74rem; }
+.ftag {
+  position: absolute; left: 6px; bottom: 5px; z-index: 2; pointer-events: none; max-width: 48%;
+  padding: 2px 8px; background: var(--screen); color: var(--screen-ink); border: 1.5px solid var(--edge); border-radius: 2px;
+  font: 600 .74rem/1.25 var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cue-tag {
+  position: absolute; right: 6px; top: 4px; z-index: 6; pointer-events: none; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+  padding: 3px 10px 2px 7px; background: var(--tangerine); color: var(--screen); border: 2.5px solid var(--edge); border-radius: 3px 3px 10px 3px;
+  font: 700 .9rem/1.1 var(--font-display); letter-spacing: .1em; text-transform: uppercase; transform: rotate(-2deg);
+  box-shadow: 0 3px 0 color-mix(in srgb, var(--screen) 45%, transparent), 0 6px 10px color-mix(in srgb, var(--screen) 28%, transparent);
+  animation: cue-bob 2.4s ease-in-out infinite;
+}
+.cue-tag[hidden] { display: none; }
+/* on Departments the tag hangs beside the nameplate, clear of the wings' figures */
+.flr-departments .cue-tag { left: 152px; right: auto; padding: 2px 8px 1px 6px; font-size: .8rem; }
+.cue-tag::before { content: ''; flex: none; margin-right: 2px; width: 9px; height: 9px; border-radius: 50%; background: var(--glow); border: 1.5px solid var(--screen); box-shadow: 0 0 0 3px color-mix(in srgb, var(--glow) 55%, transparent); }
+@keyframes cue-bob { 0%, 100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-2px) rotate(-2deg); } }
+.flr.cued.wing-cued::after { display: none; }
+.flr.cued::after { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none; border: 3px solid var(--tangerine); }
+
+/* bottleneck: words and a drawn pile, never colour alone */
+.limit-tag {
+  position: absolute; z-index: 2; pointer-events: none; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+  padding: 2px 8px 1px 6px; background: var(--sheet); color: var(--ink); border: 2.5px solid var(--alert); border-radius: 3px;
+  font: 700 .82rem/1.15 var(--font-display); letter-spacing: .08em; text-transform: uppercase;
+  box-shadow: 0 2px 0 var(--lift-sh);
+}
+.limit-tag { right: 6px; bottom: 5px; border-color: var(--concrete); }
+.limit-tag[hidden] { display: none; }
+.pile { transform-box: fill-box; transform-origin: 50% 100%; }
+.flr-pool.limit::after { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none; border: 3px dashed var(--concrete); }
+
+/* hit areas: the whole floor band is the target; a wing is a third of the Departments band */
+.hit, .wing { position: absolute; z-index: 4; background: transparent; border: 0; padding: 0; margin: 0; cursor: pointer; }
+.hit { inset: 0; }
+.wing { top: 0; bottom: 0; width: 33.34%; }
+.wing-recruiting { left: 0; } .wing-construction { left: 33.33%; } .wing-editing { left: 66.66%; }
+.hit:focus-visible, .wing:focus-visible { outline: 3px solid var(--focus); outline-offset: -6px; box-shadow: inset 0 0 0 9px var(--paper); }
+.hit:active, .wing:active { background: color-mix(in srgb, var(--glow) 30%, transparent); }
+@media (hover: hover) { .hit:hover, .wing:hover { background: color-mix(in srgb, var(--glow) 18%, transparent); } }
+.wing::before { content: ''; position: absolute; inset: 3px; pointer-events: none; border: 3px solid transparent; }
+.wing.limit::before { border: 3px dashed var(--alert); }
+.wing.cued::before { border: 3px solid var(--tangerine); }
+.wlab {
+  position: absolute; left: 5px; bottom: 5px; max-width: calc(100% - 10px); pointer-events: none; display: flex; flex-direction: column;
+  padding: 2px 6px; background: var(--screen); color: var(--screen-ink); border: 1.5px solid var(--edge); border-radius: 2px;
+  font: 700 .74rem/1.2 var(--font-display); letter-spacing: .03em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.wnote { margin-top: 1px; padding-top: 1px; border-top: 1.5px solid var(--alert); color: var(--glow); }
+.wnote[hidden] { display: none; }
+.wnote span { color: var(--tangerine); }
+.wing.limit .wlab { border-color: var(--alert); }
+.ftag { font-size: .72rem; }
+
+/* the building is hidden (and its animation paused) while a room is open */
+body.room-open .tower { visibility: hidden; transition: visibility 0s .26s; }
+body.room-open .tower :is(.seat, .seat *, .hammer, .cap, .spark, .dsil, .dst, .pulse, .swing, .cue-tag, .wb) { animation-play-state: paused; }
+body.hidden-pause .tower :is(.seat, .seat *, .hammer, .cap, .spark, .dsil, .dst, .pulse, .swing, .cue-tag, .wb) { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .hammer, .cue-tag { animation: none !important; }
+  .hammer { transform: rotate(-12deg); }
+  .tower, body.room-open .tower { transition: none; }
+}

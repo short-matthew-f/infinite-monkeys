@@ -62,3 +62,7 @@ h1, h2, h3 { font-family: var(--font-display); text-transform: uppercase; letter
 .toast { position: absolute; z-index: 60; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); max-width: 26rem; margin: 0 auto; padding: 10px 12px; background: var(--mustard); color: var(--screen); border: 2px solid var(--edge); border-radius: 4px; display: flex; justify-content: space-between; align-items: center; gap: 12px; font-weight: 600; box-shadow: 0 3px 0 var(--lift-sh), 0 8px 16px var(--soft-sh); }
 .toast[hidden] { display: none; }
 .toast button { min-height: 44px; padding: 0 14px; background: var(--walnut); color: var(--on-walnut); border: 2px solid var(--edge); border-radius: 3px 3px 10px 3px; font: 700 .95rem var(--font-display); letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
+
+/* Dark theme: a disabled primary still carries the decision word, so keep it legible (cream on concrete ≈ 5.3:1). */
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .sheet-pane button.hire:disabled { color: var(--ink); } }
+:root[data-theme='dark'] .sheet-pane button.hire:disabled { color: var(--ink); }

@@ -1,5 +1,5 @@
 import { registerSW } from 'virtual:pwa-register';
-import { N, catchUp, certifyTiers, createState, deskCost, editingPool, type EventSink, type GameEvent, type GameState } from '../core/index.js';
+import { N, catchUp, certifyTiers, createState, editingPool, type EventSink, type GameEvent, type GameState } from '../core/index.js';
 import { prototypeTuning as t } from '../content/prototype.js';
 import { createCtx } from './ctx.js';
 import { startLoop } from './loop.js';
@@ -12,16 +12,15 @@ import { readiness } from './screens/readiness.js';
 import { research } from './screens/research.js';
 import { text } from './ui/dom.js';
 import * as f from './ui/format.js';
-import { Camera, type Pose } from './world/camera.js';
 import { cueCandidates } from './world/advisor.js';
 import { CueView } from './world/cue.js';
 import { Ernest } from './world/ernest.js';
 import { progress } from './world/progress.js';
-import { FLOOR_H, FLOOR_W } from './world/floor-art.js';
-import { FloorView, floorProps } from './world/floor.js';
-import { SheetHost, type Room } from './world/sheet.js';
+import { RoomView, type Room } from './world/room.js';
+import { Tower, floorProps } from './world/tower.js';
+import { floorHint } from './world/tower-art.js';
 
-// The place is the interface: each room on the floor opens its screen in a paper sheet.
+// The place is the interface: each floor of the building opens its room, full screen.
 const ROOMS: Room[] = [
   { id: 'personnel', name: 'Personnel', form: 'Form 3-H', disc: 1, screen: office },
   { id: 'pool', name: 'Typing Pool', form: 'Form 7-T', disc: 2, screen: pool },
@@ -29,13 +28,9 @@ const ROOMS: Room[] = [
   { id: 'research', name: 'Records Library', form: 'Form 4-R', disc: 4, screen: research },
   { id: 'director', name: "Director's Office", form: 'Form 9-R', disc: 5, screen: readiness },
 ];
-const CHIPS: Record<string, string> = { personnel: 'Personnel', pool: 'Typing<br>Pool', departments: 'Departments', research: 'Records<br>Library', director: 'Director' };
 
 const SAVE_EVERY_MS = 5000;
-const PLAY_SCALE = 1.04;
 const FEED_H = 40;
-const CAM_KEY = 'im:camera';
-const INTRO_MS = 1200;
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -92,7 +87,7 @@ document.addEventListener('visibilitychange', () => {
 });
 $('save-retry').addEventListener('click', () => void save());
 
-// ---------- the world ----------
+// ---------- the building ----------
 
 const stage = $('stage');
 const hdr = $('hdr');
@@ -101,139 +96,55 @@ const setHdr = () => document.documentElement.style.setProperty('--hdr', `${inse
 setHdr();
 addEventListener('resize', setHdr);
 
-const floor = new FloorView(
-  document.getElementById('world') as unknown as SVGGElement,
-  document.getElementById('fx') as unknown as SVGGElement,
-  $('cam'),
-  $('chips'),
-  Object.fromEntries(ROOMS.map((r) => [r.id, { name: r.name, disc: r.disc, chip: CHIPS[r.id] ?? r.name }])),
-);
-floor.apply(floorProps(state, t));
+let props = floorProps(state, t);
+const tower = new Tower($('map'));
+tower.apply(props);
 
-let planMode = false;
-const camera: Camera = new Camera({
-  stage,
-  world: $('cam'),
-  size: [FLOOR_W, FLOOR_H],
-  playScale: PLAY_SCALE,
-  insets: () => ({ top: insetTop(), bottom: planMode ? 58 : 0 }),
-  onSettle: ([x, y, s], mode) => {
-    floor.placeChips(x, y, s, mode === 'plan');
-    placeEdge();
-    if (mode === 'play' && !sheets.current) {
-      try {
-        localStorage.setItem(CAM_KEY, JSON.stringify([x, y, s]));
-      } catch {}
-    }
-  },
-  onMode: (m) => {
-    planMode = m === 'plan';
-    $('planbtn').setAttribute('aria-label', m === 'plan' ? 'Back: return to the close-up view' : 'Floor plan: see the whole floor');
-    say(m === 'plan' ? 'Floor plan. All five rooms are in view. Tap a room to go there.' : 'Back to the close-up view.');
-  },
-});
-camera.measure('.area');
+// ---------- rooms ----------
 
-/** Play-view pose for a room, from the zone's camera anchor. */
-function playPose(id: string): Pose {
-  const z = floor.zone(id);
-  if (!z) return [camera.x, camera.y, PLAY_SCALE];
-  const [wx, wy, at] = z.cam;
-  const sy = at === 'top' ? insetTop() : (insetTop() + camera.vh) / 2;
-  const [x, y] = camera.clampPose(camera.vw / 2 - wx * PLAY_SCALE, sy - wy * PLAY_SCALE, PLAY_SCALE);
-  return [x, y, PLAY_SCALE];
-}
-camera.pinchIn = (wx: number, wy: number): Pose => {
-  let best = 'personnel', bd = Infinity;
-  for (const z of floor.zones) {
-    const d = Math.hypot(z.centre[0] - wx, z.centre[1] - wy);
-    if (d < bd) { bd = d; best = z.id; }
-  }
-  return playPose(best);
-};
+const rooms = new RoomView(stage, ctx, () => props);
+rooms.register(ROOMS);
+/** The Departments wing that opened the room, so focus can return to it. */
+let lastDept: string | undefined;
 
-// ---------- sheets ----------
-
-const sheets = new SheetHost(stage, ctx);
-sheets.register(ROOMS);
-let beforeSheet: Pose | null = null;
-
-function frameOpenRoom(): void {
-  const room = sheets.current;
-  const z = room && floor.zone(room.id);
-  if (z) void camera.fly(camera.frame(z.frame, sheets.cover()));
-}
-
-function openRoom(id: string, from?: HTMLElement | null): void {
+function openRoom(id: string, dept?: string): void {
   const room = ROOMS.find((r) => r.id === id);
   if (!room) return;
   closeDir();
-  if (!sheets.current) beforeSheet = camera.mode === 'plan' ? playPose(id) : [camera.x, camera.y, camera.s];
-  if (camera.mode === 'plan') camera.setMode('play');
-  if (sheets.current) document.getElementById(`z-${sheets.current.id}`)?.classList.remove('pop', 'active');
-  document.getElementById(`z-${id}`)?.classList.add('pop', 'active');
-  sheets.open(room, from);
+  lastDept = dept;
+  props = floorProps(state, t);
+  rooms.open(room);
   progress.markOpened(id);
   if (cues.cue?.room === id) progress.ackCue(cues.cue.key);
-  frameOpenRoom();
   markDirectory(id);
   say(`${room.name} opened.`);
   dirty = true;
 }
-sheets.onClose = (room) => {
-  window.setTimeout(placeEdge, 900);
-  document.getElementById(`z-${room.id}`)?.classList.remove('pop', 'active');
-  if (beforeSheet) void camera.fly(beforeSheet);
-  beforeSheet = null;
+rooms.onClose = (room) => {
+  tower.focusFloor(room.id, lastDept);
   markDirectory(null);
+  say('Back in the building.');
   dirty = true;
 };
 
-floor.onZone = (id, from) => {
-  if (camera.dragged) return;
-  if (camera.mode === 'plan') {
-    void camera.toPlay(playPose(id));
-    return;
-  }
-  // A cabinet in Departments opens that department's own view; the room itself opens the summary.
-  // A cabinet opens its own view; the room sign opens the summary, or the cued department's view.
-  const cueView = cues.cue?.room === 'departments' ? cues.cue.view : undefined;
-  if (id === 'departments') dispatchEvent(new CustomEvent('im:dept-view', { detail: from.dataset.dept ?? cueView ?? 'summary' }));
-  openRoom(id, from);
+tower.onOpen = (id, _from, dept) => {
+  // A wing opens its own department's view; the cued department's view is used otherwise.
+  if (id === 'departments') dispatchEvent(new CustomEvent('im:dept-view', { detail: dept ?? (cues.cue?.room === 'departments' ? cues.cue.view : undefined) ?? 'summary' }));
+  openRoom(id, dept);
 };
-// The sheet changed height: keep the room framed in the space above it.
-sheets.onDetent = () => frameOpenRoom();
 // Forms can send the player to another room ("Go to Departments").
 addEventListener('im:goto', (e) => {
   const room = (e as CustomEvent<string>).detail;
   if (room === 'departments') dispatchEvent(new CustomEvent('im:dept-view', { detail: 'summary' }));
   openRoom(room);
 });
-floor.onWalk = (box) => {
-  if (sheets.current?.id !== 'personnel') return;
-  // Pull back enough to see the walker, but never so far the monkeys turn to specks.
-  if (box) void camera.fly(camera.frame(box, sheets.cover(), PLAY_SCALE, 0.62));
-  else window.setTimeout(() => { if (sheets.current?.id === 'personnel') frameOpenRoom(); }, 500);
-};
 
-// A manual hire: the candidate walks from the entrance to the new desk.
+// A manual hire: the candidate walks from the street into the lobby.
 onEvent((e) => {
-  if (e.type === 'hire' && e.manual) floor.hire(Math.floor(N.toNumber(state.monkeys)) - 1, floorProps(state, t));
+  if (e.type === 'hire' && e.manual) tower.hire(Math.floor(N.toNumber(state.monkeys)) - 1, floorProps(state, t), !!rooms.current);
 });
 
 // ---------- header controls ----------
-
-$('planbtn').addEventListener('click', () => {
-  endIntro();
-  closeDir();
-  if (sheets.current) {
-    // Plan from inside a room: fold the sheet, then pull back to the whole floor.
-    sheets.close();
-    window.setTimeout(() => void camera.toPlan(), 280);
-    return;
-  }
-  void (camera.mode === 'plan' ? camera.toPlay() : camera.toPlan());
-});
 
 const dir = $('dir');
 const dirbtn = $('dirbtn');
@@ -242,18 +153,7 @@ function closeDir(): void {
   dirbtn.setAttribute('aria-expanded', 'false');
   $('reset-confirm').hidden = true;
 }
-function roomHint(id: string): string {
-  const s = state;
-  const seated = Math.floor(N.toNumber(s.monkeys)), desks = Math.floor(N.toNumber(s.desks));
-  switch (id) {
-    case 'personnel': return desks > seated ? `${f.count(desks - seated)} desk${desks - seated === 1 ? '' : 's'} free` : 'Every desk is taken';
-    case 'pool': return `${f.count(seated)} seated`;
-    case 'departments': return 'Recruiting, Construction, Editing';
-    case 'research': return `${Object.values(s.tiers).filter((x) => x.discovered).length} of ${t.tiers.length} tiers discovered`;
-    case 'director': return s.stability.permit ? 'Permit stamped' : 'Readiness and the Permit';
-    default: return '';
-  }
-}
+const roomHint = (id: string): string => floorHint(id, floorProps(state, t));
 $('dirlist').innerHTML = ROOMS.map((r) => `<li><button data-room="${r.id}" aria-current="false"><span class="disc" aria-hidden="true">${r.disc}</span><span class="nm">${r.name}<span class="hn"></span></span></button></li>`).join('');
 function markDirectory(id: string | null): void {
   for (const b of dir.querySelectorAll<HTMLElement>('[data-room]')) b.setAttribute('aria-current', String(b.dataset.room === id));
@@ -266,20 +166,19 @@ dirbtn.addEventListener('click', () => {
 });
 $('dirlist').addEventListener('click', (e) => {
   const b = (e.target as HTMLElement).closest<HTMLElement>('[data-room]');
-  if (b) openRoom(b.dataset.room!, dirbtn);
+  if (b) openRoom(b.dataset.room!);
 });
 document.addEventListener('pointerdown', (e) => {
   if (!dir.hidden && !(e.target as HTMLElement).closest('#dir, #dirbtn')) closeDir();
 });
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
-  // Escape folds an open sheet even when focus has left it (e.g. a button that just disabled itself).
-  if (sheets.current) {
-    if (!sheets.el.contains(document.activeElement)) sheets.close();
+  // Escape leaves an open room even when focus has left it (e.g. a button that just disabled itself).
+  if (rooms.current) {
+    if (!rooms.el.contains(document.activeElement)) rooms.close();
     return;
   }
   if (!dir.hidden) { closeDir(); dirbtn.focus(); }
-  else if (camera.mode === 'plan') void camera.toPlay();
 });
 
 // Reset is destructive: it asks first (MOBILE-UX rule 1).
@@ -294,7 +193,6 @@ $('reset-no').addEventListener('click', () => {
 $('reset-yes').addEventListener('click', async () => {
   await persist.clear();
   try {
-    localStorage.removeItem(CAM_KEY);
     for (const k of Object.keys(localStorage)) if (k.startsWith('im:')) localStorage.removeItem(k);
   } catch {}
   location.reload();
@@ -306,10 +204,10 @@ const ernest = new Ernest($('ewrap'), ctx, t);
 
 // ---------- the next-thing cue ----------
 
-const cues = new CueView($('cam'), $('chips'), $('dir'));
+const cues = new CueView(tower, $('dir'));
 const roomName = (id: string) => ROOMS.find((r) => r.id === id)?.name ?? id;
 function updateCue(): void {
-  const open = sheets.current?.id;
+  const open = rooms.current?.id;
   // The first cue the player hasn't already acted on; a cue for the open room is acted on.
   let cue = null;
   for (const c of cueCandidates(ctx)) {
@@ -322,19 +220,9 @@ function updateCue(): void {
     break;
   }
   const changed = cue?.key !== cues.cue?.key;
-  cues.show(cue, cue ? floor.zone(cue.room) : undefined, roomName);
-  if (changed) {
-    placeEdge();
-    if (cue) say(`${cue.tag}: ${roomName(cue.room)}.`);
-  }
+  cues.show(cue);
+  if (changed && cue) say(`${cue.tag}: ${roomName(cue.room)}.`);
 }
-function placeEdge(): void {
-  cues.placeEdge(camera.x, camera.y, camera.s, camera.mode === 'play' && !sheets.current && !camera.busy, insetTop(), camera.vw, camera.vh);
-}
-cues.onEdge = (cue) => {
-  if (cue.room === 'departments') dispatchEvent(new CustomEvent('im:dept-view', { detail: cue.view ?? 'summary' }));
-  openRoom(cue.room);
-};
 // Reels about Editors open the Editing view; other Departments reels open the summary.
 ernest.onOpenRoom = (room, reel) => {
   if (room === 'departments') dispatchEvent(new CustomEvent('im:dept-view', { detail: reel === 'finds-need-editors' ? 'editing' : 'summary' }));
@@ -347,30 +235,6 @@ function say(msg: string): void {
   const l = $('live');
   l.textContent = '';
   window.setTimeout(() => (l.textContent = msg), 30);
-}
-
-// ---------- first load ----------
-
-let intro = 0;
-function endIntro(): void {
-  window.clearTimeout(intro);
-  intro = 0;
-}
-let saved: Pose | null = null;
-try {
-  const v = JSON.parse(localStorage.getItem(CAM_KEY) ?? 'null') as unknown;
-  if (Array.isArray(v) && v.length === 3 && v.every((n) => typeof n === 'number')) saved = v as unknown as Pose;
-} catch {}
-if (returning && saved) {
-  camera.jump(saved);
-} else {
-  // A new Bureau: the floor plan for a beat, so the player sees there are five rooms, then down to Personnel.
-  camera.setMode('plan');
-  camera.jump(camera.planPose());
-  intro = window.setTimeout(() => {
-    intro = 0;
-    void camera.toPlay(playPose('personnel'));
-  }, INTRO_MS);
 }
 
 // ---------- the loop ----------
@@ -398,9 +262,10 @@ startLoop(() => state, t, sink, () => {
   lastTick = state.tick;
   renderHeader();
   renderFeed();
-  if (floor.apply(floorProps(state, t))) camera.measure('.area');
-  sheets.render();
-  ernest.update(sheets.current?.id ?? null, camera.mode === 'plan');
+  props = floorProps(state, t);
+  tower.apply(props);
+  rooms.render();
+  ernest.update(rooms.current?.id ?? null);
   updateCue();
 });
 
@@ -415,7 +280,6 @@ if (import.meta.env.DEV) {
       },
       run: (seconds: number) => catchUp(state, t, sink, seconds),
       open: openRoom,
-      camera,
       t,
     },
   });

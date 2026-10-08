@@ -1,0 +1,36 @@
+/* Room view: a room opens full screen. Scene band on top, the room's form below, an exit door top-left.
+   The transition is opacity and transform only. */
+.room {
+  position: absolute; left: 0; right: 0; top: calc(var(--hdr, 138px) - var(--feed, 40px)); bottom: 0; z-index: 20;
+  display: flex; flex-direction: column; background: var(--sheet); color: var(--ink);
+  opacity: 0; transform: translateY(14px) scale(.985); transform-origin: 50% 100%;
+  transition: transform 260ms cubic-bezier(.3, .8, .25, 1), opacity 200ms;
+}
+.room.open { opacity: 1; transform: none; }
+.room[hidden] { display: none; }
+.room-bar {
+  flex: none; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 10px;
+  background: color-mix(in srgb, var(--walnut) 14%, var(--sheet)); border-bottom: 3px double var(--rule);
+}
+.exit {
+  flex: none; min-height: 48px; min-width: 44px; max-width: 52%; display: flex; align-items: center; gap: 8px; padding: 4px 12px 4px 8px; cursor: pointer;
+  background: var(--btn); color: var(--ink); border: 2px solid var(--ctl); border-radius: 3px 3px 12px 3px; box-shadow: 0 3px 0 var(--ctl), 0 5px 6px var(--soft-sh);
+  font: 700 .95rem/1.05 var(--font-display); letter-spacing: .08em; text-transform: uppercase; text-align: left;
+}
+.exit:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--ctl); }
+.exit svg { flex: none; }
+.room-id { min-width: 0; text-align: right; }
+.room h2 { font-size: 1.5rem; line-height: 1; color: var(--head); }
+.room-id .form { margin: 3px 0 0; font-size: .72rem; letter-spacing: .04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* the scene: as wide as the stage, tall enough to read (at least 140 px), never more than a third of the screen */
+.room-scene {
+  flex: none; position: relative; overflow: hidden; background: var(--floor); border-bottom: 3px solid var(--edge);
+  height: clamp(140px, calc(min(100vw, 560px) * var(--ar, .7)), max(140px, 34dvh));
+}
+.room-art { display: block; width: 100%; height: 100%; }
+.room-art.fold .up { transform: scaleY(.06); transition: none; }
+.sbody { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 10px 14px calc(14px + env(safe-area-inset-bottom)); position: relative; }
+@media (prefers-reduced-motion: reduce) {
+  .room { transform: none; transition: opacity .16s; }
+  .room.open { transition: opacity .16s; }
+}

@@ -651,7 +651,7 @@ Recorded so they aren't reintroduced.
 | 46 | The place is the interface: a pop-up floor plan per floor, rooms open their own sheets (Matt, Oct 7 2026) | Roomy, no menu buttons; Egg, Inc.'s map model | Tab bar; cutaway dollhouse; paper theater |
 | 47 | Whimsy is always present, from the first desk (Matt, Oct 7 2026) | Charm carries the early game | Straight-faced early game (amends #15 and §1 pillar 5: absurdity still rises with height, but the floor is never joyless) |
 | 48 | Roomy means space between spaces, not ceiling height (Matt, Oct 7 2026) | Zones breathe; ceilings can stay low until the ceremony | Tall rooms |
-| 49 | Proposed: the building of floors is the map; each room opens full screen with an exit door; no panning (Matt, Oct 8 2026; mockup `design/explorations/tower/`, not yet adopted) | Clear organisation, wings and heads, quarterly rhythm | Pannable pop-up floor with two zoom levels (#46 stays until adopted) |
+| 49 | Adopted: the building of floors is the map; each room opens full screen with an exit door; no panning (Matt, Oct 8 2026; mockup `design/explorations/tower/`; game port in progress) | Clear organisation, wings and heads, quarterly rhythm | Pannable pop-up floor with two zoom levels (#46 stays until adopted) |
 | 50 | Proposed: a quarterly budget with discretionary income replaces the free funding slider (§13; behind a tuning switch) | Make the budget count; leftover goes back into the budget | Free shares (today); lines as locked operating funding only |
 
 ### Open

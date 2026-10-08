@@ -1,19 +1,20 @@
-// The Bureau floor as a function of game state. Ported verbatim from the
-// art exploration (design/explorations/floor-r4) so art agents can keep
-// editing it as art; the typed boundary is floor-art.d.ts.
+// The Bureau's parts kit and room scenes. Ported from the art exploration
+// (design/explorations/floor-r4), kept as art so art agents can keep editing it;
+// the typed boundary is floor-art.d.ts.
 //
-// buildFloor(props) is pure: same props, same markup, no DOM. The game calls
-// it, compares `key` with the last one, and replaces the world's innerHTML only
-// when the picture can change.
+// buildRoom(id, props) is pure: same props, same markup, no DOM. The room view
+// calls it, compares `key` with the last one, and replaces the scene only when
+// the picture can change. tower-art.js draws the building's small per-floor
+// scenes from the same kit.
 /* eslint-disable */
-const f1 = n => Math.round(n * 10) / 10;
+export const f1 = n => Math.round(n * 10) / 10;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 /* ===== the cast: every typist is authored, so no two share a silhouette, view, gaze or headwear ===== */
-function hash(i) { let h = Math.imul(i + 1, 0x9E3779B1); h ^= h >>> 15; h = Math.imul(h, 0x85EBCA77); h ^= h >>> 13; h = Math.imul(h, 0xC2B2AE3D); h ^= h >>> 16; return h >>> 0; }
+export function hash(i) { let h = Math.imul(i + 1, 0x9E3779B1); h ^= h >>> 15; h = Math.imul(h, 0x85EBCA77); h ^= h >>> 13; h = Math.imul(h, 0xC2B2AE3D); h ^= h >>> 16; return h >>> 0; }
 const BEH_LABEL = { type: 'touch-typing', peck: 'hunt-and-peck', slam: 'carriage-return slam', sip: 'sipping from a mug', stretch: 'stretching', read: 'reading a page', doze: 'dozing', sharpen: 'sharpening a pencil', stamp: 'stamping' };
 // H = visible height above the desk, bw = shoulder width, tw = hip/shoulder ratio, hr = head radius
-const CAST = [
+export const CAST = [
   { fur: 3, H: 62, bw: 38, tw: 1.0, hr: 13, ears: 'round', lean: -6, view: 'f', gaze: [0, .9], eyes: 'open', mouth: 'flat', head: 'phones', body: 'tie', tail: 'up', prop: 0, ps: 1, beh: 'type', shirt: 'sk-paper', chair: 'tall' },
   { fur: 1, H: 47, bw: 25, tw: 1.2, hr: 12.5, ears: 'big', lean: 8, view: 'pr', gaze: [1, .6], eyes: 'wide', mouth: 'tongue', head: 'swirl', body: 'none', tail: 'curl', prop: 1, ps: -1, beh: 'peck', shirt: 'sk-mustard', chair: 'short', fwd: 4 },
   { fur: 2, H: 64, bw: 26, tw: .95, hr: 11, ears: 'tuft', lean: 4, view: 'f', gaze: [0, -.9], eyes: 'wide', mouth: 'teeth', head: 'glassesS', body: 'bowtie', tail: 'hang', prop: 5, ps: 1, beh: 'slam', shirt: 'sk-olive', chair: 'round' },
@@ -34,7 +35,7 @@ const rot = (p, a, o) => { const r = a * Math.PI / 180, c = Math.cos(r), s = Mat
 
 /* ===== svg helpers ===== */
 // standing piece: contact + long shadow, fold tabs, front face, cut rim, lighter top face
-function pbox({ x, yb, w, h, d = 8, c = 'walnut', extra = '', before = '', cls = '', tabs = true, shadow = true, glass = false, sk = 1 }) {
+export function pbox({ x, yb, w, h, d = 8, c = 'walnut', extra = '', before = '', cls = '', tabs = true, shadow = true, glass = false, sk = 1 }) {
   const i = d * .2, cx = x + w / 2;
   const sh = shadow ? `<polygon class="shl" points="${x},${yb} ${x + w},${yb} ${f1(x + w + h * .5 * sk)},${f1(yb + h * .2 * sk + 4)} ${f1(x + h * .5 * sk)},${f1(yb + h * .2 * sk + 4)}"/><polygon class="shc" points="${x},${yb} ${x + w},${yb} ${x + w + 3},${yb + 4} ${x + 3},${yb + 4}"/>` : '';
   const tb = tabs ? `<polygon class="tb" points="${f1(x + w * .1)},${yb - 1} ${f1(x + w * .3)},${yb - 1} ${f1(x + w * .3 + 3)},${yb + 6} ${f1(x + w * .1 - 3)},${yb + 6}"/><polygon class="tb" points="${f1(x + w * .7)},${yb - 1} ${f1(x + w * .9)},${yb - 1} ${f1(x + w * .9 + 3)},${yb + 6} ${f1(x + w * .7 - 3)},${yb + 6}"/>` : '';
@@ -43,7 +44,7 @@ function pbox({ x, yb, w, h, d = 8, c = 'walnut', extra = '', before = '', cls =
   return `<g class="up c-${c} ${cls}" style="transform-origin:${cx}px ${yb}px">${sh}${before}${tb}${fr}${tp}${extra}</g>`;
 }
 // hanging sign: two posts and a brass rail, the plate hangs from cords and swings; shadow falls on the pad
-function sign(cx, top, w, h, text, nd = 0) {
+export function sign(cx, top, w, h, text, nd = 0) {
   const x = cx - w / 2, rod = top - 13, base = top + h + 22;
   const post = px => `<rect class="tb" x="${px - 3}" y="${rod}" width="6" height="${base - rod}" rx="1"/><rect class="tb" x="${px - 7}" y="${base - 2}" width="14" height="5" rx="1.5"/>`;
   return `<g class="up" style="transform-origin:${cx}px ${base}px">` +
@@ -60,7 +61,7 @@ function sign(cx, top, w, h, text, nd = 0) {
     `<text class="sg" x="${cx}" y="${top + h / 2 + 4.6}">${text}</text></g></g>`;
 }
 // floor lamp, fully lit: pool of light on the pad, glowing bulb under the shade, rays; only an outer ring breathes
-function lamp(x, yb, dl = 0, breathe = false) {
+export function lamp(x, yb, dl = 0, breathe = false) {
   const sy = yb - 34;
   return `<g><polygon class="shl" points="${x - 7},${yb} ${x + 7},${yb} ${x + 24},${yb + 6} ${x + 8},${yb + 6}"/>` +
     `<ellipse class="halo${breathe ? ' pulse' : ''}" cx="${x}" cy="${yb - 6}" rx="42" ry="26" style="${breathe ? `animation-delay:${dl}s` : 'opacity:.4'}"/><ellipse class="halo" cx="${x}" cy="${yb - 8}" rx="28" ry="17"/>` +
@@ -69,7 +70,7 @@ function lamp(x, yb, dl = 0, breathe = false) {
     `<ellipse class="lampc" cx="${x}" cy="${sy + 2}" rx="11" ry="4.4"/><path class="fr" style="--c:var(--tangerine)" d="M${x - 13} ${sy}L${x - 7} ${sy - 15}H${x + 7}L${x + 13} ${sy}Z"/><path class="rim" d="M${x - 11} ${sy - 1}L${x - 6} ${sy - 13}H${x + 6}"/></g>`;
 }
 // paper hand pointing down at the next thing to tap; it bobs, and its shadow shrinks as it lifts
-function nextCue(x, y) {
+export function nextCue(x, y) {
   const L = 'stroke="var(--screen)" stroke-width="1.5" stroke-linejoin="round"';
   const hand = `<rect x="-11" y="-44" width="22" height="11" rx="2" fill="var(--tangerine)" stroke="var(--edge)" stroke-width="1.8"/><path d="M-6 -44v11M0 -44v11M6 -44v11" stroke="var(--edge)" stroke-width="1" opacity=".7"/>` +
     `<path d="M-10 -33H10q4 0 4 5V-6q0 4-4 4H-10q-4 0-4-4V-28q0-5 4-5z" fill="var(--edge)" ${L}/>` +
@@ -79,26 +80,26 @@ function nextCue(x, y) {
   return `<g class="nextcue" transform="translate(${x} ${y})"><ellipse class="shl cuesh" cx="6" cy="34" rx="14" ry="4" style="opacity:.34"/><g class="cue">${hand}</g></g>`;
 }
 /* plants: three distinct kinds */
-function ficus(cx, yb, s = 1) {
+export function ficus(cx, yb, s = 1) {
   const blobs = [[0, -50, 15], [-13, -40, 11], [13, -42, 12], [-6, -62, 10], [9, -60, 9], [0, -36, 10]].map(([dx, dy, r], k) => `<circle class="${k % 2 ? 'leaf2' : 'leaf'}" cx="${cx + dx * s}" cy="${yb + dy * s}" r="${r * s}"/>`).join('');
   return `<g class="up" style="transform-origin:${cx}px ${yb}px"><polygon class="shl" points="${cx - 9 * s},${yb} ${cx + 9 * s},${yb} ${cx + 34 * s},${yb + 8 * s} ${cx + 10 * s},${yb + 8 * s}"/><polygon class="shc" points="${cx - 9 * s},${yb} ${cx + 9 * s},${yb} ${cx + 12 * s},${yb + 3} ${cx - 6 * s},${yb + 3}"/>` +
     `<path d="M${cx} ${yb - 12 * s}V${yb - 38 * s}M${cx} ${yb - 28 * s}l-8 -8M${cx} ${yb - 32 * s}l8 -8" stroke="var(--walnut)" stroke-width="${3 * s}" stroke-linecap="round" fill="none"/>${blobs}` +
     `<path class="fr" style="--c:var(--tangerine)" d="M${cx - 10 * s} ${yb - 14 * s}H${cx + 10 * s}L${cx + 7 * s} ${yb}H${cx - 7 * s}Z"/><path class="rim" d="M${cx - 9 * s} ${yb - 13 * s}h${18 * s}"/></g>`;
 }
-function snake(cx, yb, s = 1) {
+export function snake(cx, yb, s = 1) {
   const blade = (dx, h, lean, w = 5) => `<path d="M${cx + dx * s - w * s} ${yb - 12 * s}Q${cx + (dx + lean * .4) * s} ${yb - h * .5 * s} ${cx + (dx + lean) * s} ${yb - h * s}Q${cx + (dx + lean * .5 + w) * s} ${yb - h * .45 * s} ${cx + dx * s + w * s} ${yb - 12 * s}Z" class="leaf" style="fill:color-mix(in srgb, var(--olive) 78%, var(--screen))"/><path d="M${cx + dx * s} ${yb - 14 * s}Q${cx + (dx + lean * .4) * s} ${yb - h * .5 * s} ${cx + (dx + lean) * s} ${yb - (h - 3) * s}" stroke="var(--mustard)" stroke-width="${1.6 * s}" fill="none" stroke-linecap="round"/>`;
   return `<g class="up" style="transform-origin:${cx}px ${yb}px"><polygon class="shl" points="${cx - 11 * s},${yb} ${cx + 11 * s},${yb} ${cx + 36 * s},${yb + 8 * s} ${cx + 12 * s},${yb + 8 * s}"/><polygon class="shc" points="${cx - 11 * s},${yb} ${cx + 11 * s},${yb} ${cx + 14 * s},${yb + 3} ${cx - 8 * s},${yb + 3}"/>` +
     blade(-9, 52, -6) + blade(8, 58, 7) + blade(0, 70, 1, 5.4) + blade(-3, 40, -9, 4.4) + blade(5, 44, 10, 4.4) +
     `<rect class="fr c-concrete" x="${cx - 11 * s}" y="${yb - 16 * s}" width="${22 * s}" height="${16 * s}" rx="1.5"/><path class="rim" d="M${cx - 10 * s} ${yb - 1}V${yb - 15 * s}H${cx + 10 * s}"/><rect x="${cx - 11 * s}" y="${yb - 16 * s}" width="${22 * s}" height="${3.4 * s}" fill="var(--mustard)" stroke="var(--edge)" stroke-width="1"/></g>`;
 }
-function cactus(cx, yb, s = 1) {
+export function cactus(cx, yb, s = 1) {
   return `<g class="up" style="transform-origin:${cx}px ${yb}px"><polygon class="shl" points="${cx - 8 * s},${yb} ${cx + 8 * s},${yb} ${cx + 28 * s},${yb + 6 * s} ${cx + 8 * s},${yb + 6 * s}"/><polygon class="shc" points="${cx - 8 * s},${yb} ${cx + 8 * s},${yb} ${cx + 10 * s},${yb + 3} ${cx - 6 * s},${yb + 3}"/>` +
     `<rect class="leaf2" x="${cx - 6 * s}" y="${yb - 44 * s}" width="${12 * s}" height="${34 * s}" rx="${6 * s}"/><path class="leaf2" d="M${cx - 6 * s} ${yb - 26 * s}h${-6 * s}q${-5 * s} 0 ${-5 * s} ${-6 * s}v${-8 * s}" stroke-width="${1 * s}" style="fill:none;stroke:var(--edge);stroke-width:${6 * s}px;stroke-linecap:round"/><path d="M${cx - 6 * s} ${yb - 26 * s}h${-6 * s}q${-5 * s} 0 ${-5 * s} ${-6 * s}v${-8 * s}" fill="none" stroke="var(--olive)" stroke-width="${4 * s}" stroke-linecap="round" style="stroke:color-mix(in srgb, var(--olive) 70%, var(--phosphor-green))"/>` +
     `<path d="M${cx} ${yb - 40 * s}v${28 * s}" stroke="var(--edge)" stroke-width="1" opacity=".6"/><circle cx="${cx}" cy="${yb - 46 * s}" r="${3.4 * s}" fill="var(--alert)" stroke="var(--edge)" stroke-width="1"/>` +
     `<path class="fr" style="--c:var(--tangerine)" d="M${cx - 9 * s} ${yb - 12 * s}H${cx + 9 * s}L${cx + 7 * s} ${yb}H${cx - 7 * s}Z"/></g>`;
 }
 /* small story props */
-function umbrellaStand(cx, yb) {
+export function umbrellaStand(cx, yb) {
   return `<g class="up" style="transform-origin:${cx}px ${yb}px"><polygon class="shl" points="${cx - 10},${yb} ${cx + 10},${yb} ${cx + 32},${yb + 7} ${cx + 10},${yb + 7}"/><polygon class="shc" points="${cx - 10},${yb} ${cx + 10},${yb} ${cx + 13},${yb + 3} ${cx - 7},${yb + 3}"/>` +
     `<path d="M${cx - 4} ${yb - 28}l-6 -34" stroke="var(--screen)" stroke-width="2.4" stroke-linecap="round"/><path d="M${cx - 10} ${yb - 62}q-3 -9 5 -12q9 3 5 12z" class="fr" style="--c:var(--alert)"/><path d="M${cx + 4} ${yb - 28}l7 -30" stroke="var(--screen)" stroke-width="2.4" stroke-linecap="round"/><path d="M${cx + 11} ${yb - 58}q-1 -9 7 -10q7 4 3 10z" class="fr" style="--c:var(--mustard)"/><path d="M${cx + 8} ${yb - 28}l12 -22q4 -6 8 -2" fill="none" stroke="var(--walnut)" stroke-width="3" stroke-linecap="round"/>` +
     `<path class="fr c-steel" d="M${cx - 11} ${yb - 28}H${cx + 11}L${cx + 9} ${yb}H${cx - 9}Z"/><path class="rim" d="M${cx - 10} ${yb - 27}H${cx + 10}"/><ellipse cx="${cx}" cy="${yb - 28}" rx="11" ry="3" fill="var(--screen)" stroke="var(--edge)" stroke-width="1.2"/><path d="M${cx - 8} ${yb - 12}h16" stroke="var(--mustard)" stroke-width="2"/></g>`;
@@ -111,12 +112,12 @@ function stepLadder(cx, yb) {
     [14, 28, 42].map(h => `<rect class="fr c-mustard" x="${cx - 19 + h * .19}" y="${yb - h - 3}" width="${38 - h * .38}" height="5" rx="1"/>`).join('') +
     `<rect class="fr c-paper" x="${cx - 12}" y="${yb - 70}" width="24" height="7" rx="1.5"/><rect x="${cx - 6}" y="${yb - 82}" width="12" height="12" fill="var(--tangerine)" stroke="var(--edge)" stroke-width="1.2"/><rect x="${cx - 6}" y="${yb - 82}" width="12" height="3" fill="var(--screen)" opacity=".5"/></g>`;
 }
-function wasteBin(cx, yb) {
+export function wasteBin(cx, yb) {
   return `<g class="up" style="transform-origin:${cx}px ${yb}px"><polygon class="shl" points="${cx - 12},${yb} ${cx + 12},${yb} ${cx + 32},${yb + 6} ${cx + 10},${yb + 6}"/><polygon class="shc" points="${cx - 11},${yb} ${cx + 11},${yb} ${cx + 14},${yb + 3} ${cx - 8},${yb + 3}"/>` +
     `<circle cx="${cx - 4}" cy="${yb - 30}" r="7" fill="var(--edge)" stroke="var(--concrete)" stroke-width="1.2"/><path d="M${cx - 8} ${yb - 31}l5 3M${cx - 5} ${yb - 35}l2 6" stroke="var(--concrete)" stroke-width="1"/><circle cx="${cx + 6}" cy="${yb - 29}" r="5.4" fill="var(--paper-shade)" stroke="var(--concrete)" stroke-width="1.2"/>` +
     `<path class="fr c-concrete" d="M${cx - 12} ${yb - 28}H${cx + 12}L${cx + 9} ${yb}H${cx - 9}Z"/><path class="rim" d="M${cx - 11} ${yb - 27}H${cx + 11}"/><path d="M${cx - 5} ${yb - 22}V${yb - 5}M${cx} ${yb - 22}V${yb - 5}M${cx + 5} ${yb - 22}V${yb - 5}" stroke="var(--edge)" stroke-width="1.3" opacity=".6"/><circle cx="${cx + 21}" cy="${yb - 3}" r="4.4" fill="var(--edge)" stroke="var(--concrete)" stroke-width="1"/></g>`;
 }
-function noticeBoard(cx, yb) {
+export function noticeBoard(cx, yb) {
   const w = 70, h = 48, x = cx - w / 2, y = yb - 30 - h;
   return `<g class="up" style="transform-origin:${cx}px ${yb}px"><polygon class="shl" points="${x},${yb} ${x + w},${yb} ${x + w + 26},${yb + 8} ${x + 22},${yb + 8}"/><polygon class="shc" points="${x + 6},${yb} ${x + w - 6},${yb} ${x + w - 3},${yb + 3} ${x + 9},${yb + 3}"/>` +
     `<path d="M${x + 10} ${y + h}L${x + 4} ${yb}M${x + w - 10} ${y + h}L${x + w - 4} ${yb}" stroke="var(--edge)" stroke-width="6"/><path d="M${x + 10} ${y + h}L${x + 4} ${yb}M${x + w - 10} ${y + h}L${x + w - 4} ${yb}" stroke="var(--walnut)" stroke-width="3.4"/>` +
@@ -133,7 +134,7 @@ function padSVG(x, y, w, h, tint) {
     `<rect class="pad-th ${tint}" x="${x}" y="${y + 6}" width="${w}" height="${h}" rx="${r}"/><rect class="pad ${tint}" x="${x}" y="${y}" width="${w}" height="${h}" rx="${r}"/>` +
     `<path class="curl-sh" d="M${x + w - k + 4} ${y + h - 2}L${x + w - 3} ${y + h - k + 6}L${x + w + 3} ${y + h + 6}Z"/><path class="curl ${tint}" d="M${x + w - k} ${y + h}L${x + w} ${y + h - k}L${x + w - 3} ${y + h - 3}Z"/><path d="M${x + w - k} ${y + h}L${x + w} ${y + h - k}" stroke="var(--concrete)" stroke-width="1" opacity=".7"/>`;
 }
-const T = (x, y, inner, cls = '', st = '') => `<g transform="translate(${x} ${y})"${cls ? ` class="${cls}"` : ''}${st ? ` style="${st}"` : ''}>${inner}</g>`;
+export const T = (x, y, inner, cls = '', st = '') => `<g transform="translate(${x} ${y})"${cls ? ` class="${cls}"` : ''}${st ? ` style="${st}"` : ''}>${inner}</g>`;
 
 /* ===== monkey parts (local coords: 0,0 = base of desk, y up is negative) ===== */
 function wedge(x, y, r, a1, a2) { const p = a => [f1(x + r * Math.cos(a * Math.PI / 180)), f1(y + r * Math.sin(a * Math.PI / 180))]; const [x1, y1] = p(a1), [x2, y2] = p(a2); return `M${x} ${y}L${x1} ${y1}A${r} ${r} 0 0 1 ${x2} ${y2}Z`; }
@@ -143,7 +144,7 @@ function eyeSVG(x, y, r, g, kind) {
   const lid = kind === 'heavy' ? `<path d="M${f1(x - r - .4)} ${f1(y + r * .1)}a${f1(r + .4)} ${f1(r + .4)} 0 0 1 ${f1(2 * r + .8)} 0z" class="fur" stroke="var(--screen)" stroke-width=".7"/>` : '';
   return `<circle cx="${x}" cy="${y}" r="${r}" class="glowf" stroke="var(--screen)" stroke-width=".8"/><circle cx="${px}" cy="${py}" r="${f1(r * .66)}" class="ink"/><path d="${wedge(px, py, r * .66, -70, -10)}" class="glowf"/>${lid}`;
 }
-function headSVG(s, hx, hy, hr) {
+export function headSVG(s, hx, hy, hr) {
   const v = { f: 0, l: -1, r: 1, pl: -1, pr: 1 }[s.view], prof = s.view[0] === 'p', vv = v || 1;
   const er = hr * ({ big: .66, round: .5, small: .33, tuft: .42 }[s.ears]);
   const ear = (x, y, r) => `<circle class="fur" cx="${f1(x)}" cy="${f1(y)}" r="${f1(r)}"/><circle class="face" cx="${f1(x)}" cy="${f1(y)}" r="${f1(r * .55)}"/>` + (s.ears === 'tuft' ? `<path d="M${f1(x - r * .6)} ${f1(y - r * .8)}l-1 -4M${f1(x)} ${f1(y - r)}l0 -5M${f1(x + r * .6)} ${f1(y - r * .8)}l1 -4" class="furl" stroke-width="1.8"/>` : '');
@@ -220,7 +221,7 @@ function tailSVG(kind, bw, lean) {
 }
 
 /* seated monkey + desk. all authored in local coords, then placed with one translate */
-function seatSVG(i, cx, yb, o = {}) {
+export function seatSVG(i, cx, yb, o = {}) {
   const s = Object.assign({}, CAST[i] || gen(i), o.over || {});
   const hr = s.hr, ys0 = -37 - s.H + hr * 1.9, dw = o.dw || 64, hw2 = dw / 2;
   const v = { f: 0, l: -1, r: 1, pl: -1, pr: 1 }[s.view];
@@ -295,7 +296,7 @@ function seatSVG(i, cx, yb, o = {}) {
 }
 
 /* standing monkey (aisle life): ground at 0,0 */
-function stand(s, pose = {}) {
+export function stand(s, pose = {}) {
   const hr = s.hr || 11, H = s.H || 66, legH = 22;
   const hy = -(H - hr), ys = hy + hr * .92, sw = s.bw || 22, hwid = sw * (s.tw || 1);
   const v = { f: 0, l: -1, r: 1, pl: -1, pr: 1 }[s.view || 'pr'];
@@ -309,8 +310,8 @@ function stand(s, pose = {}) {
 const headBlock = (s, hy, hr) => `<g class="head">${headSVG(Object.assign({ eyes: 'open', mouth: 'smile', gaze: [0, 0], ears: 'round', head: 'none', view: 'pr' }, s), 0, hy, hr)}</g>`;
 
 /* ===== editor, candidate ===== */
-const EDITOR = { fur: 5, H: 58, bw: 52, tw: 1.02, hr: 16, ears: 'small', lean: 3, fwd: 5, view: 'f', gaze: [0, .9], eyes: 'open', mouth: 'flat', head: 'visor', body: 'braces', tail: 'none', prop: 2, ps: 1, beh: 'stamp', shirt: 'sk-ink', chair: 'round', flange: true };
-const CANDIDATE = { fur: 4, H: 56, bw: 24, tw: 1.1, hr: 12, ears: 'big', view: 'pl', gaze: [-1, -.7], eyes: 'wide', mouth: 'o', head: 'none', tail: true, shirt: 'sk-rust' };
+export const EDITOR = { fur: 5, H: 58, bw: 52, tw: 1.02, hr: 16, ears: 'small', lean: 3, fwd: 5, view: 'f', gaze: [0, .9], eyes: 'open', mouth: 'flat', head: 'visor', body: 'braces', tail: 'none', prop: 2, ps: 1, beh: 'stamp', shirt: 'sk-ink', chair: 'round', flange: true };
+export const CANDIDATE = { fur: 4, H: 56, bw: 24, tw: 1.1, hr: 12, ears: 'big', view: 'pl', gaze: [-1, -.7], eyes: 'wide', mouth: 'o', head: 'none', tail: true, shirt: 'sk-rust' };
 
 
 /* =====================================================================================
@@ -319,24 +320,22 @@ const CANDIDATE = { fur: 4, H: 56, bw: 24, tw: 1.1, hr: 12, ears: 'big', view: '
    except the parts kit above. The game calls it, compares `key` with the last one, and only
    when it differs replaces the world's innerHTML.
    ===================================================================================== */
-export const FLOOR_W = 780, FLOOR_H = 1764;
 export const CAP = 12;                      // desks drawn in the Typing Pool (4 x 3); past this a brass placard carries the true count
 const ED_CAP = 2;                    // editors drawn besides the Editor-in-Chief
 const POOL_DY = 264;                 // the pool's group is translated down by this
-export const PERS_DY = 234;                 // Personnel, the entrance and the shredder station are translated down by this
+const PERS_DY = 234;                 // Personnel, the entrance and the shredder station are translated down by this
 const POOL_G = { xs: [273, 351, 429, 507], rows: [610, 715, 820], edRow: 925, edXs: [506, 388, 270], edDw: 84 };
 const TIER_IDS = ['letters', 'words', 'phrases', 'sentences'];
 const TIER_NAMES = { letters: 'Letters', words: 'Words', phrases: 'Phrases', sentences: 'Sentences' };
 const DEPT_IDS = ['recruiting', 'construction', 'editing'];
-// where a hired monkey ends up (world coords): in front of the desk, for the hire walk
-export const deskSpot = i => [POOL_G.xs[i % 4], POOL_G.rows[i >> 2] + POOL_DY + 24];
-const ZONES = [
-  { id: 'personnel', label: 'Personnel: hire monkeys and manage desks', box: [265, 1334, 250, 204], extra: [[226, 1564, 190, 156]], frame: [190, 1334, 400, 380], cam: [390, 1034, 'top'], centre: [390, 1444], chip: { x: 542, y: 1444, a: 'r' } },
-  { id: 'pool', label: 'Typing Pool: typing versus editing', box: [216, 707, 348, 539], frame: [214, 700, 352, 330], cam: [390, 976, 'mid'], centre: [390, 976], chip: { x: 590, y: 976, a: 'r' } },
-  { id: 'departments', label: 'Departments: Recruiting, Construction, Editing', box: [66, 146, 246, 171], frame: [64, 144, 252, 176], cam: [189, 232, 'mid'], centre: [189, 232], chip: { x: 189, y: 132, a: 'c' } },
-  { id: 'research', label: 'Records Library: research tiers and faster typewriters', box: [264, 434, 252, 192], frame: [250, 428, 280, 200], cam: [390, 530, 'mid'], centre: [390, 530], chip: { x: 256, y: 530, a: 'l' } },
-  { id: 'director', label: "Director's Office: readiness, permit, declare", box: [468, 146, 246, 171], frame: [466, 144, 252, 176], cam: [591, 232, 'mid'], centre: [591, 232], chip: { x: 591, y: 132, a: 'c' } }
-];
+// What each room's full-width scene shows: [x, y, w, h] in the room art's own coordinates.
+const ROOM_VIEWS = {
+  personnel: [204, 1342, 400, 308],
+  pool: [214, 706, 352, 282],
+  departments: [60, 140, 260, 184],
+  research: [246, 424, 288, 208],
+  director: [462, 140, 260, 184]
+};
 
 // every drawing cap is applied here, once; the renderer reads only this, and `key` is this object
 export function normalize(p) {
@@ -358,56 +357,23 @@ const headcountText = n => `${Math.max(0, Math.floor(n)).toLocaleString('en-US')
 
 /* ----- small pieces ----- */
 // where a desk will go: chalk outline plus corner tape
-function deskMark(cx, yb, dw, faint, label) {
+export function deskMark(cx, yb, dw, faint, label) {
   const x0 = cx - dw / 2 - 2, x1 = cx + dw / 2 + 2, y0 = yb - 30, y1 = yb + 8, k = 9;
   const c = [[x0, y0, 1, 1], [x1, y0, -1, 1], [x0, y1, 1, -1], [x1, y1, -1, -1]].map(([x, y, a, b]) => `M${x + a * k} ${y}H${x}V${y + b * k}`).join('');
   return `<g class="dmark${faint ? ' faint' : ''}"><rect class="chalk" x="${x0}" y="${y0}" width="${x1 - x0}" height="${y1 - y0}" rx="3"/><path class="tapec" d="${c}"/>` +
     (label ? `<rect x="${cx - 20}" y="${yb - 20}" width="40" height="12" rx="1.5" class="tape"/><text class="dtag" x="${cx}" y="${yb - 11}">${label}</text>` : `<path d="M${cx - 4} ${yb - 12}h8M${cx} ${yb - 16}v8" stroke="var(--edge)" stroke-width="1.6" opacity=".5"/>`) + `</g>`;
 }
-const stagePlate = (cx, y, stage) => {
+export const stagePlate = (cx, y, stage) => {
   let lamps = '';
   for (let k = 0; k < 4; k++) lamps += `<circle cx="${cx - 15 + k * 10}" cy="${y - 5}" r="3.1" fill="${k < stage ? 'var(--tangerine)' : 'var(--paper-shade)'}" stroke="var(--screen)" stroke-width=".9"/>`;
   return `<g>${lamps}<rect class="brass" x="${cx - 33}" y="${y}" width="66" height="13" rx="2"/><text class="sg sm" x="${cx}" y="${y + 9.6}" style="font-size:8.2px;letter-spacing:.05em">Stage ${stage} of 4</text></g>`;
 };
-const drawers = (x, y0, w, n, rh, hasLabel = true) => Array.from({ length: n }, (_, k) => {
+export const drawers = (x, y0, w, n, rh, hasLabel = true) => Array.from({ length: n }, (_, k) => {
   const y = y0 + k * rh;
   return `<rect x="${x + 5}" y="${y}" width="${w - 10}" height="${rh - 3}" rx="1.2" fill="none" stroke="var(--edge)" stroke-width="1"/><rect x="${x + w / 2 - 9}" y="${y + 4}" width="18" height="6" rx="1.6" class="brass"/>` + (hasLabel ? `<rect x="${x + w / 2 - 5}" y="${y + 12}" width="10" height="2.4" rx="1.2" class="ink" opacity=".4"/>` : '');
 }).join('');
 
 /* ----- the back wall: windows (closed until 'office'), elevator (barrier until 'building'), sky (changes at 'tall') ----- */
-const WIN_X = [30, 124, 218, 492, 586, 680], WIN_OPEN = 2;
-function windowSVG(x, open, tall) {
-  const frame = `<rect x="${x}" y="17" width="70" height="72" fill="var(--concrete)" stroke="var(--edge)" stroke-width="1.4"/>`;
-  const sill = `<rect x="${x - 3}" y="88" width="76" height="6" fill="var(--edge)" opacity=".9"/>`;
-  if (!open) {
-    let sl = ''; for (let k = 0; k < 10; k++) sl += `M${x + 5} ${27 + k * 6}h60`;
-    return frame + `<rect class="blind" x="${x + 5}" y="22" width="60" height="62"/><path class="slat" d="${sl}"/><path d="M${x + 60} 22v50" stroke="var(--edge)" stroke-width="1.2"/><circle cx="${x + 60}" cy="74" r="2.2" class="brass"/>` + sill;
-  }
-  const mun = `<path d="M${x + 35} 22v62M${x + 5} 53h60" stroke="var(--concrete)" stroke-width="2"/>`;
-  if (tall) {
-    // above the clouds: a warm sky, the sun, and a sea of cloud tops
-    return frame + `<rect class="skyh" x="${x + 5}" y="22" width="60" height="62"/><circle cx="${x + 46}" cy="52" r="9" fill="var(--mustard)" stroke="var(--edge)" stroke-width="1.2"/>` +
-      `<g clip-path="url(#wclip)"><g class="cloudw" style="transform:translateX(40px);--cdl:-8s"><ellipse cx="${x + 4}" cy="36" rx="14" ry="4.4" class="cloudsea"/></g>` +
-      `<ellipse cx="${x + 14}" cy="76" rx="20" ry="11" class="cloudsea"/><ellipse cx="${x + 38}" cy="72" rx="22" ry="12" class="cloudsea"/><ellipse cx="${x + 60}" cy="77" rx="18" ry="10" class="cloudsea"/><ellipse cx="${x + 30}" cy="82" rx="30" ry="8" class="cloudsea"/></g>` + mun + sill;
-  }
-  const sk = [[0, 18, 10], [11, 28, 9], [21, 14, 12], [34, 24, 8], [43, 16, 10], [54, 30, 8]].map(([dx, h, w]) => `<rect class="sil" x="${x + 5 + dx}" y="${84 - h}" width="${w}" height="${h}"/>`).join('');
-  return frame + `<rect class="skyg" x="${x + 5}" y="22" width="60" height="62"/>${sk}<g clip-path="url(#wclip)"><g class="cloudw" style="transform:translateX(30px)"><ellipse cx="${x + 4}" cy="38" rx="13" ry="4.6" class="cloud" style="animation:none;opacity:.9"/><ellipse cx="${x + 14}" cy="34" rx="8" ry="4.6" class="cloud" style="animation:none"/></g></g>` + mun + sill;
-}
-function elevatorSVG(b) {
-  return `<rect x="335" y="26" width="110" height="74" fill="var(--concrete)" stroke="var(--edge)" stroke-width="1.6"/><rect x="343" y="34" width="42" height="66" fill="color-mix(in srgb, var(--edge) 70%, var(--concrete))" stroke="var(--edge)" stroke-width="1.3"/><rect x="395" y="34" width="42" height="66" fill="color-mix(in srgb, var(--edge) 70%, var(--concrete))" stroke="var(--edge)" stroke-width="1.3"/>` +
-    (b ? `<rect x="387" y="34" width="6" height="66" fill="var(--glow)"/>` : '') + `<path d="M390 34v66" stroke="var(--screen)" stroke-width="1.6"/><rect x="351" y="48" width="2" height="48" fill="var(--edge)" opacity=".5"/>` +
-    `<rect x="374" y="12" width="32" height="14" rx="2" class="ink"/><text x="380" y="23" class="sg" style="fill:var(--screen-ink);text-anchor:start;font-size:11px">1</text><text x="394" y="23" class="sg" style="fill:var(--screen-ink);text-anchor:start;font-size:11px;opacity:${b ? 1 : .2}">2</text>` +
-    (b ? `<ellipse class="halo pulse" cx="397" cy="19" rx="16" ry="10"/><path d="M410 52l6 -7l6 7z" fill="var(--mustard)" stroke="var(--screen)" stroke-width=".9"/><circle class="halo" cx="416" cy="56" r="14"/><circle cx="416" cy="62" r="3" class="brass"/>` : `<path d="M410 52l6 -7l6 7z" fill="var(--concrete)" stroke="var(--screen)" stroke-width=".9"/><circle cx="416" cy="62" r="3" class="ink"/>`);
-}
-const barrierSVG = () => pbox({ x: 348, yb: 134, w: 84, h: 22, d: 5, c: 'paper', tabs: false, extra: [0, 1, 2, 3].map(k => `<polygon points="${354 + k * 21},${112} ${363 + k * 21},${112} ${357 + k * 21},${134} ${348 + k * 21},${134}" fill="var(--mustard)"/>`).join('') + `<rect x="368" y="115" width="44" height="14" fill="var(--edge)" stroke="var(--screen)" stroke-width=".8"/><text class="sg sm" x="390" y="125" style="font-size:9px;letter-spacing:.04em">Floor 2</text><rect x="348" y="112" width="84" height="22" fill="none" stroke="var(--screen)" stroke-width="1"/>` }) +
-  `<g class="up" style="transform-origin:330px 140px"><polygon class="shc" points="320,140 340,140 344,145 316,145"/><polygon class="fr" style="--c:var(--tangerine)" points="324,140 336,140 332,114 328,114"/><rect x="326" y="124" width="6" height="4" fill="var(--edge)"/><rect x="318" y="139" width="24" height="4" class="fr" style="--c:var(--screen)"/></g>` +
-  `<g class="up" style="transform-origin:448px 140px"><polygon class="shc" points="438,140 460,140 462,144 436,144"/><path class="fr" style="--c:var(--concrete)" d="M440 112h18l2 28h-22z"/><path d="M440 118h20" stroke="var(--edge)" stroke-width="1.4"/></g>`;
-function wallSVG(n) {
-  const wins = WIN_X.map((x, i) => windowSVG(x, n.office && i === WIN_OPEN, n.tall)).join('');
-  return `<g class="area" id="a-wall"><g class="up" style="transform-origin:390px 100px"><polygon class="shl" points="0,100 780,100 800,118 20,118" style="opacity:.22"/><rect class="fr c-wall" x="0" y="6" width="780" height="94"/><path class="rim" d="M2 99V8H778"/><polygon class="tp c-wall" points="6,0 774,0 780,6 0,6"/>${wins}${elevatorSVG(n.building)}<path d="M0 66H780" stroke="var(--edge)" stroke-width="1" stroke-dasharray="2 5" opacity=".6"/></g></g>` +
-    (n.building ? '' : barrierSVG());
-}
-
 /* ----- Departments: cabinets grow with level, a plate and four lamps show the stage ----- */
 function departmentsSVG(n) {
   const [[lr, sr], [lc, sc], [le, se]] = n.depts, yb = 314;
@@ -463,7 +429,7 @@ function directorSVG(n) {
 
 /* ----- Records Library: shelves of bound volumes, a card catalogue, a reading lamp, a librarian, and the lectern where tiers are researched ----- */
 const SPINES = ['var(--alert)', 'var(--mustard)', 'var(--olive)', 'var(--tangerine)', 'var(--edge)', 'var(--concrete)', 'color-mix(in srgb, var(--walnut) 55%, var(--screen))', 'color-mix(in srgb, var(--olive) 50%, var(--alert))'];
-function shelfBooks(x, yb, w, seed, hmax) {
+export function shelfBooks(x, yb, w, seed, hmax) {
   let o = '', cx = x + 5, k = 0;
   while (cx < x + w - 10) {
     const bw = 5 + hash(seed + k * 7) % 4, bh = hmax - 3 - hash(seed + k * 13) % 9, lean = k % 6 === 4;
@@ -472,7 +438,7 @@ function shelfBooks(x, yb, w, seed, hmax) {
   }
   return o;
 }
-function volume(x, yb, state, id, w = 42, h = 27) {
+export function volume(x, yb, state, id, w = 42, h = 27) {
   const nm = TIER_NAMES[id].toUpperCase(), y = yb - h;
   if (state === 'researching') return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2" fill="none" stroke="var(--edge)" stroke-width="1.4" stroke-dasharray="4 3" opacity=".8"/><path d="M${x + w / 2} ${y + h - 6}v-12m-5 5l5 -6l5 6" fill="none" stroke="var(--edge)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>`;
   if (state === 'discovered') return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2" fill="color-mix(in srgb, var(--olive) 78%, var(--screen))" stroke="var(--edge)" stroke-width="1.3"/><rect x="${x}" y="${y}" width="5" height="${h}" fill="var(--mustard)" stroke="var(--edge)" stroke-width="1"/>` +
@@ -584,85 +550,31 @@ function personnelSVG(n) {
   return s;
 }
 
-/* ----- aisles and the water-cooler nook (static; they move with the world, not with state) ----- */
-const AISLE_DY = 349;
-const ROUTE = [[100, 669], [676, 669], [676, 1281], [100, 1281], [100, 669]];
-function aislesSVG() {
-  let s = `<g class="area" id="a-left" transform="translate(0 ${AISLE_DY})">`;
-  s += pbox({ x: 22, yb: 560, w: 74, h: 96, d: 10, c: 'wall', extra: [0, 1, 2, 3].map(r => [0, 1, 2].map(c => `<rect x="${28 + c * 22}" y="${472 + r * 22}" width="18" height="18" fill="var(--screen)" opacity=".78" stroke="var(--edge)" stroke-width="1"/>`).join('')).join('') + `<rect class="page" x="31" y="480" width="12" height="9"/><rect class="page" x="54" y="502" width="12" height="9" transform="rotate(-6 60 506)"/><rect class="page" x="74" y="524" width="12" height="9"/><rect class="page" x="32" y="546" width="12" height="9" transform="rotate(5 38 550)"/>` });
-  s += stepLadder(56, 712) + snake(98, 810, 1);
-  s += ficus(160, 658, 1.2);
-  s += T(100, 654, stand({ fur: 2, H: 62, bw: 26, tw: 1.1, hr: 12, ears: 'big', view: 'pr', gaze: [1, .8], eyes: 'open', mouth: 'smile', tail: true, shirt: 'sk-olive' }, { hr: [16, -40], hl: [-6, -22], xr: `<g class="can" style="transform-origin:16px -40px"><rect x="14" y="-50" width="16" height="12" rx="2" fill="var(--concrete)" stroke="var(--edge)" stroke-width="1.2"/><path d="M30 -46l12 -2l-1 4l-11 2z" fill="var(--concrete)" stroke="var(--edge)" stroke-width="1"/><path d="M14 -48q-6 -4 0 -8" fill="none" stroke="var(--edge)" stroke-width="1.6"/><circle class="drp" cx="42" cy="-44" r="1.8" fill="var(--edge)" stroke="var(--concrete)" stroke-width=".6"/><circle class="drp" cx="39" cy="-46" r="1.5" fill="var(--edge)" stroke="var(--concrete)" stroke-width=".6" style="animation-delay:.4s"/></g>` }));
-  s += `</g><g class="area" id="a-right" transform="translate(0 ${AISLE_DY})">`;
-  s += snake(598, 520, 1) + noticeBoard(690, 500);
-  s += T(102, -52, pbox({ x: 600, yb: 672, w: 76, h: 54, d: 14, c: 'steel', extra: `<rect x="606" y="626" width="64" height="9" fill="var(--screen)" opacity=".7"/><rect class="scan" x="610" y="623" width="6" height="14" fill="var(--glow)" stroke="var(--screen)" stroke-width=".7"/><rect x="606" y="642" width="30" height="14" rx="2" class="ink"/><text x="621" y="653" class="sg" style="fill:var(--screen-ink);font-size:13px">∞</text><rect x="642" y="644" width="22" height="10" rx="1.4" class="brass"/><rect x="606" y="660" width="64" height="5" fill="var(--screen)" opacity=".5"/><g class="eject"><rect class="page" x="624" y="664" width="26" height="14"/></g>` }));
-  s += wasteBin(684, 640) + ficus(606, 770, 1.1);
-  s += `</g>`;
-  // beside the Library: a plant on one side, a cactus and a crate on the other
-  s += `<g class="area" id="a-lib-side">` + ficus(176, 600, 1.15) + snake(212, 470, .9) + cactus(600, 590, 1) + snake(630, 480, 1) + `</g>`;
-  // water-cooler nook under the elevator lobby
-  s += `<g class="area" id="a-nook"><g transform="translate(0 -34)">`;
-  s += pbox({ x: 372, yb: 392, w: 30, h: 46, d: 6, c: 'steel', extra: `<rect x="378" y="368" width="8" height="5" rx="1" fill="var(--tangerine)" stroke="var(--screen)" stroke-width=".7"/><rect x="390" y="368" width="8" height="5" rx="1" fill="var(--edge)" stroke="var(--screen)" stroke-width=".7"/><rect x="379" y="382" width="18" height="12" fill="none" stroke="var(--edge)" stroke-width="1"/><circle cx="388" cy="388" r="2.4" fill="var(--glow)" stroke="var(--screen)" stroke-width=".7"/>` });
-  s += `<g class="up" style="transform-origin:387px 404px"><rect x="374" y="316" width="26" height="36" rx="9" class="glass-f" style="fill:color-mix(in srgb, var(--paper) 55%, var(--glow));stroke:var(--edge)"/><path d="M377 335h20" stroke="var(--edge)" stroke-width="1.4" opacity=".8"/><circle class="bub" cx="384" cy="346" r="1.8" fill="var(--edge)" style="--d:0s"/><circle class="bub" cx="391" cy="348" r="1.4" fill="var(--edge)" style="--d:-1.1s"/><rect x="378" y="311" width="18" height="6" rx="2" class="fr c-steel"/></g>`;
-  s += `</g><g transform="translate(-10 -34)">`;
-  s += T(348, 410, stand({ fur: 5, H: 68, bw: 24, tw: 1.0, hr: 11.5, ears: 'tuft', view: 'pr', gaze: [1, -.2], eyes: 'heavy', mouth: 'smirk', head: 'none', tail: true, shirt: 'sk-paper' }, { hr: [19, -40], hl: [-4, -26], xr: `<g class="cupa" style="--sa:-70deg;transform-origin:19px -40px"><path d="M15 -50h9l-4.5 12z" fill="var(--edge)" stroke="var(--screen)" stroke-width=".9"/></g>`, body: `<path d="M-2 -52h4l1.6 14l-3.6 4l-3.6 -4z" fill="var(--alert)" stroke="var(--edge)" stroke-width=".8"/>` }));
-  s += `</g><g transform="translate(-16 -34)">`;
-  s += `<g class="up" style="transform-origin:448px 408px"><polygon class="shl" points="438,408 458,408 492,420 468,420"/><polygon class="shc" points="438,408 458,408 461,412 441,412"/><path d="M448 408V330" stroke="var(--walnut)" stroke-width="5" stroke-linecap="round"/><path d="M432 410l16 -6l16 6M448 404v6" stroke="var(--walnut)" stroke-width="4" stroke-linecap="round" fill="none"/><path d="M448 340l-14 -6M448 340l14 -6M448 352l-14 -4M448 352l14 -4" stroke="var(--walnut)" stroke-width="3" stroke-linecap="round"/>` +
-    `<g class="coat" style="--d:0s;transform-origin:434px 336px"><path d="M426 338h16l4 36h-24z" fill="var(--olive)" stroke="var(--edge)" stroke-width="1.3" stroke-linejoin="round"/><path d="M434 338v36" stroke="var(--edge)" stroke-width=".9"/></g><g class="coat" style="--d:-2s;transform-origin:462px 336px"><path d="M454 338h16l5 40h-26z" fill="var(--edge)" stroke="var(--concrete)" stroke-width="1.3" stroke-linejoin="round"/><circle cx="462" cy="352" r="1.4" class="brass"/></g><path d="M440 326q8 -9 16 0z" fill="var(--alert)" stroke="var(--edge)" stroke-width="1.2"/></g>`;
-  return s + `</g></g>`;
-}
-function cart() {
-  return `<polygon class="shl" points="-30,0 30,0 54,9 -6,9"/><polygon class="shc" points="-28,0 28,0 31,3 -25,3"/>` +
-    `<g transform="translate(-20 0)" class="cartbob">${stand({ fur: 1, H: 60, bw: 22, tw: 1.1, hr: 11, ears: 'big', view: 'pr', gaze: [1, .2], eyes: 'open', mouth: 'smile', tail: true, shirt: 'sk-mustard' }, { hr: [14, -30], hl: [10, -28] })}</g>` +
-    `<rect class="fr c-steel" x="-6" y="-34" width="56" height="26" rx="2"/><path class="rim" d="M-4 -10V-33H48"/><rect x="-2" y="-30" width="48" height="8" fill="var(--edge)" stroke="var(--screen)" stroke-width=".8"/><rect class="page" x="2" y="-38" width="14" height="9" transform="rotate(-6 8 -34)"/><rect class="page" x="20" y="-37" width="12" height="8" transform="rotate(5 26 -33)"/><rect x="34" y="-41" width="12" height="12" fill="var(--walnut)" stroke="var(--edge)" stroke-width="1"/><path d="M34 -35h12M40 -41v12" stroke="var(--mustard)" stroke-width="1.4"/>` +
-    `<path d="M-6 -34h-8l-2 10" stroke="var(--screen)" stroke-width="2.4" fill="none" stroke-linecap="round"/><path d="M50 -34v-14" stroke="var(--screen)" stroke-width="1.4"/><path d="M50 -48l9 3l-9 3z" fill="var(--alert)" stroke="var(--edge)" stroke-width=".8"/>` +
-    `<g class="wheel" style="transform-origin:4px -4px"><circle cx="4" cy="-4" r="5" fill="var(--screen)" stroke="var(--edge)" stroke-width="1.2"/><path d="M4 -8v8" stroke="var(--edge)" stroke-width="1.2"/></g><g class="wheel" style="transform-origin:40px -4px"><circle cx="40" cy="-4" r="5" fill="var(--screen)" stroke="var(--edge)" stroke-width="1.2"/><path d="M40 -8v8" stroke="var(--edge)" stroke-width="1.2"/></g>`;
-}
-// mail-cart keyframes: a loop of the aisles around the pool, with a short stop at each corner (static, installed once)
-/** Installs the mail-cart route keyframes once (they depend only on the static route). */
-export function installRouteCSS() {
-  if (document.getElementById('route-css')) return;
-  const pts = ROUTE, sp = 42, dwell = 2;
-  let t = 0; const ev = [{ t: 0, p: pts[0] }];
-  for (let k = 1; k < pts.length; k++) {
-    const d = Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]); t += d / sp; ev.push({ t, p: pts[k] });
-    if (k < pts.length - 1) { t += dwell; ev.push({ t, p: pts[k] }); }
-  }
-  const total = t, pc = x => (x / total * 100).toFixed(2) + '%';
-  let a = ''; ev.forEach(e => { a += `${pc(e.t)}{transform:translate(${e.p[0]}px,${e.p[1]}px)}`; });
-  const flipKF = `0%{transform:scaleX(1)}${pc(ev[4].t - .05)}{transform:scaleX(-1)}${pc(ev[6].t)}{transform:scaleX(-1)}${pc(ev[7].t - .01)}{transform:scaleX(1)}`;
-  const st = document.createElement('style');
-  st.id = 'route-css';
-  st.textContent = `@keyframes cartxy{${a}}@keyframes cartflip{${flipKF}}`;
-  document.head.appendChild(st);
-  document.documentElement.style.setProperty('--cdur', total + 's');
-}
 
-/* ----- the whole world ----- */
-export function buildFloor(props) {
-  const n = normalize(props), key = JSON.stringify(n);
-  const defs = `<defs><radialGradient id="halo"><stop offset="0" style="stop-color:var(--glow);stop-opacity:.95"/><stop offset=".55" style="stop-color:var(--glow);stop-opacity:.45"/><stop offset="1" style="stop-color:var(--glow);stop-opacity:0"/></radialGradient>` +
-    `<filter id="soft" x="-20%" y="-20%" width="140%" height="160%"><feGaussianBlur stdDeviation="2.6"/></filter><filter id="soft2" x="-10%" y="-10%" width="125%" height="130%"><feGaussianBlur stdDeviation="6"/></filter>` +
-    `<pattern id="grainp" width="160" height="160" patternUnits="userSpaceOnUse"><image width="160" height="160" href="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' seed='7'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E"/></pattern><pattern id="dotp" width="40" height="40" patternUnits="userSpaceOnUse"><circle cx="20" cy="20" r="1.5" class="dots"/></pattern>` +
-    `<clipPath id="wclip"><rect x="${WIN_X[WIN_OPEN] + 5}" y="22" width="60" height="62"/></clipPath></defs>`;
-  const FH = 1400 + PERS_DY;
-  let s = defs;
-  s += `<rect class="table-shadow" x="-4" y="104" width="796" height="${FH + 10}" rx="6"/><rect class="floor-edge" x="0" y="106" width="780" height="${FH}" rx="4"/><rect class="floor" x="0" y="100" width="780" height="${FH}" rx="4"/>`;
-  s += `<rect class="grain" x="0" y="100" width="780" height="${FH}" fill="url(#grainp)"/><rect x="0" y="100" width="780" height="${FH}" fill="url(#dotp)"/><rect class="floor-rim" x="1" y="101" width="778" height="${FH - 2}" rx="4"/>`;
-  s += `<path class="crease-hi" d="M6 416.5H774M6 1316.5H774"/><path class="crease" d="M6 415.5H774M6 1315.5H774"/>`;
-  s += [[10, 106, -35], [770, 106, 35], [10, 100 + FH - 6, 35], [770, 100 + FH - 6, -35]].map(([x, y, a]) => `<rect class="tape" x="${x - 11}" y="${y - 5}" width="22" height="10" transform="rotate(${a} ${x} ${y})"/>`).join('');
-  // flat things on the floor: three runner rugs that join the rooms, the nook rug, the entrance mat, the mail-cart route
-  const runner = (x, y, h) => `<rect class="pad-sh" x="${x + 4}" y="${y + 5}" width="56" height="${h}" rx="3"/><rect class="rug" x="${x}" y="${y}" width="56" height="${h}" rx="3" style="fill:color-mix(in srgb, var(--alert) 26%, var(--pad))"/><rect x="${x + 6}" y="${y + 6}" width="44" height="${h - 12}" fill="none" stroke="var(--mustard)" stroke-width="2.2"/><path d="M${x + 28} ${y + 14}V${y + h - 14}" stroke="var(--olive)" stroke-width="3" stroke-dasharray="14 6"/><path d="${[...Array(Math.floor(h / 14))].map((_, k) => `M${x - 4} ${y + 6 + k * 14}h4M${x + 56} ${y + 6 + k * 14}h4`).join('')}" stroke="var(--edge)" stroke-width="1.4"/>`;
-  s += runner(362, 380, 56) + runner(362, 636, 72) + runner(362, 1262, 82);
-  s += `<rect class="pad-sh" x="330" y="334" width="128" height="44" rx="3"/><rect class="rug" x="326" y="330" width="128" height="44" rx="3" style="fill:color-mix(in srgb, var(--olive) 30%, var(--pad))"/><rect x="332" y="336" width="116" height="32" fill="none" stroke="var(--edge)" stroke-width="1.6" stroke-dasharray="5 4"/>`;
-  s += `<rect class="pad-sh" x="226" y="${1460 + PERS_DY}" width="100" height="26" rx="2"/><rect class="pad t-pe" x="222" y="${1456 + PERS_DY}" width="100" height="26" rx="2" style="fill:color-mix(in srgb, var(--mustard) 40%, var(--pad))"/>`;
-  const [a, b, c, d] = ROUTE, mx = (a[0] + b[0]) / 2, my = (b[1] + c[1]) / 2;
-  s += `<path class="route" d="M${a[0]} ${a[1]}H${b[0] - 10}Q${b[0]} ${a[1]} ${b[0]} ${a[1] + 10}V${c[1] - 10}Q${b[0]} ${c[1]} ${b[0] - 10} ${c[1]}H${d[0] + 10}Q${d[0]} ${c[1]} ${d[0]} ${c[1] - 10}V${a[1] + 10}Q${d[0]} ${a[1]} ${d[0] + 10} ${a[1]}Z"/>`;
-  s += `<path d="M${mx} ${a[1] - 3}l8 3-8 3z M${b[0] - 3} ${my}h6l-3 8z M${mx} ${c[1] - 3}l-8 3 8 3z M${d[0] - 3} ${my}h6l-3 -8z" fill="var(--mustard)" stroke="var(--screen)" stroke-width=".8"/>`;
-  s += wallSVG(n) + departmentsSVG(n) + directorSVG(n) + librarySVG(n) + poolSVG(n, props.seated) + `<g transform="translate(0 ${PERS_DY})">` + personnelSVG(n) + `</g>` + aislesSVG();
-  s += `<g class="cartpos" style="--cd:var(--cdur);--cdl:-1.4s"><g class="cartflip" style="--cd:var(--cdur);--cdl:-1.4s">${cart()}</g></g>`;
-  s += `<g transform="translate(176 372)"><path class="planesh" d="M0 20l22 -6l-4 6l-8 2z" fill="var(--screen)"/><g class="plane"><path d="M0 0l30 -9l-9 14z" fill="var(--edge)" stroke="var(--concrete)" stroke-width="1.1" stroke-linejoin="round"/><path d="M0 0l21 5l-5 4z" fill="var(--edge)" stroke="var(--concrete)" stroke-width="1.1" stroke-linejoin="round"/><path d="M21 5l9 -14" stroke="var(--concrete)" stroke-width=".9"/></g></g>`;
-  return { svg: s, zones: ZONES, key, size: [FLOOR_W, FLOOR_H] };
+const DEFS = `<defs><radialGradient id="halo"><stop offset="0" style="stop-color:var(--glow);stop-opacity:.95"/><stop offset=".55" style="stop-color:var(--glow);stop-opacity:.45"/><stop offset="1" style="stop-color:var(--glow);stop-opacity:0"/></radialGradient></defs>`;
+
+/** One room's scene as a function of state: markup for an <svg> whose viewBox is `viewBox`. */
+export function buildRoom(id, props) {
+  const n = normalize(props), key = id + JSON.stringify(n);
+  let body = '';
+  switch (id) {
+    case 'personnel': {
+      // the entrance and the shredder station sit a little closer to the office, so the room fits one wide scene
+      const p = personnelSVG(n), at = p.indexOf('<g class="area" id="a-entrance"');
+      body = `<g transform="translate(0 ${PERS_DY})">${p.slice(0, at)}<g transform="translate(0 -30)">${p.slice(at)}</g></g>`;
+      break;
+    }
+    case 'pool': body = poolSVG(n, props.seated); break;
+    case 'departments': body = departmentsSVG(n); break;
+    case 'research': body = librarySVG(n); break;
+    case 'director': body = directorSVG(n); break;
+    default: body = '';
+  }
+  // ids are dropped: the building draws the same kit on the same page, and nothing here needs them
+  return { svg: body.replace(/ id="[^"]*"/g, ''), viewBox: ROOM_VIEWS[id] || [0, 0, 100, 100], key };
 }
+/** Shared <defs> (the lamp-glow gradient the kit refers to). Put once in the document. */
+export const roomDefs = () => DEFS;
+
 // the headcount placard changes more often than the picture does: patch its text in place instead of rebuilding
 export const updateHeadcount = (root, seated) => root.querySelectorAll('[data-hc]').forEach(t => { t.textContent = headcountText(seated); });

@@ -215,11 +215,11 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
     const d = (e as CustomEvent<unknown>).detail;
     if (isView(d)) setView(d);
   });
-  // Reopening the sheet from the room sign starts at the summary: reset when it closes or another room replaces it.
+  // Reopening the room from its floor starts at the summary: reset when it closes or another room replaces it.
   const reset = () => { if (view !== 'summary') setView('summary'); };
-  let wasOpen = document.body.classList.contains('sheet-open');
+  let wasOpen = document.body.classList.contains('room-open');
   new MutationObserver(() => {
-    const now = document.body.classList.contains('sheet-open');
+    const now = document.body.classList.contains('room-open');
     if (wasOpen && !now) reset();
     wasOpen = now;
   })

@@ -15,10 +15,8 @@
   </head>
   <body>
 <div class="stage" id="stage">
-  <div class="cam" id="cam">
-    <svg id="map" viewBox="0 0 780 1764" role="img" aria-label="Floor plan of the Bureau's first floor: Departments and the Director's Office at the back, the Records Library below them, the Typing Pool in the middle, and Personnel by the entrance. Drag to look around, or use Plan to see all of it."><g id="world"></g><g id="fx"></g></svg>
-  </div>
-  <div class="chips" id="chips"></div>
+  <svg class="defs" width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute"><defs><radialGradient id="halo"><stop offset="0" style="stop-color:var(--glow);stop-opacity:.95"/><stop offset=".55" style="stop-color:var(--glow);stop-opacity:.45"/><stop offset="1" style="stop-color:var(--glow);stop-opacity:0"/></radialGradient><filter id="soft" x="-20%" y="-20%" width="140%" height="160%"><feGaussianBlur stdDeviation="2.6"/></filter><filter id="soft2" x="-10%" y="-10%" width="125%" height="130%"><feGaussianBlur stdDeviation="6"/></filter></defs></svg>
+  <main class="tower" id="map" aria-label="The Bureau: five floors from the street up to the Director's Office. Tap a floor to go in."></main>
 
   <header class="hdr" id="hdr">
     <div class="brand">
@@ -27,12 +25,8 @@
         <circle cx="20" cy="20" r="13.5" fill="none" stroke="var(--screen)" stroke-width="1.2" stroke-dasharray="2 2"/>
         <path d="M9 20c0-5 5-5 11 0s11 5 11 0-5-5-11 0-11 5-11 0z" fill="none" stroke="var(--screen)" stroke-width="2.6" stroke-linejoin="round"/>
       </svg>
-      <div><p class="eb">Bureau of Infinite Typing</p><h1>First Floor</h1></div>
+      <div><p class="eb">Bureau of Infinite Typing</p><h1>The Bureau</h1></div>
     </div>
-    <button class="hbtn planbtn" id="planbtn" aria-label="Floor plan: see the whole floor">
-      <span class="t-plan"><svg width="20" height="18" viewBox="0 0 20 20" aria-hidden="true"><rect x="1.5" y="1.5" width="7" height="5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="11.5" y="1.5" width="7" height="5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="5" y="8.5" width="10" height="5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="4" y="15.5" width="6" height="3" fill="currentColor"/></svg>Plan</span>
-      <span class="t-back"><svg width="20" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M11 3L5 9l6 6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round" stroke-linecap="round"/></svg>Back</span>
-    </button>
     <button class="hbtn dirbtn" id="dirbtn" aria-expanded="false" aria-controls="dir" aria-label="Building directory">
       <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="3" y="1" width="12" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="9" cy="6" r="1.8" fill="currentColor"/><circle cx="9" cy="12" r="1.8" fill="currentColor"/></svg>
       <span>Directory</span>
@@ -44,14 +38,13 @@
     </div>
   </header>
   <div class="feed" id="feed"></div>
-  <div class="plancap" id="plancap">Tap a room to go there. Pinch in or tap Back to return.</div>
 
   <nav class="dir" id="dir" hidden aria-label="Building directory">
     <div class="tabw"><div class="fold-tab"><span>Directory</span></div></div>
-    <p class="typed">Floor 1 &middot; First floor</p>
+    <p class="typed">The Bureau &middot; Floors 1&ndash;5</p>
     <ul id="dirlist"></ul>
     <p class="typed" style="margin-top:8px">Above</p>
-    <div class="dis" role="note"><span class="plate" aria-hidden="true">F2</span><span class="nm">Floor 2<span class="hn">Under construction. Not yet open.</span></span></div>
+    <div class="dis" role="note"><span class="plate" aria-hidden="true">6</span><span class="nm">More floors<span class="hn">Under construction. Not yet open.</span></span></div>
     <div class="dir-foot">
       <p class="typed">Build <span id="build"></span> &middot; <span id="save-status">Not yet saved</span></p>
       <div class="dir-actions">

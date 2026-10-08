@@ -1,6 +1,6 @@
 // Ernest, Orientation Officer: nine Orientation Reels, each teaching one rule
 // the first time it matters. He leans in from the corner with a short card,
-// docks to a strip while his own room's sheet is open, and steps back otherwise.
+// docks to a strip while his own room is open, and steps back otherwise.
 //
 // Rules of the system:
 //  - A reel fires on a false-to-true transition seen during this session. Triggers
@@ -34,7 +34,7 @@ const seatedOf = (s: GameState) => Math.floor(N.toNumber(s.monkeys));
 
 const REELS: Reel[] = [
   { id: 'first-hire', n: 1, title: 'Your First Hire', room: 'personnel', essential: true,
-    say: () => 'Monkeys earn bananas, and more monkeys earn more. Each needs a desk; pull up the Personnel form to seat the first.',
+    say: () => 'Monkeys earn bananas, and more monkeys earn more. Each needs a desk; open Personnel to seat the first.',
     stale: (s) => seatedOf(s) > 1 },
   { id: 'records', n: 2, title: 'The Records', room: 'research',
     say: () => 'Monkeys type, and the Library keeps what they find. Research a kind of find, and every find of it pays.',
@@ -96,8 +96,8 @@ export class Ernest {
     this.go.addEventListener('click', () => this.finish(true));
   }
 
-  /** Called at most once per tick. `open` is the open sheet's room id or null; `plan` is true in plan view. */
-  update(open: string | null, plan: boolean): void {
+  /** Called at most once per tick. `open` is the open room's id, or null on the building. */
+  update(open: string | null): void {
     this.calls++;
     const s = this.ctx.state();
     this.detect(s, open);
@@ -120,7 +120,6 @@ export class Ernest {
     }
     this.trim();
     if (!this.current) return;
-    void plan; // Plan view is hidden by CSS (body.plan); the card keeps its place.
 
     const r = this.current;
     if (open && open !== r.room) {

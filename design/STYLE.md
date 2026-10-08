@@ -43,7 +43,19 @@ The chosen direction for all game art (gate 1 passed Oct 7, 2026). Read with
 - **Room sheets** cap at 40% of screen height; the camera frames the room above.
 - **Reference:** `design/explorations/popup-r3/`.
 
-## First screen: two zoom levels (Matt, Oct 8 2026)
+## The Bureau Tower (Matt, Oct 8 2026; replaces the two zoom levels below)
+
+- **The building is the map.** The whole Bureau fits the screen as a building
+  of floors, with no panning: worker floors at the bottom (lobby and
+  Personnel, Typing Pool), Departments above, and the executive suite at the
+  top. Each floor shows a live mini-scene and lights up its bottleneck.
+- **Tap a floor to enter it full screen.** The room's scene runs full width
+  across the top, with its form below and an exit door back to the building.
+- **Keep the charm:** the pop-up paper material, monkey parts kit and
+  behaviours above all carry over.
+- **Reference:** `design/explorations/tower/` (layout A, "fit").
+
+## First screen: two zoom levels (Matt, Oct 8 2026; superseded by the Tower)
 
 - **Play view** (default): roomy, monkeys 55–64 px, centred on what needs the
   player next. **Floor-plan view**: pinch out or tap "Floor plan" to see the

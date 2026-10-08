@@ -1,24 +1,8 @@
-/* The Bureau shell: world art, header, feed strip, directory, sheets, Ernest.
+/* The Bureau shell: room art, header, feed strip, directory, Ernest.
    Ported from design/explorations/floor-r4. Tokens live in game/style.css. */
-/* ---------- stage, camera, world ---------- */
+/* ---------- stage ---------- */
 .stage { position: absolute; inset: 0; overflow: hidden; width: 100%; max-width: 560px; margin: 0 auto; }
 @media (min-width: 561px) { .stage { box-shadow: 0 0 0 1px var(--concrete); } }
-.cam {
-  position: absolute; left: 0; top: 0; width: 780px; height: 1764px;
-  transform: translate3d(-95px, -734px, 0) scale(1.04); transform-origin: 0 0;
-  /* Performance: the camera is a single transform on one layer. Nothing inside reads camera values,
-     so moving it never restyles the floor. While it moves, the layer is GPU-promoted and ambient
-     animation pauses; when it settles, promotion drops so the floor re-rasters crisp at the new zoom. */
-  transition: opacity 140ms;
-  touch-action: none;
-}
-.cam.flying { transition: transform 860ms cubic-bezier(.5, .02, .2, 1), opacity 140ms; }
-.cam.moving { will-change: transform; }
-body.moving #map *, body.moving #map *::before, body.moving #map *::after { animation-play-state: paused !important; }
-#map { position: absolute; left: 0; top: 0; width: 780px; height: 1764px; display: block; overflow: visible; }
-.hot { position: absolute; background: transparent; border: 0; padding: 0; margin: 0; cursor: pointer; border-radius: 10px; }
-.hot:focus-visible { outline: 3px dashed var(--focus); outline-offset: -4px; box-shadow: none; }
-
 /* ---------- map art: paper cutouts ---------- */
 .floor { fill: var(--floor); }
 .floor-edge { fill: color-mix(in srgb, var(--floor) 55%, var(--screen)); }
@@ -41,19 +25,12 @@ body.moving #map *, body.moving #map *::before, body.moving #map *::after { anim
 .rug { stroke: var(--edge); stroke-width: 1.2; }
 .ring { fill: none; stroke: var(--ink); stroke-width: 2; stroke-dasharray: 7 5; opacity: 0; transition: opacity .3s; }
 .zone.active .ring { opacity: .9; }
-body.plan .ring { opacity: .8; stroke-width: 2.6; }
-/* a mid-value apron between the light pad and the dark floor: three clear steps */
 .apron { fill: color-mix(in srgb, var(--floor) 50%, var(--pad)); stroke: color-mix(in srgb, var(--edge) 40%, var(--floor)); stroke-width: 1.2; }
 .apron-dots { fill: none; stroke: color-mix(in srgb, var(--edge) 55%, var(--floor)); stroke-width: 1.4; stroke-dasharray: 2 7; stroke-linecap: round; }
 .tape { fill: var(--mustard); opacity: .9; stroke: var(--edge); stroke-width: .8; }
 
 .up { transition: transform 620ms cubic-bezier(.3, .8, .25, 1); transform: scaleY(1); }
 .zone.pop .up { transform: scaleY(1.18); }
-#cam:has(.hot[data-zone='personnel']:is(:hover, :active)) #z-personnel .up,
-#cam:has(.hot[data-zone='pool']:is(:hover, :active)) #z-pool .up,
-#cam:has(.hot[data-zone='departments']:is(:hover, :active)) #z-departments .up,
-#cam:has(.hot[data-zone='research']:is(:hover, :active)) #z-research .up,
-#cam:has(.hot[data-zone='director']:is(:hover, :active)) #z-director .up { transform: scaleY(1.07); transition-duration: 160ms; }
 
 /* standing pieces: front face, lighter cut rim, lighter top face, two shadow tiers */
 .fr { fill: var(--c, var(--walnut)); stroke: var(--edge); stroke-width: 1.7; stroke-linejoin: round; }
@@ -250,17 +227,13 @@ body.plan .ring { opacity: .8; stroke-width: 2.6; }
 .dev { position: absolute; z-index: 90; left: 6px; bottom: 6px; right: 6px; display: flex; flex-wrap: wrap; gap: 4px; padding: 5px; background: color-mix(in srgb, var(--screen) 86%, transparent); border-radius: 6px; font: 600 .7rem var(--font-mono); }
 .dev button { min-height: 28px; padding: 2px 8px; border: 1px solid var(--edge); background: var(--paper); color: var(--ink); border-radius: 3px; font: inherit; cursor: pointer; }
 .dev button[aria-pressed='true'] { background: var(--mustard); color: var(--screen); }
-.has-dev .plancap { bottom: 78px; }
-
 /* performance: areas outside the camera and everything while the page is hidden stop animating */
 .offscreen, .offscreen * { animation-play-state: paused !important; }
 body.hidden-pause, body.hidden-pause * { animation-play-state: paused !important; }
 
 /* reduced motion: no loops, no travel; each scene holds the pose that carries its meaning */
 @media (prefers-reduced-motion: reduce) {
-  .cam { transition: opacity .14s !important; }
-  .cam.fade { opacity: 0; }
-  .up, .planbtn { transition: none !important; }
+  .up { transition: none !important; }
   .pulse, .swing, .bub, .foot, .arrive, .cloud, .cloudw, .spark, .feedbtn .fl.print, .wheel, .cartbob, .g-glance .eyes, [class*='b-'] *, .scan, .eject, .cap, .shred, .coat, .drw, .dst, .dmk, .dsil, .elv, .cue, .cuesh, .sit, .walker .wb { animation: none !important; }
   .swing { transform: rotate(-1.6deg); }
   .pulse { opacity: .6; }
@@ -277,25 +250,7 @@ body.hidden-pause, body.hidden-pause * { animation-play-state: paused !important
   .cap { opacity: 1; transform: translateY(-50px); } .elv { opacity: 1; }
 }
 
-/* ---------- two zoom levels: floor-plan tags, the plan control, the caption ---------- */
-/* tags live in a screen-space overlay (not inside the world). JS places them when the camera settles; they fade in when pulled back. */
-.chip {
-  position: absolute; z-index: 3; left: 0; top: 0; pointer-events: none; display: flex; align-items: center; gap: 6px; white-space: nowrap;
-  min-height: 44px; padding: 4px 14px 4px 7px; background: var(--sheet); color: var(--ink); border: 2.5px solid var(--ctl); border-radius: 4px 4px 14px 4px;
-  font: 700 .95rem/1 var(--font-display); letter-spacing: .06em; text-transform: uppercase;
-  box-shadow: 0 3px 0 var(--ctl), 0 7px 10px var(--soft-sh);
-  transform: translate(-50%, -100%); opacity: 0; transition: opacity 180ms;
-}
-.chip[data-a='l'] { transform: translate(-100%, -50%); }
-.chip[data-a='r'] { transform: translate(0, -50%); }
-.chip::after { content: ''; position: absolute; right: -2.5px; bottom: -2.5px; width: 13px; height: 13px; background: linear-gradient(135deg, var(--edge) 50%, var(--ctl) 51%); border-radius: 0 0 11px 0; }
-.chip .start { position: absolute; right: -4px; top: -15px; background: var(--tangerine); color: var(--screen); font: 700 .8rem var(--font-display); letter-spacing: .1em; padding: 0 7px; border: 2px solid var(--screen); transform: rotate(3deg); }
-.hired .chip .start { display: none; }
-body.plan .chip { pointer-events: auto; cursor: pointer; }
-body.plan .chip:active { margin-top: 2px; }
-.chips { position: absolute; inset: 0; pointer-events: none; z-index: 4; }
-.sheet-open .chip { opacity: 0 !important; }
-/* the plan control lives in the header, beside the Directory */
+/* header buttons */
 .hbtn {
   min-width: 44px; min-height: 44px; border: 2px solid var(--ctl-hdr); background: var(--paper); color: var(--ink);
   font: 700 .66rem/1 var(--font-display); letter-spacing: .08em; text-transform: uppercase; padding: 3px 7px 2px;
@@ -303,18 +258,6 @@ body.plan .chip:active { margin-top: 2px; }
 }
 .hbtn:active { transform: translateY(2px); }
 .hbtn svg { display: block; }
-.planbtn .t-back { display: none; }
-body.plan .planbtn .t-plan { display: none; }
-body.plan .planbtn .t-back, .planbtn .t-plan { display: flex; flex-direction: column; align-items: center; gap: 3px; }
-body.plan .planbtn { background: var(--tangerine); color: var(--screen); border-color: var(--edge); }
-.sheet-open .planbtn { display: none; }
-.plancap {
-  position: absolute; z-index: 15; left: 8px; right: 8px; bottom: 8px; height: 44px; display: flex; align-items: center; pointer-events: none;
-  background: var(--sheet); color: var(--ink); border: 2px solid var(--edge); border-radius: 3px; padding: 2px 10px; font: 400 .72rem/1.25 var(--font-type); letter-spacing: .03em; text-transform: uppercase;
-  box-shadow: 0 2px 0 var(--lift-sh), 0 6px 12px var(--soft-sh); opacity: 0; visibility: hidden; transition: opacity .3s, visibility 0s .3s;
-}
-body.plan .plancap { opacity: 1; visibility: visible; transition-delay: .35s, 0s; }
-body.plan .hot:hover, body.plan .hot:active { background: color-mix(in srgb, var(--glow) 26%, transparent); }
 .bn { width: 20px; height: 15px; flex: none; }
 
 /* ---------- header ---------- */
@@ -323,7 +266,7 @@ body.plan .hot:hover, body.plan .hot:active { background: color-mix(in srgb, var
   padding: max(8px, env(safe-area-inset-top)) 12px 8px; background: var(--walnut);
   border-bottom: 2px solid var(--mustard); color: var(--on-walnut);
   box-shadow: 0 6px 14px color-mix(in srgb, var(--screen) 40%, transparent);
-  display: grid; grid-template-columns: 1fr auto auto; gap: 6px 8px; align-items: center;
+  display: grid; grid-template-columns: 1fr auto; gap: 6px 8px; align-items: center;
 }
 .hdr .seal { width: 34px; height: 34px; flex: none; }
 .brand { display: flex; align-items: center; gap: 8px; min-width: 0; }
@@ -337,7 +280,7 @@ body.plan .hot:hover, body.plan .hot:active { background: color-mix(in srgb, var
 
 /* ---------- the feed: a teletype strip under the header ---------- */
 .feed { position: absolute; left: 0; right: 0; top: calc(var(--hdr, 138px) - var(--feed)); height: var(--feed); z-index: 29; transition: opacity .2s, visibility 0s; }
-.sheet-open .feed { opacity: 0; visibility: hidden; transition: opacity .2s, visibility 0s .2s; }
+.room-open .feed { opacity: 0; visibility: hidden; transition: opacity .2s, visibility 0s .2s; }
 .feedbtn {
   position: relative; display: flex; align-items: center; gap: 8px; width: 100%; height: 100%; padding: 0 10px 0 8px; text-align: left; cursor: pointer; border: 0; border-bottom: 2px solid var(--edge);
   color: var(--ink); background-color: color-mix(in srgb, var(--sheet) 90%, var(--glow));
@@ -406,38 +349,7 @@ body.plan .hot:hover, body.plan .hot:active { background: color-mix(in srgb, var
 .dir .hn { display: block; font: 400 .875rem var(--font-body); letter-spacing: 0; text-transform: none; color: var(--ink-muted); margin-top: 3px; }
 .dir button[aria-current='true']::after { content: ''; position: absolute; left: 44px; right: 8px; bottom: 3px; height: 3px; background: var(--tangerine); }
 
-/* ---------- sheet: a paper form that unfolds, capped at 40% of the screen ---------- */
-.sheetwrap { position: absolute; left: 0; right: 0; bottom: 0; z-index: 20; perspective: 900px; pointer-events: none; }
-.sheet {
-  position: relative; pointer-events: auto; background: var(--sheet); color: var(--ink);
-  display: flex; flex-direction: column; max-height: 40dvh;
-  border: 2px solid var(--edge); border-bottom: 0; border-radius: 8px 8px 0 0; margin: 0 8px;
-  padding: 12px 14px calc(8px + env(safe-area-inset-bottom));
-  box-shadow: 0 -2px 0 var(--lift-sh), 0 -12px 26px var(--soft-sh);
-  transform-origin: 50% 100%; transform: rotateX(78deg) translateY(30px); opacity: 0; visibility: hidden;
-  transition: transform 560ms cubic-bezier(.3, .8, .25, 1), opacity 300ms, visibility 0s 560ms;
-}
-.sheet.open { transform: none; opacity: 1; visibility: visible; transition-delay: 220ms, 220ms, 0s; }
-/* a second, offset sheet peeks out behind (paper under paper) */
-.sheet::before { content: ''; position: absolute; left: 14px; right: 14px; top: -9px; height: 9px; background: var(--paper-shade); border: 2px solid var(--edge); border-bottom: 0; border-radius: 6px 6px 0 0; z-index: -1; box-shadow: 0 -2px 4px var(--soft-sh); }
-.sheet::after { content: ''; position: absolute; inset: 5px 5px 0; border: 1px solid var(--rule); border-bottom: 0; border-radius: 4px 4px 0 0; pointer-events: none; }
-.sheetgrain { position: absolute; inset: 0; pointer-events: none; opacity: .5; mix-blend-mode: multiply; border-radius: inherit;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' seed='5'/><feColorMatrix type='saturate' values='0'/></filter><rect width='160' height='160' filter='url(%23n)' opacity='.16'/></svg>"); }
-@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .sheetgrain { mix-blend-mode: screen; opacity: .35; } }
-:root[data-theme='dark'] .sheetgrain { mix-blend-mode: screen; opacity: .35; }
-.sheet .tabw { top: -33px; left: 16px; }
-.shead { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; padding-bottom: 6px; border-bottom: 3px double var(--rule); flex: none; position: relative; }
-.sheet h2 { font-size: 1.5rem; line-height: 1; color: var(--head); }
 .form { font: 400 .76rem var(--font-type); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-muted); margin: 4px 0 0; }
-.close {
-  min-height: 44px; min-width: 44px; background: var(--btn); border: 2px solid var(--ctl); border-radius: 3px 3px 12px 3px; color: var(--ink);
-  box-shadow: 0 3px 0 var(--ctl), 0 5px 6px var(--soft-sh); cursor: pointer;
-  font: 700 .92rem var(--font-display); letter-spacing: .08em; text-transform: uppercase; padding: 4px 10px; display: flex; align-items: center; gap: 6px; white-space: nowrap; flex: none;
-}
-.close:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--ctl); }
-.sbody { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 8px 4px 4px; margin: 0 -4px; position: relative; }
-.sheet > .sheetgrain { position: absolute; }
-.sheet > :not(.sheetgrain):not(.tabw) { position: relative; }
 .field { display: flex; align-items: baseline; gap: 8px; }
 .field .lead { flex: 1; border-bottom: 1.5px dotted var(--concrete); transform: translateY(-4px); min-width: 12px; }
 .lab { font: 400 .8rem var(--font-type); letter-spacing: .1em; text-transform: uppercase; color: var(--ink); margin: 0; font-weight: 700; }
@@ -492,8 +404,7 @@ body.plan .hot:hover, body.plan .hot:active { background: color-mix(in srgb, var
   transform: translate(190px, 0) rotate(3deg); opacity: 0; visibility: hidden; transform-origin: 100% 100%;
   transition: transform 620ms cubic-bezier(.3, .8, .25, 1), opacity 260ms, visibility 0s 620ms; }
 .ewrap.in { transform: none; opacity: 1; visibility: visible; transition-delay: 0s; }
-body.plan .ewrap.in { transform: translate(190px, 0) rotate(3deg); opacity: 0; visibility: hidden; transition-delay: 0s, 0s, .62s; }
-.ewrap.docked { bottom: auto; top: calc(var(--hdr, 138px) + 4px); width: 148px; padding-top: 50px; }
+.ewrap.docked { bottom: auto; top: calc(var(--hdr, 138px) - var(--feed) + 62px); width: 148px; padding-top: 50px; }
 .efig { width: 104px; height: 97px; margin: 0 4px -16px 0; pointer-events: none; position: relative; z-index: 0; }
 /* docked: only the head and pencil peek over the corner of the card */
 .ewrap.docked .efig { position: absolute; right: 2px; top: 0; width: 72px; height: 64px; margin: 0; }
@@ -520,14 +431,12 @@ body.plan .ewrap.in { transform: translate(190px, 0) rotate(3deg); opacity: 0; v
 .boil { animation: boil .9s steps(1) infinite; transform-origin: 90% 90%; }
 .ewrap:not(.in) .boil { animation-play-state: paused; }
 @media (prefers-reduced-motion: reduce) {
-  .ewrap, .sheet, .dir { transform: none !important; transition: opacity .2s, visibility 0s .2s !important; }
-  body.plan .ewrap.in { opacity: 0; visibility: hidden; }
-  .ewrap.in, .sheet.open, .dir:not([hidden]) { transition: opacity .2s !important; }
+  .ewrap, .room, .dir { transform: none !important; transition: opacity .2s, visibility 0s .2s !important; }
+  .ewrap.in, .room.open, .dir:not([hidden]) { transition: opacity .2s !important; }
   .boil, .hire.nudge, .pt, .desks i.fresh { animation: none !important; }
 }
 
 /* ---------- game additions ---------- */
-body.moving .chip { opacity: 0 !important; }
 .dir-foot { margin-top: 10px; padding-top: 8px; border-top: 3px double var(--rule); display: grid; gap: 6px; position: relative; z-index: 1; }
 .dir-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .dir-actions .btn2 { font-size: .875rem; padding: 4px 10px; }
@@ -537,7 +446,7 @@ body.moving .chip { opacity: 0 !important; }
 .dir { max-height: calc(100dvh - var(--hdr, 138px) - 24px); overflow: auto; }
 .dir .dir-actions .btn2 { width: auto; min-height: 44px; display: inline-flex; grid-template-columns: none; padding: 4px 12px; border: 2px solid var(--ctl); background: var(--btn); color: var(--ink); box-shadow: 0 3px 0 var(--ctl), 0 5px 6px var(--soft-sh); font: 700 .875rem var(--font-display); letter-spacing: .08em; text-transform: uppercase; border-radius: 3px 3px 10px 3px; }
 .dir .dir-actions .btn2.danger { border-color: var(--stamp); color: var(--stamp); box-shadow: 0 3px 0 var(--stamp); }
-.sheet h2:focus { outline: none; }   /* the heading takes focus on open so screen readers land there; it is not a control */
+.room h2:focus { outline: none; }   /* the heading takes focus on open so screen readers land there; it is not a control */
 /* iOS 26 Safari blurs page content under the status bar but treats a fixed
    top bar as a header and tints the status bar with its colour instead.
    So the header is fixed (centred to the stage's width), not absolute. */
