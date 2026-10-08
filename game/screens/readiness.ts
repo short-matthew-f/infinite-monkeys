@@ -38,7 +38,7 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
 
   // Step 1 lifts the cover; step 2 throws the switch. Cancel puts the cover back.
   let armed = false;
-  const liftBtn = h('button', { class: 'lift wide', type: 'button', 'aria-expanded': 'false', onclick: () => arm(true) }, 'Lift the cover');
+  const liftBtn = h('button', { class: 'lift wide', type: 'button', 'aria-expanded': 'false', onclick: () => arm(true) }, 'Lift the cover to declare');
   const liftWhy = why();
   const switchBtn = h('button', { class: 'switch', type: 'button', onclick: () => { if (ctx.act(declareInfinity)) arm(false); } }, 'Throw the switch: Declare Infinity');
   const cancelBtn = h('button', { class: 'quiet wide', type: 'button', onclick: () => arm(false, true) }, 'Cancel. Keep the cover down');

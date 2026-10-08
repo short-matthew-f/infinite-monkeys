@@ -289,7 +289,7 @@ body.hidden-pause, body.hidden-pause * { animation-play-state: paused !important
 .chip[data-a='l'] { transform: translate(-100%, -50%); }
 .chip[data-a='r'] { transform: translate(0, -50%); }
 .chip::after { content: ''; position: absolute; right: -2.5px; bottom: -2.5px; width: 13px; height: 13px; background: linear-gradient(135deg, var(--edge) 50%, var(--ctl) 51%); border-radius: 0 0 11px 0; }
-.chip .start { position: absolute; right: -4px; top: -13px; background: var(--tangerine); color: var(--screen); font: 700 .72rem var(--font-display); letter-spacing: .1em; padding: 0 7px; border: 2px solid var(--screen); transform: rotate(3deg); }
+.chip .start { position: absolute; right: -4px; top: -15px; background: var(--tangerine); color: var(--screen); font: 700 .8rem var(--font-display); letter-spacing: .1em; padding: 0 7px; border: 2px solid var(--screen); transform: rotate(3deg); }
 .hired .chip .start { display: none; }
 body.plan .chip { pointer-events: auto; cursor: pointer; }
 body.plan .chip:active { margin-top: 2px; }
@@ -403,7 +403,7 @@ body.plan .hot:hover, body.plan .hot:active { background: color-mix(in srgb, var
 .dir .dis { cursor: default; margin-top: 4px; border: 2px dashed var(--concrete); }
 .dir .plate { display: grid; place-items: center; width: 30px; height: 24px; border: 2px dashed var(--ink-muted); border-radius: 3px; font: 700 .8rem var(--font-type); color: var(--ink-muted); }
 .dir .nm { font: 700 1.04rem var(--font-display); letter-spacing: .06em; text-transform: uppercase; line-height: 1; color: var(--ink); }
-.dir .hn { display: block; font: 400 .74rem var(--font-type); letter-spacing: 0; text-transform: none; color: var(--ink-muted); margin-top: 3px; }
+.dir .hn { display: block; font: 400 .875rem var(--font-body); letter-spacing: 0; text-transform: none; color: var(--ink-muted); margin-top: 3px; }
 .dir button[aria-current='true']::after { content: ''; position: absolute; left: 44px; right: 8px; bottom: 3px; height: 3px; background: var(--tangerine); }
 
 /* ---------- sheet: a paper form that unfolds, capped at 40% of the screen ---------- */
@@ -514,7 +514,7 @@ body.plan .ewrap.in { transform: translate(190px, 0) rotate(3deg); opacity: 0; v
 .ernest .ok { min-height: 44px; width: 100%; background: none; border: 0; color: var(--ink-muted); font: 400 .875rem var(--font-type); letter-spacing: .02em; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .ewrap.docked .reel, .ewrap.docked h2 { display: none; }
 .ewrap.docked .ernest { padding: 7px 8px; }
-.ewrap.docked .ok { text-decoration: none; font-size: .82rem; letter-spacing: .04em; padding: 0 4px; }
+.ewrap.docked .ok { text-decoration: none; font-size: .875rem; letter-spacing: .04em; padding: 0 4px; }
 .ewrap.docked p.say { margin: 0 0 6px; font-size: .875rem; font-weight: 600; }
 @keyframes boil { 0% { transform: rotate(-.8deg); } 33% { transform: rotate(.7deg) translateY(-.6px); } 66% { transform: rotate(0); } }
 .boil { animation: boil .9s steps(1) infinite; transform-origin: 90% 90%; }
@@ -530,12 +530,12 @@ body.plan .ewrap.in { transform: translate(190px, 0) rotate(3deg); opacity: 0; v
 body.moving .chip { opacity: 0 !important; }
 .dir-foot { margin-top: 10px; padding-top: 8px; border-top: 3px double var(--rule); display: grid; gap: 6px; position: relative; z-index: 1; }
 .dir-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.dir-actions .btn2 { font-size: .82rem; padding: 4px 10px; }
+.dir-actions .btn2 { font-size: .875rem; padding: 4px 10px; }
 .btn2.danger { border-color: var(--stamp); color: var(--stamp); box-shadow: 0 3px 0 var(--stamp); }
 .reset-confirm { display: grid; gap: 6px; }
 .reset-confirm[hidden] { display: none; }
 .dir { max-height: calc(100dvh - var(--hdr, 138px) - 24px); overflow: auto; }
-.dir .dir-actions .btn2 { width: auto; min-height: 44px; display: inline-flex; grid-template-columns: none; padding: 4px 12px; border: 2px solid var(--ctl); background: var(--btn); color: var(--ink); box-shadow: 0 3px 0 var(--ctl), 0 5px 6px var(--soft-sh); font: 700 .82rem var(--font-display); letter-spacing: .08em; text-transform: uppercase; border-radius: 3px 3px 10px 3px; }
+.dir .dir-actions .btn2 { width: auto; min-height: 44px; display: inline-flex; grid-template-columns: none; padding: 4px 12px; border: 2px solid var(--ctl); background: var(--btn); color: var(--ink); box-shadow: 0 3px 0 var(--ctl), 0 5px 6px var(--soft-sh); font: 700 .875rem var(--font-display); letter-spacing: .08em; text-transform: uppercase; border-radius: 3px 3px 10px 3px; }
 .dir .dir-actions .btn2.danger { border-color: var(--stamp); color: var(--stamp); box-shadow: 0 3px 0 var(--stamp); }
 .sheet h2:focus { outline: none; }   /* the heading takes focus on open so screen readers land there; it is not a control */
 /* iOS 26 Safari blurs page content under the status bar but treats a fixed
@@ -549,3 +549,5 @@ html { background: var(--walnut); }
 .readout .goal::after { content: ''; position: absolute; inset: 0 auto 0 0; width: var(--fill, 0%); background: var(--screen-ink); border-radius: 2px; }
 .readout .goal[hidden] { display: none; }
 .readout .v { white-space: nowrap; }
+/* The stage never scrolls, even programmatically (focus or scrollIntoView would otherwise shift the world under the header). */
+.stage { overflow: clip; }

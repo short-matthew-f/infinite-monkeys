@@ -54,7 +54,7 @@ export class SheetHost {
       svgIcon('<path d="M2 5l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>'), 'Fold down');
     this.body = h('div', { class: 'sbody' });
     this.grab = h('button', { class: 'grab', 'aria-label': 'Pull up the form', 'aria-expanded': 'false' }, h('span', { class: 'grab-bar' }));
-    this.el = h('section', { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'sheet-title' },
+    this.el = h('section', { class: 'sheet', role: 'dialog', 'aria-modal': 'false', 'aria-labelledby': 'sheet-title' },
       h('div', { class: 'sheetgrain' }),
       this.grab,
       h('div', { class: 'tabw' }, this.tab),
@@ -72,7 +72,11 @@ export class SheetHost {
   }
 
   private heightFor(d: Detent): number {
-    return Math.round(this.stageH() * (d === 'full' ? FULL : PEEK));
+    const stage = this.stageH();
+    if (d === 'peek') return Math.round(stage * PEEK);
+    // Full stops below the header, so the handle (and Fold down) stay reachable.
+    const hdr = document.getElementById('hdr')?.offsetHeight ?? 0;
+    return Math.round(Math.min(stage * FULL, stage - hdr - 28));
   }
 
   setDetent(d: Detent, notify = true): void {

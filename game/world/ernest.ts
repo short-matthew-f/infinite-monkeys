@@ -63,7 +63,7 @@ const PAUSE_SECONDS = 1.5;
 
 export class Ernest {
   /** Set by main: open a room. */
-  onOpenRoom: (room: string) => void = () => {};
+  onOpenRoom: (room: string, reel?: string) => void = () => {};
 
   private say: HTMLElement;
   private reelLine: HTMLElement;
@@ -208,11 +208,11 @@ export class Ernest {
     progress.markReel(r.id);
     if (goThere && r.id === 'first-hire') {
       // Reel 1 stays on as the docked hire guide until the first hire or "Understood".
-      this.onOpenRoom(r.room);
+      this.onOpenRoom(r.room, r.id);
       return;
     }
     this.retire();
-    if (goThere) this.onOpenRoom(r.room);
+    if (goThere) this.onOpenRoom(r.room, r.id);
   }
 
   private retire(): void {

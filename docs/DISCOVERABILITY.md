@@ -44,3 +44,17 @@ The playtest checks that players grasp tradeoffs unprompted (PROTOTYPE.md §1).
 Onboarding teaches rules and locations, never which option is best; the cue
 points at new rooms and unlocks, not "the right purchase", and stays silent at
 the Hotel's Commission choice.
+
+## Result (Oct 8, 2026, after the polish)
+
+Same twelve moments, same rubric, re-scored by the same panel. Find scores
+went from 1-2 to 4 for department levels, the first stage, the finish line,
+the Stability Window, and the Permit (3); first desk 4-5. Research and the
+50-60 s stretch were still 1-2 on the last full re-score; after it, research
+became cued as it comes within reach ("Research soon") and every off-screen
+cue gets an edge arrow, verified by capture but not re-scored.
+
+Still open: the 450-1410 s lull (F2) has a goal bar and cues but no new
+decision; more than one new noun lands around 60 s (Editors, Recruiters,
+Builders); Reel 6 can fire before allocation matters; the screen reader
+treatment is announcements only (the sheet is non-modal by design).

@@ -1,7 +1,7 @@
 /* Readiness: layout beyond game/ui/forms.css. */
 .sheet-pane .ready-meter { display: grid; gap: 4px; }
 .sheet-pane .permit { display: grid; gap: 4px; }
-.sheet-pane .permit-line { display: flex; align-items: center; gap: 10px; font: 700 0.8rem var(--font-type); letter-spacing: 0.1em; text-transform: uppercase; min-height: 36px; }
+.sheet-pane .permit-line { display: flex; align-items: center; gap: 10px; font: 700 0.875rem var(--font-type); letter-spacing: 0.1em; text-transform: uppercase; min-height: 36px; }
 .sheet-pane .permit-stamp { display: inline-block; }
 .sheet-pane .permit-fresh .permit-stamp { animation: permit-thud 0.45s cubic-bezier(0.2, 0.9, 0.3, 1) both; }
 @keyframes permit-thud {

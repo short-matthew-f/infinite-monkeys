@@ -68,6 +68,9 @@ export function cueCandidates(ctx: Ctx): Cue[] {
     if (!ts || ts.discoverable || tier.startsDiscovered) continue;
     if (ctx.can(`researchTier:${tier.id}`, (st, tt, k) => researchTier(st, tt, k, tier.id)))
       out.push({ key: `research:${tier.id}`, room: 'research', tag: 'Research open', memo: `Memo: the Records Library can now open research into ${tier.id}.` });
+    // Research is the game's main lever, so it's announced as it comes within reach, not only once affordable.
+    else if (N.toNumber(s.bananas) >= tier.researchCost * 0.6)
+      out.push({ key: `research-soon:${tier.id}`, room: 'research', tag: 'Research soon', memo: `Memo: the Records Library is preparing research into ${tier.id}.` });
     break; // only the next tier in line
   }
   if (s.depts.recruiting.level === 0 && ctx.can('buyDeptLevel:recruiting', (st, tt, k) => buyDeptLevel(st, tt, k, 'recruiting')))

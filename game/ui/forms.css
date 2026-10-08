@@ -261,7 +261,7 @@
    for typed headers, stamps and flavor. Sentence case. Colours only via tokens.
    ========================================================================================= */
 .sheet-pane .vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.sheet-pane .n { font: 600 0.95em var(--font-mono); font-variant-numeric: tabular-nums; }
+.sheet-pane .n { font: 600 1em var(--font-mono); font-variant-numeric: tabular-nums; }
 
 /* before -> after line */
 .sheet-pane .fx-lab { color: var(--ink-muted); }

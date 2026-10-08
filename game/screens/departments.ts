@@ -280,7 +280,7 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
       const can = ctx.can('balancedBuy', balancedBuy);
       nextAct = () => { act(balancedBuy); };
       next.update({
-        label: 'Balanced buy', cost: N.toNumber(total), enabled: can,
+        label: 'Hire a Recruiter and a Builder', cost: N.toNumber(total), enabled: can,
         why: 'Recruiters hire for you; each new monkey needs a desk, so buy a Recruiter and a Builder together.',
         effect: `Monkeys ${outText(s, 'recruiting')} → ${outText(after, 'recruiting')}/s · desks ${outText(s, 'construction')} → ${outText(after, 'construction')}/s`,
         reason: f.shortBy(total, s.bananas) ?? CLOSED,
@@ -384,7 +384,7 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
       const pAfter = ctx.preview((c) => { afford(c, N.toNumber(total)); balancedBuy(c, t, nullSink); });
       const canPair = ctx.can('balancedBuy', balancedBuy);
       pairRow.update({
-        label: 'Balanced buy',
+        label: 'Hire a Recruiter and a Builder',
         effect: `+1 level each. Monkeys ${outText(s, 'recruiting')} → ${outText(pAfter, 'recruiting')}/s, desks ${outText(s, 'construction')} → ${outText(pAfter, 'construction')}/s`,
         price: N.toNumber(total), have: bananas, progress: N.ratio(s.bananas, total), enabled: canPair,
         reason: f.shortBy(total, s.bananas) ?? CLOSED,

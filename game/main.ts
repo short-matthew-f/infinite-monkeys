@@ -323,7 +323,10 @@ function updateCue(): void {
   }
   const changed = cue?.key !== cues.cue?.key;
   cues.show(cue, cue ? floor.zone(cue.room) : undefined, roomName);
-  if (changed) placeEdge();
+  if (changed) {
+    placeEdge();
+    if (cue) say(`${cue.tag}: ${roomName(cue.room)}.`);
+  }
 }
 function placeEdge(): void {
   cues.placeEdge(camera.x, camera.y, camera.s, camera.mode === 'play' && !sheets.current && !camera.busy, insetTop(), camera.vw, camera.vh);
@@ -332,7 +335,11 @@ cues.onEdge = (cue) => {
   if (cue.room === 'departments') dispatchEvent(new CustomEvent('im:dept-view', { detail: cue.view ?? 'summary' }));
   openRoom(cue.room);
 };
-ernest.onOpenRoom = (room) => openRoom(room);
+// Reels about Editors open the Editing view; other Departments reels open the summary.
+ernest.onOpenRoom = (room, reel) => {
+  if (room === 'departments') dispatchEvent(new CustomEvent('im:dept-view', { detail: reel === 'finds-need-editors' ? 'editing' : 'summary' }));
+  openRoom(room);
+};
 
 // ---------- live region ----------
 
