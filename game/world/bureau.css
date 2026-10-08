@@ -535,3 +535,8 @@ body.moving .chip { opacity: 0 !important; }
 .dir .dir-actions .btn2 { width: auto; min-height: 44px; display: inline-flex; grid-template-columns: none; padding: 4px 12px; border: 2px solid var(--ctl); background: var(--btn); color: var(--ink); box-shadow: 0 3px 0 var(--ctl), 0 5px 6px var(--soft-sh); font: 700 .82rem var(--font-display); letter-spacing: .08em; text-transform: uppercase; border-radius: 3px 3px 10px 3px; }
 .dir .dir-actions .btn2.danger { border-color: var(--stamp); color: var(--stamp); box-shadow: 0 3px 0 var(--stamp); }
 .sheet h2:focus { outline: none; }   /* the heading takes focus on open so screen readers land there; it is not a control */
+/* iOS 26 Safari blurs page content under the status bar but treats a fixed
+   top bar as a header and tints the status bar with its colour instead.
+   So the header is fixed (centred to the stage's width), not absolute. */
+.hdr { position: fixed; left: 50%; right: auto; width: min(100%, 560px); transform: translateX(-50%); }
+html { background: var(--walnut); }
