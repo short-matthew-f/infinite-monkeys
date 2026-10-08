@@ -29,3 +29,21 @@ The chosen direction for all game art (gate 1 passed Oct 7, 2026). Read with
 - Paper depth must read in still frames: paper rims, a second shadow tier,
   value separation between layers.
 - Idle zones need a visible tap cue.
+
+## Locked after round 3 (panel: "treat sheets and parts as final, composition as not final")
+
+- **Material vocabulary:** cut rims, two-tier shadows (tight contact + soft long),
+  lifted dog-ear on tappable pads, brass rails and plates, hanging signs on
+  posts, lit floor lamps as the tap cue, die-cut cream cards with notched folder
+  tabs and a second sheet behind, typed form headers (Form 3-H), dotted-leader
+  fields, brass-bezel dials, hatched ledger bars, double-ruled rubber stamps.
+- **Monkey parts kit:** build, head size, ears, lean, view (front / ¾ / profile),
+  gaze, eyes, mouth, tail, chair, shirt, headwear; behaviours out of sync and
+  deterministic per desk. No repeated headwear on screen.
+- **Room sheets** cap at 40% of screen height; the camera frames the room above.
+- **Reference:** `design/explorations/popup-r3/`.
+
+## Open
+
+- **First-screen composition.** Round 2 was roomy but showed one area; round 3
+  shows all four but feels cramped and shrinks the monkeys. Needs Matt's call.
