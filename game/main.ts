@@ -13,7 +13,10 @@ import { research } from './screens/research.js';
 import { text } from './ui/dom.js';
 import * as f from './ui/format.js';
 import { Camera, type Pose } from './world/camera.js';
+import { cueCandidates } from './world/advisor.js';
+import { CueView } from './world/cue.js';
 import { Ernest } from './world/ernest.js';
+import { progress } from './world/progress.js';
 import { FLOOR_H, FLOOR_W } from './world/floor-art.js';
 import { FloorView, floorProps } from './world/floor.js';
 import { SheetHost, type Room } from './world/sheet.js';
@@ -116,6 +119,7 @@ const camera: Camera = new Camera({
   insets: () => ({ top: insetTop(), bottom: planMode ? 58 : 0 }),
   onSettle: ([x, y, s], mode) => {
     floor.placeChips(x, y, s, mode === 'plan');
+    placeEdge();
     if (mode === 'play' && !sheets.current) {
       try {
         localStorage.setItem(CAM_KEY, JSON.stringify([x, y, s]));
@@ -169,12 +173,15 @@ function openRoom(id: string, from?: HTMLElement | null): void {
   if (sheets.current) document.getElementById(`z-${sheets.current.id}`)?.classList.remove('pop', 'active');
   document.getElementById(`z-${id}`)?.classList.add('pop', 'active');
   sheets.open(room, from);
+  progress.markOpened(id);
+  if (cues.cue?.room === id) progress.ackCue(cues.cue.key);
   frameOpenRoom();
   markDirectory(id);
   say(`${room.name} opened.`);
   dirty = true;
 }
 sheets.onClose = (room) => {
+  window.setTimeout(placeEdge, 900);
   document.getElementById(`z-${room.id}`)?.classList.remove('pop', 'active');
   if (beforeSheet) void camera.fly(beforeSheet);
   beforeSheet = null;
@@ -184,9 +191,24 @@ sheets.onClose = (room) => {
 
 floor.onZone = (id, from) => {
   if (camera.dragged) return;
-  if (camera.mode === 'plan') void camera.toPlay(playPose(id));
-  else openRoom(id, from);
+  if (camera.mode === 'plan') {
+    void camera.toPlay(playPose(id));
+    return;
+  }
+  // A cabinet in Departments opens that department's own view; the room itself opens the summary.
+  // A cabinet opens its own view; the room sign opens the summary, or the cued department's view.
+  const cueView = cues.cue?.room === 'departments' ? cues.cue.view : undefined;
+  if (id === 'departments') dispatchEvent(new CustomEvent('im:dept-view', { detail: from.dataset.dept ?? cueView ?? 'summary' }));
+  openRoom(id, from);
 };
+// The sheet changed height: keep the room framed in the space above it.
+sheets.onDetent = () => frameOpenRoom();
+// Forms can send the player to another room ("Go to Departments").
+addEventListener('im:goto', (e) => {
+  const room = (e as CustomEvent<string>).detail;
+  if (room === 'departments') dispatchEvent(new CustomEvent('im:dept-view', { detail: 'summary' }));
+  openRoom(room);
+});
 floor.onWalk = (box) => {
   if (sheets.current?.id !== 'personnel') return;
   // Pull back enough to see the walker, but never so far the monkeys turn to specks.
@@ -204,6 +226,12 @@ onEvent((e) => {
 $('planbtn').addEventListener('click', () => {
   endIntro();
   closeDir();
+  if (sheets.current) {
+    // Plan from inside a room: fold the sheet, then pull back to the whole floor.
+    sheets.close();
+    window.setTimeout(() => void camera.toPlan(), 280);
+    return;
+  }
   void (camera.mode === 'plan' ? camera.toPlay() : camera.toPlan());
 });
 
@@ -244,7 +272,12 @@ document.addEventListener('pointerdown', (e) => {
   if (!dir.hidden && !(e.target as HTMLElement).closest('#dir, #dirbtn')) closeDir();
 });
 document.addEventListener('keydown', (e) => {
-  if (e.key !== 'Escape' || sheets.current) return;
+  if (e.key !== 'Escape') return;
+  // Escape folds an open sheet even when focus has left it (e.g. a button that just disabled itself).
+  if (sheets.current) {
+    if (!sheets.el.contains(document.activeElement)) sheets.close();
+    return;
+  }
   if (!dir.hidden) { closeDir(); dirbtn.focus(); }
   else if (camera.mode === 'plan') void camera.toPlay();
 });
@@ -262,14 +295,44 @@ $('reset-yes').addEventListener('click', async () => {
   await persist.clear();
   try {
     localStorage.removeItem(CAM_KEY);
-    localStorage.removeItem('im:ernest-reel1');
+    for (const k of Object.keys(localStorage)) if (k.startsWith('im:')) localStorage.removeItem(k);
   } catch {}
   location.reload();
 });
 
 // ---------- Ernest ----------
 
-const ernest = new Ernest($('ewrap'), $('esay'), $('ernest-ok'));
+const ernest = new Ernest($('ewrap'), ctx, t);
+
+// ---------- the next-thing cue ----------
+
+const cues = new CueView($('cam'), $('chips'), $('dir'));
+const roomName = (id: string) => ROOMS.find((r) => r.id === id)?.name ?? id;
+function updateCue(): void {
+  const open = sheets.current?.id;
+  // The first cue the player hasn't already acted on; a cue for the open room is acted on.
+  let cue = null;
+  for (const c of cueCandidates(ctx)) {
+    if (progress.ackedCue(c.key)) continue;
+    if (c.room === open) {
+      progress.ackCue(c.key);
+      continue;
+    }
+    cue = c;
+    break;
+  }
+  const changed = cue?.key !== cues.cue?.key;
+  cues.show(cue, cue ? floor.zone(cue.room) : undefined, roomName);
+  if (changed) placeEdge();
+}
+function placeEdge(): void {
+  cues.placeEdge(camera.x, camera.y, camera.s, camera.mode === 'play' && !sheets.current && !camera.busy, insetTop(), camera.vw, camera.vh);
+}
+cues.onEdge = (cue) => {
+  if (cue.room === 'departments') dispatchEvent(new CustomEvent('im:dept-view', { detail: cue.view ?? 'summary' }));
+  openRoom(cue.room);
+};
+ernest.onOpenRoom = (room) => openRoom(room);
 
 // ---------- live region ----------
 
@@ -308,7 +371,17 @@ if (returning && saved) {
 function renderHeader(): void {
   text($('r-ban'), f.count(state.bananas));
   text($('r-inc'), f.rate(certifyTiers(state, t, editingPool(state, t), state.tierAllocation).income));
+  // After 'tall', the finish line needs a headcount: show it as progress toward the Permit's minimum.
+  const goal = state.milestonesReached.includes('tall') && state.phase === 'finite';
   text($('r-mon'), f.count(state.monkeys));
+  const bar = $('r-goal');
+  bar.hidden = !goal;
+  if (goal) {
+    const frac = Math.min(1, N.toNumber(state.monkeys) / t.readiness.minMonkeys);
+    bar.style.setProperty('--fill', `${(frac * 100).toFixed(1)}%`);
+    bar.setAttribute('aria-valuenow', String(Math.round(frac * 100)));
+    bar.setAttribute('aria-valuetext', `${f.count(state.monkeys)} of ${f.count(t.readiness.minMonkeys)} monkeys for the Permit`);
+  }
 }
 
 let lastTick = -1;
@@ -320,13 +393,8 @@ startLoop(() => state, t, sink, () => {
   renderFeed();
   if (floor.apply(floorProps(state, t))) camera.measure('.area');
   sheets.render();
-  const seated = Math.floor(N.toNumber(state.monkeys)), desks = Math.floor(N.toNumber(state.desks));
-  ernest.update({
-    needed: floorProps(state, t).tutorial,
-    open: sheets.current?.id ?? null,
-    freeDesk: desks > seated,
-    deskPrice: f.bananaText(deskCost(state, t)),
-  });
+  ernest.update(sheets.current?.id ?? null, camera.mode === 'plan');
+  updateCue();
 });
 
 // Dev-only console hook for testing at later game states. Stripped from production builds.

@@ -40,7 +40,7 @@
     <div class="readout" role="group" aria-label="Bureau totals">
       <div><span class="lb">Bananas</span><span class="v" id="r-ban">0</span></div>
       <div><span class="lb">Income</span><span class="v" id="r-inc">0/s</span></div>
-      <div><span class="lb">Monkeys</span><span class="v" id="r-mon">1</span></div>
+      <div class="mon"><span class="lb">Monkeys</span><span class="v" id="r-mon">1</span><span class="goal" id="r-goal" role="progressbar" aria-label="Monkeys toward the Permit" aria-valuemin="0" aria-valuemax="100" hidden></span></div>
     </div>
   </header>
   <div class="feed" id="feed"></div>
@@ -86,8 +86,8 @@
   <aside class="ernest" id="ernest" aria-label="Orientation Reel 1">
     <p class="reel">Orientation Reel 1</p>
     <h2>Your First Hire</h2>
-    <p class="say" id="esay">Tap Personnel, the desk with the sign, to seat a monkey.</p>
-    <button class="ok" id="ernest-ok">Understood</button>
+    <p class="say">Tap Personnel, the desk with the sign, to seat a monkey.</p>
+    <div class="acts"><button class="go" type="button">Take me there</button><button class="ok" type="button">Understood</button></div>
   </aside>
   </div>
   <div class="sr" id="live" aria-live="polite"></div>

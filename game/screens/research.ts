@@ -1,134 +1,151 @@
-// Research: tier research (make a tier discoverable, then wait for the Editor-in-Chief to
-// review it) and common research (faster typewriters). Review research exists in core but
-// is deliberately not offered (finding F4). Contents of a paper sheet.
-import { N, buyTypingResearch, keystrokeRate, nullSink, researchTier, tierCost, typingResearchCost } from '../../core/index.js';
+// Records Library: fund research on a tier (a size of text the monkeys can find), then wait while
+// the Editor-in-Chief reviews it. Faster typewriters appear once they are within reach.
+// Review research exists in core but is deliberately not offered (finding F4).
+// Layout: one next card on top, finished tiers as chips, then what comes after.
+import { N, buyTypingResearch, keystrokeRate, nullSink, researchTier, typingResearchCost } from '../../core/index.js';
 import type { Ctx, Screen } from '../ctx.js';
-import { h, text, enable } from '../ui/dom.js';
+import { h, show, text } from '../ui/dom.js';
 import * as f from '../ui/format.js';
-import { afford, field, figure, formbox, ledger, setCost, setWhy, stack, stamp, why } from '../ui/forms.js';
+import { afford, buyRow, chip, ledger, nextCard, sealed, stack } from '../ui/forms.js';
 import './research.css';
-
-/** Locked tiers shown at once. Two keeps the next goal visible without spoiling the whole ladder. */
-const LOCKED_VISIBLE = 2;
 
 const title = (id: string): string => id.charAt(0).toUpperCase() + id.slice(1);
 const CLOSED = 'Closed after Infinity.';
-
-interface TierRow {
-  id: string;
-  root: HTMLElement;
-  locked: HTMLElement;
-  costEl: HTMLElement;
-  btn: HTMLButtonElement;
-  delta: HTMLElement;
-  worth: HTMLElement;
-  why: HTMLElement;
-  review: HTMLElement;
-  bar: ReturnType<typeof ledger>;
-  rewardNote: HTMLElement;
-  done: HTMLElement;
-  doneNote: HTMLElement;
-}
+/** Faster typewriters appear once the balance is this share of their cost (or they are already bought). */
+const TYPING_REACH = 0.25;
 
 function mount(root: HTMLElement, ctx: Ctx): () => void {
   const { t } = ctx;
+  const tiers = t.tiers.filter((tier) => !tier.startsDiscovered);
+  const fund = (id: string) => () => ctx.act((s, tu, k) => researchTier(s, tu, k, id));
 
-  const rows: TierRow[] = t.tiers
-    .filter((tier) => !tier.startsDiscovered)
-    .map((tier, i) => {
-      const id = tier.id;
-      const costEl = h('span', { class: 'cost' });
-      const btn = h('button', { class: 'strong wide', type: 'button', onclick: () => ctx.act((s, tu, k) => researchTier(s, tu, k, id)) }, h('span', {}, 'Fund research'), costEl);
-      const delta = h('p', { class: 'delta' });
-      const worth = h('p', { class: 'why' });
-      const whyEl = why();
-      const locked = h('div', { class: 'form-stack tight' }, h('p', {}, stamp('Not researched', 'plain')), btn, whyEl, delta, worth);
+  // 1. Next card (fund the next tier, or wait for the review in progress).
+  const next = nextCard({ heading: 'Research' });
+  const glossary = h('p', { class: 'note' }, 'A tier is a size of text the monkeys can type: letters, words, phrases and so on. A find is a typed piece of a researched tier. Each find the Editor-in-Chief reviews pays bananas.');
+  const reviewBar = ledger('Review progress', 'gold');
+  const reviewNote = h('p', { class: 'why' });
+  const reviewLine = h('p', { class: 'next-calm' });
+  const review = h('section', { class: 'next calm review', 'aria-label': 'Research under review' }, h('h3', { class: 'typed' }, 'Research'), reviewLine, reviewBar.el, reviewNote);
 
-      const bar = ledger(`${title(id)} review progress`, 'gold');
-      const rewardNote = h('p', { class: 'why' });
-      const review = h('div', { class: 'form-stack tight' },
-        h('p', {}, stamp('Under review', 'plain')),
-        h('p', { class: 'note' }, 'The Editor-in-Chief is reviewing submissions for this tier. Discovery completes by itself.'),
-        bar.el,
-        rewardNote,
-      );
+  // 2. Finished tiers as chips.
+  const chips = tiers.map((tier) => chip(title(tier.id), 'Discovered'));
+  const chipRow = h('div', { class: 'chip-row' }, ...chips.map((c) => c.el));
 
-      const doneNote = h('p', { class: 'delta' });
-      const done = h('div', { class: 'form-stack tight' }, h('p', {}, stamp('Discovered', 'ok')), doneNote);
+  // 3. The next locked tier (only while another tier is under review), then a sealed envelope.
+  const laterRow = buyRow({ verb: 'Fund research for' });
+  const laterWrap = h('div', { class: 'later' }, laterRow.el);
+  const seal = sealed('');
 
-      const rowEl = formbox(`Ref. 4-R/${i + 1} / ${title(id)}`, locked, review, done);
-      return { id, root: rowEl, locked, costEl, btn, delta, worth, why: whyEl, review, bar, rewardNote, done, doneNote };
-    });
+  // 4. Faster typewriters.
+  const typingRow = buyRow({ onBuy: () => ctx.act(buyTypingResearch), verb: 'Fund' });
+  const typingNote = h('p', { class: 'note' }, 'Faster typing means more finds, and more to review.');
+  const typingWrap = h('div', { class: 'typing' }, h('h3', { class: 'typed' }, 'Faster typewriters'), typingRow.el, typingNote);
 
-  const typingLevel = figure();
-  const typingCost = h('span', { class: 'cost' });
-  const typingBtn = h('button', { type: 'button', onclick: () => ctx.act(buyTypingResearch) }, h('span', {}, 'Fund'), typingCost);
-  const typingDelta = h('p', { class: 'delta' });
-  const typingWhy = why();
-  const typingNote = h('p', { class: 'why' });
-  const golden = figure();
+  // 5. Golden Bananas.
+  const golden = h('p', { class: 'note golden' });
 
-  root.append(
-    stack(
-      ...rows.map((r) => r.root),
-      formbox('Req. 4-R/9 / Faster typewriters',
-        field('Typewriter level', typingLevel),
-        h('div', { class: 'row2' }, typingDelta, typingBtn, typingWhy),
-        typingNote,
-      ),
-      formbox('Ref. 4-R/G / Reserve', field('Golden Bananas', golden)),
-    ),
-  );
+  root.append(stack(next.el, review, glossary, chipRow, laterWrap, seal.el, typingWrap, golden));
 
   return () => {
     const s = ctx.state();
+    const status = tiers.map((tier) => {
+      const ts = s.tiers[tier.id];
+      return ts?.discovered ? 'done' : ts?.discoverable ? 'review' : 'locked';
+    });
+    const bananasNow = N.toNumber(s.bananas);
+    const reviewing = tiers.findIndex((_, i) => status[i] === 'review');
+    const lockedIdx = tiers.map((_, i) => i).filter((i) => status[i] === 'locked');
 
-    let lockedSeen = 0;
-    for (const r of rows) {
-      const tier = t.tiers.find((x) => x.id === r.id)!;
-      const ts = s.tiers[r.id];
-      if (!ts) continue;
-      const state = ts.discovered ? 'done' : ts.discoverable ? 'review' : 'locked';
-      let visible = true;
-      if (state === 'locked') visible = lockedSeen++ < LOCKED_VISIBLE;
-      r.root.hidden = !visible;
-      if (!visible) continue;
-      r.locked.hidden = state !== 'locked';
-      r.review.hidden = state !== 'review';
-      r.done.hidden = state !== 'done';
+    // Chips: only the finished ones.
+    let anyDone = false;
+    tiers.forEach((_, i) => {
+      show(chips[i]!.el, status[i] === 'done');
+      if (status[i] === 'done') anyDone = true;
+    });
+    show(chipRow, anyDone);
 
-      if (state === 'locked') {
-        const cost = N.of(tier.researchCost);
-        setCost(r.btn, r.costEl, `Fund research for ${title(r.id)}`, tier.researchCost);
-        const can = ctx.can(`researchTier:${r.id}`, (st, tu, k) => researchTier(st, tu, k, r.id));
-        enable(r.btn, can);
-        setWhy(r.why, can ? null : f.shortBy(cost, s.bananas) ?? CLOSED);
-        const after = ctx.preview((c) => { afford(c, tier.researchCost); researchTier(c, t, nullSink, r.id); });
-        const opens = !!after.tiers[r.id]?.discoverable;
-        text(r.delta, opens ? `Tier ${f.change('Not researched', 'Under review')} ${can ? `· Bananas ${f.change(f.count(s.bananas), f.count(after.bananas))}` : ''}` : '');
-        r.delta.hidden = !opens;
-        text(r.worth, `Worth ${f.bananaText(tier.value)} per find.`);
-      } else if (state === 'review') {
-        const acc = Math.min(ts.acc, 1);
-        r.bar.set(Math.min(acc, 0.99), `${title(r.id)} review ${f.meterPct(acc)}`);
-        const claimed = s.save.discoveryRewardsClaimed.includes(r.id);
-        const gold = tier.discoveryGolden > 0 ? ` and ${f.count(tier.discoveryGolden)} Golden ${tier.discoveryGolden === 1 ? 'Banana' : 'Bananas'} (once per save)` : '';
-        text(r.rewardNote, `${f.meterPct(acc)} reviewed. ${claimed ? 'Discovery reward already claimed on an earlier run.' : `On discovery: ${f.bananaText(tier.discoveryBananas)}${gold}.`}`);
-      } else {
-        text(r.doneNote, `Worth ${f.bananaText(tier.value)} per find. Review cost ${f.amount(tierCost(s, t, tier))} per find.`);
-      }
+    /** The locked tier that is a full card right now: first locked, unless a review is in progress (then it is a row below). */
+    const fundIdx = lockedIdx[0];
+    const fundTier = fundIdx === undefined ? undefined : tiers[fundIdx]!;
+    const price = (tier: (typeof tiers)[number]) => tier.researchCost;
+
+    show(next.el, reviewing < 0);
+    if (reviewing >= 0) {
+      const tier = tiers[reviewing]!;
+      const ts = s.tiers[tier.id]!;
+      const acc = Math.min(ts.acc, 1);
+      const claimed = s.save.discoveryRewardsClaimed.includes(tier.id);
+      const gold = tier.discoveryGolden > 0 ? ` and ${f.count(tier.discoveryGolden)} Golden ${tier.discoveryGolden === 1 ? 'Banana' : 'Bananas'}` : '';
+      text(reviewLine, `The Editor-in-Chief is reviewing ${tier.id}. Nothing to do but wait.`);
+      show(review, true);
+      reviewBar.set(Math.min(acc, 0.99), `${title(tier.id)} discovery ${f.meterPct(acc)}`);
+      text(reviewNote, `${title(tier.id)} discovery ${f.meterPct(acc)}. ${claimed ? 'Discovery reward already claimed on an earlier run.' : `On discovery: ${f.bananaText(tier.discoveryBananas)}${gold}, once.`}`);
+      show(glossary, false);
+    } else if (fundTier) {
+      const can = ctx.can(`researchTier:${fundTier.id}`, (st, tu, k) => researchTier(st, tu, k, fundTier.id));
+      next.update({
+        label: `Fund research: ${title(fundTier.id)}`,
+        cost: price(fundTier),
+        enabled: can,
+        onAct: fund(fundTier.id),
+        why: `Research lets the Editor-in-Chief start finding ${fundTier.id}. Each ${fundTier.id.replace(/s$/, '')} reviewed pays ${f.bananaText(fundTier.value)}.`,
+        reason: can ? null : f.shortBy(price(fundTier), bananasNow) ?? CLOSED,
+      });
+      show(review, false);
+      show(glossary, true);
+    } else {
+      next.update({ label: null, hint: 'Every tier is discovered. Nothing left to research here.' });
+      show(review, false);
+      show(glossary, false);
     }
 
-    text(typingLevel, String(s.typingLevel));
+    // The next locked tier below the card (only while one is under review), and the sealed envelope after it.
+    const rowIdx = reviewing >= 0 ? lockedIdx[0] : undefined;
+    const sealIdx = reviewing >= 0 ? lockedIdx[1] : lockedIdx[1];
+    if (rowIdx !== undefined) {
+      const tier = tiers[rowIdx]!;
+      const can = ctx.can(`researchTier:${tier.id}`, (st, tu, k) => researchTier(st, tu, k, tier.id));
+      laterRow.update({
+        label: `Fund research: ${title(tier.id)}`,
+        effect: `Each find pays ${f.bananaText(tier.value)}.`,
+        price: price(tier),
+        have: bananasNow,
+        progress: bananasNow / price(tier),
+        enabled: can,
+        onBuy: fund(tier.id),
+      });
+    }
+    show(laterWrap, rowIdx !== undefined);
+    // Sealed: names the tier ahead of it as the one to file first.
+    const gate = reviewing >= 0 ? tiers[reviewing]! : fundTier;
+    const beyond = reviewing >= 0 ? (rowIdx !== undefined ? tiers[rowIdx]! : gate) : gate;
+    const sealTier = sealIdx !== undefined ? tiers[sealIdx]! : undefined;
+    if (sealTier && beyond) seal.set(`${title(sealTier.id)}: opens when ${title(beyond.id)} is filed`);
+    show(seal.el, !!sealTier);
+
+    // Faster typewriters: hidden until within reach, or already bought.
     const tCost = typingResearchCost(s, t);
-    setCost(typingBtn, typingCost, 'Fund faster typewriters', N.toNumber(tCost));
-    const canTyping = ctx.can('buyTypingResearch', buyTypingResearch);
-    enable(typingBtn, canTyping);
-    setWhy(typingWhy, canTyping ? null : f.shortBy(tCost, s.bananas) ?? CLOSED);
-    const afterTyping = ctx.preview((c) => { afford(c, N.toNumber(tCost)); buyTypingResearch(c, t, nullSink); });
-    text(typingDelta, `Level ${f.change(String(s.typingLevel), String(afterTyping.typingLevel))} · Keystrokes ${f.change(f.rate(keystrokeRate(s, t)), f.rate(keystrokeRate(afterTyping, t)))}`);
-    text(typingNote, `×${t.typingResearch.mult} typing per level. Each level costs ×${t.typingResearch.costGrowth} more.`);
-    text(golden, f.count(s.save.golden));
+    const tNum = N.toNumber(tCost);
+    const reach = s.typingLevel > 0 || bananasNow >= tNum * TYPING_REACH;
+    show(typingWrap, reach);
+    if (reach) {
+      const canTyping = ctx.can('buyTypingResearch', buyTypingResearch);
+      const afterTyping = ctx.preview((c) => { afford(c, tNum); buyTypingResearch(c, t, nullSink); });
+      typingRow.update({
+        label: `Level ${s.typingLevel + 1}: typing ×${t.typingResearch.mult}`,
+        effect: { label: 'Keystrokes', from: f.rate(keystrokeRate(s, t)), to: f.rate(keystrokeRate(afterTyping, t)) },
+        price: tNum,
+        have: bananasNow,
+        progress: bananasNow / tNum,
+        enabled: canTyping,
+        reason: canTyping ? null : bananasNow >= tNum ? CLOSED : null,
+      });
+    }
+
+    // Golden Bananas: only once the player has any.
+    const g = s.save.golden;
+    show(golden, g > 0);
+    if (g > 0) text(golden, `Golden Bananas in reserve: ${f.count(g)}. They carry over past Infinity.`);
   };
 }
 

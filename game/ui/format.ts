@@ -15,7 +15,7 @@ export function count(x: Num | number): string {
   if (tier >= SUFFIXES.length - 1 && a >= 1e36) return v.toExponential(2);
   const scaled = v / 10 ** (tier * 3);
   // Three significant figures, trailing zeros dropped: 50K, 12.3K, 4.56M.
-  return `${Number(scaled.toFixed(scaled < 100 ? 2 : 1))}${SUFFIXES[tier]}`;
+  return `${Number(scaled.toFixed(scaled < 10 ? 2 : scaled < 100 ? 1 : 0))}${SUFFIXES[tier]}`;
 }
 
 /** Rates and small quantities: keeps decimals below 10. */
@@ -84,4 +84,9 @@ export function meterPct(v: number): string {
 /** A change shown as "before → after". */
 export function change(before: string, after: string): string {
   return `${before} → ${after}`;
+}
+
+/** "Costs 1,000 bananas, you have 873": the accessible twin of a price gauge. */
+export function costSpoken(price: Num | number, have: Num | number): string {
+  return `Costs ${bananaText(price)}, you have ${count(have)}`;
 }

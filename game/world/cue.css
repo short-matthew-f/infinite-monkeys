@@ -1,0 +1,60 @@
+/* The next-thing cue. Lives inside the camera, so it scales with the world.
+   Never colour-only: the tab always carries words. */
+.ncue { position: absolute; z-index: 2; transform: translate(-50%, -6px); pointer-events: none; height: 0; }
+.ncue[hidden] { display: none; }
+.ncue-ring {
+  position: absolute; left: 50%; top: 0; width: calc(100% + 28px); height: 46px; transform: translate(-50%, -50%);
+  border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--glow) 75%, transparent), transparent);
+  animation: ncue-breathe 2.4s ease-in-out infinite;
+}
+.ncue-tab {
+  position: absolute; left: 50%; top: -6px; transform: translate(-50%, -100%) rotate(-2deg);
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+  padding: 5px 12px 4px; background: var(--tangerine); color: var(--screen);
+  border: 2.5px solid var(--edge); border-radius: 3px 3px 10px 3px;
+  font: 700 1.05rem var(--font-display); letter-spacing: .1em; text-transform: uppercase;
+  box-shadow: 0 3px 0 color-mix(in srgb, var(--screen) 45%, transparent), 0 8px 12px color-mix(in srgb, var(--screen) 30%, transparent);
+  animation: ncue-bob 2.4s ease-in-out infinite;
+}
+.ncue-tab::before { content: ''; position: absolute; left: 50%; bottom: -12px; width: 2px; height: 10px; background: var(--edge); }
+.ncue.ncue-in .ncue-tab { animation: ncue-drop 520ms cubic-bezier(.3, 1.4, .5, 1) both, ncue-bob 2.4s ease-in-out 520ms infinite; }
+@keyframes ncue-bob { 0%, 100% { transform: translate(-50%, -100%) rotate(-2deg); } 50% { transform: translate(-50%, calc(-100% - 4px)) rotate(-2deg); } }
+@keyframes ncue-drop { from { transform: translate(-50%, -160%) rotate(-8deg); opacity: 0; } to { transform: translate(-50%, -100%) rotate(-2deg); opacity: 1; } }
+@keyframes ncue-breathe { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+.cued-zone .halo { opacity: 1 !important; }
+body.moving .ncue-tab, body.moving .ncue-ring { animation-play-state: paused; }
+
+/* plan tag flag and directory stamp */
+.chip .cue-flag {
+  position: absolute; left: 50%; top: -15px; transform: translateX(-50%) rotate(-3deg); white-space: nowrap;
+  background: var(--tangerine); color: var(--screen); font: 700 .72rem var(--font-display); letter-spacing: .1em; text-transform: uppercase;
+  padding: 0 7px; border: 2px solid var(--screen);
+}
+.chip.cued .start { display: none; }
+.dir .cue-stamp {
+  display: inline-block; margin-left: 8px; vertical-align: 2px; padding: 0 6px; transform: rotate(-3deg);
+  background: var(--tangerine); color: var(--screen); border: 1.5px solid var(--screen);
+  font: 700 .7rem var(--font-display); letter-spacing: .1em; text-transform: uppercase;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ncue-ring, .ncue-tab, .ncue.ncue-in .ncue-tab { animation: none !important; }
+}
+
+/* edge arrow for a cued room that's off-screen */
+.cue-edge {
+  position: absolute; z-index: 18; transform: translate(-50%, -50%); display: inline-flex; align-items: center; gap: 8px;
+  min-height: 44px; max-width: calc(100% - 20px); padding: 6px 14px 6px 10px; white-space: nowrap;
+  background: var(--tangerine); color: var(--screen); border: 2.5px solid var(--edge); border-radius: 4px 4px 14px 4px;
+  font: 700 .95rem var(--font-display); letter-spacing: .08em; text-transform: uppercase; cursor: pointer;
+  box-shadow: 0 3px 0 color-mix(in srgb, var(--screen) 45%, transparent), 0 8px 14px color-mix(in srgb, var(--screen) 32%, transparent);
+}
+.cue-edge[hidden] { display: none; }
+.cue-edge .cue-arrow { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--screen); color: var(--tangerine); font: 700 1rem var(--font-body); transition: transform .2s; }
+.cue-edge-text { overflow: hidden; text-overflow: ellipsis; }
+.cue-edge:active { transform: translate(-50%, calc(-50% + 2px)); }
+.cue-edge:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.sheet-open .cue-edge, body.plan .cue-edge, body.moving .cue-edge { display: none; }
+@media (prefers-reduced-motion: reduce) { .cue-edge .cue-arrow { transition: none; } }
+/* a11y: cue words at decision size */
+.chip .cue-flag { font-size: .875rem; top: -19px; }
+.dir .cue-stamp { font-size: .875rem; }

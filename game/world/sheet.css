@@ -1,0 +1,21 @@
+/* Pull-up sheets: a peek detent that keeps the room in view, a full detent for the whole form. */
+.sheet { max-height: none; height: auto; max-height: var(--sheet-h, 42dvh); transition: transform 560ms cubic-bezier(.3, .8, .25, 1), opacity 300ms, visibility 0s 560ms, max-height 280ms cubic-bezier(.3, .8, .25, 1); }
+.sheet.open { transition-delay: 220ms, 220ms, 0s, 0s; }
+.sheet.dragging { transition: none; }
+.grab {
+  position: relative; display: grid; place-items: center; width: 100%; height: 22px; margin: -8px 0 2px;
+  background: transparent; border: 0; padding: 0; cursor: grab; touch-action: none;
+}
+.grab::before { content: ''; position: absolute; left: 0; right: 0; top: -12px; bottom: -10px; }   /* 44 px hit area */
+.grab-bar { width: 44px; height: 5px; border-radius: 3px; background: color-mix(in srgb, var(--ink) 45%, transparent); }
+.grab:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.shead { touch-action: none; cursor: grab; }
+.shead button { cursor: pointer; }
+/* While a sheet is open, Plan and Directory stay reachable (Plan folds the sheet first). */
+.sheet-open .planbtn { display: flex; }
+@media (prefers-reduced-motion: reduce) { .sheet { transition: opacity .2s, visibility 0s .2s !important; } }
+/* At the full detent the form needs the whole height: a docked Ernest steps aside until it lowers. */
+.sheet-full .ewrap.docked { opacity: 0; visibility: hidden; }
+/* Dark theme: a disabled primary still carries the decision word, so keep it legible (cream on concrete ≈ 5.3:1). */
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .sheet-pane button.hire:disabled { color: var(--ink); } }
+:root[data-theme='dark'] .sheet-pane button.hire:disabled { color: var(--ink); }

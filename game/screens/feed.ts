@@ -231,6 +231,11 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
   };
 
   push(lastTick, OPENING_LINE);
+  // Memos from the floor's next-thing cue (game/world/cue.ts).
+  addEventListener('im:memo', (e) => {
+    const text = (e as CustomEvent<string>).detail;
+    if (text) push(lastTick, text);
+  });
 
   return () => {
     const s = ctx.state();

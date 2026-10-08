@@ -7,6 +7,11 @@ import { CAP, PERS_DY, buildFloor, deskSpot, installRouteCSS, normalize, updateH
 const NS = 'http://www.w3.org/2000/svg';
 const WALK_SPEED = 250; // world px per second
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+const CABINETS: [string, string, [number, number, number, number]][] = [
+  ['recruiting', 'Recruiting cabinet: hire and level up Recruiters', [79, 203, 62, 109]],
+  ['construction', 'Construction cabinet: Builders and desks', [146, 203, 90, 109]],
+  ['editing', 'Editing cabinet: Editors who review finds', [239, 203, 64, 109]],
+];
 
 /** Art props from game state. Every value is read from state; nothing is computed here. */
 export function floorProps(s: GameState, t: Tuning): FloorProps {
@@ -110,6 +115,18 @@ export class FloorView {
         d.setAttribute('aria-hidden', 'true');
         Object.assign(d.style, { left: `${e[0]}px`, top: `${e[1]}px`, width: `${e[2]}px`, height: `${e[3]}px` });
         this.cam.append(d);
+      }
+      if (z.id === 'departments') {
+        // Each cabinet opens its own department (world coords from floor-art's departmentsSVG group transform).
+        for (const [dept, label, box] of CABINETS) {
+          const cb = document.createElement('button');
+          cb.className = 'hot cabinet';
+          cb.dataset.zone = 'departments';
+          cb.dataset.dept = dept;
+          cb.setAttribute('aria-label', label);
+          Object.assign(cb.style, { left: `${box[0]}px`, top: `${box[1]}px`, width: `${box[2]}px`, height: `${box[3]}px` });
+          this.cam.append(cb);
+        }
       }
       const c = document.createElement('div');
       c.className = 'chip';

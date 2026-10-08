@@ -29,3 +29,39 @@ export function fill(el: HTMLElement, frac: number): void {
   const v = `${Math.max(0, Math.min(1, frac)) * 100}%`;
   if (el.style.getPropertyValue('--fill') !== v) el.style.setProperty('--fill', v);
 }
+
+/** localStorage read that never throws (private windows, blocked storage). */
+export function storeGet(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+/** localStorage write that never throws. Returns false when it could not save. */
+export function storeSet(key: string, value: string): boolean {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+let uidN = 0;
+/** Unique element id for aria-controls / aria-labelledby wiring. */
+export function uid(prefix: string): string {
+  uidN += 1;
+  return `${prefix}-${uidN}`;
+}
+
+/** Set an attribute only when it changed. */
+export function attr(el: Element, name: string, value: string): void {
+  if (el.getAttribute(name) !== value) el.setAttribute(name, value);
+}
+
+/** Show or hide only when it changed. */
+export function show(el: HTMLElement, on: boolean): void {
+  if (el.hidden === on) el.hidden = !on;
+}

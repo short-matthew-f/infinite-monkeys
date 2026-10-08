@@ -16,9 +16,9 @@ import {
   type GameState,
 } from '../../core/index.js';
 import type { Ctx, Screen } from '../ctx.js';
-import { h, text, enable } from '../ui/dom.js';
+import { h, text, enable, show } from '../ui/dom.js';
 import * as f from '../ui/format.js';
-import { dial, field, figure, formbox, ledger, setWhy, stack, stamp, why } from '../ui/forms.js';
+import { dial, field, figure, folder, formbox, ledger, nextCard, presetRow, setWhy, stack, stamp, why } from '../ui/forms.js';
 import './pool.css';
 
 const name = (id: string): string => id.charAt(0).toUpperCase() + id.slice(1);
@@ -46,6 +46,8 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
   const { t } = ctx;
   /** Draft split as whole percents over the discovered tiers (sums to 100), or null when the player isn't editing. */
   let draft: Record<string, number> | null = null;
+  /** Which preset chip the draft came from ('sug' | 'common' | 'rare'), or null for a hand-made draft. */
+  let draftPreset: string | null = null;
 
   const discoveredIds = (s: GameState): string[] => t.tiers.filter((x) => s.tiers[x.id]?.discovered).map((x) => x.id);
   /** The live split as whole percents over the discovered tiers. */
@@ -54,15 +56,27 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
     const parts = distribute(ids.map((id) => s.tierAllocation[id] ?? 0), 100);
     return Object.fromEntries(ids.map((id, i) => [id, parts[i] ?? 0]));
   };
+  /** The three honest presets as whole percents. Suggested is core's; the others put every Editor on one tier. */
+  const presetPercents = (s: GameState): Record<string, Record<string, number>> => {
+    const ids = discoveredIds(s);
+    const tiers = t.tiers.filter((x) => ids.includes(x.id));
+    const common = tiers.reduce((a, x) => (x.p > a.p ? x : a), tiers[0]!);
+    const rare = tiers.reduce((a, x) => (x.value > a.value ? x : a), tiers[0]!);
+    const pct = (frac: Record<string, number>): Record<string, number> => {
+      const parts = distribute(ids.map((id) => frac[id] ?? 0), 100);
+      return Object.fromEntries(ids.map((id, i) => [id, parts[i] ?? 0]));
+    };
+    return {
+      sug: pct(suggestTierAllocation(s, t)),
+      common: pct({ [common.id]: 1 }),
+      rare: pct({ [rare.id]: 1 }),
+    };
+  };
+  const samePercents = (a: Record<string, number>, b: Record<string, number>, ids: string[]): boolean => ids.every((id) => (a[id] ?? 0) === (b[id] ?? 0));
 
-  // ---------- bottleneck dials ----------
-  const busyDial = dial('Editors busy');
-  const keptDial = dial('Finds kept');
-  const bottleneck = h('p', { class: 'note' });
-  const dialsBox = formbox('Ref. 7-T / Bottleneck',
-    h('div', { class: 'gauges' }, busyDial.el, keptDial.el),
-    bottleneck,
-  );
+  // ---------- next ----------
+  const next = nextCard({ heading: 'Next step' });
+  next.button.addEventListener('click', () => window.dispatchEvent(new CustomEvent('im:goto', { detail: 'departments' })));
 
   // ---------- allocation ----------
   const aRows = t.tiers.map((tier) => {
@@ -76,6 +90,7 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
         draft = currentPercents(s);
         recordPreview(s, ctx.sink, 'allocation', 'tiers');
       }
+      draftPreset = null;
       const ids = discoveredIds(s);
       const v = Number(input.value);
       const others = ids.filter((x) => x !== tier.id);
@@ -88,28 +103,43 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
     return { tier, el, input, share, info };
   });
 
-  const singleNote = h('p', { class: 'note' });
-  const useSuggested = h('button', { type: 'button', onclick: () => { draft = null; ctx.act(applySuggestedAllocation); render(); } }, 'Use suggested');
-  const useWhy = why();
+  const nowLine = h('p', { class: 'seatline' });
+  const pre = presetRow(
+    {
+      label: 'Editor allocation',
+      key: 'pool-adjust',
+      options: [
+        { id: 'sug', label: 'Suggested: most bananas' },
+        { id: 'common', label: 'Favour common finds' },
+        { id: 'rare', label: 'Favour rare finds' },
+      ],
+      onPick: (id) => {
+        const s = ctx.state();
+        if (!draft) recordPreview(s, ctx.sink, 'allocation', 'tiers');
+        draft = presetPercents(s)[id] ?? null;
+        draftPreset = id;
+        render();
+      },
+    },
+    ...aRows.map((r) => r.el),
+  );
+
   const applyBtn = h('button', { class: 'strong', type: 'button', onclick: () => {
-    const next = splitOf(ctx.state());
-    if (!next) return;
-    if (ctx.act((s, tt, k) => setTierAllocation(s, tt, k, next))) draft = null;
+    const s = ctx.state();
+    const ok = draftPreset === 'sug' ? ctx.act(applySuggestedAllocation) : (() => {
+      const next = splitOf(s);
+      return !!next && ctx.act((cs, tt, k) => setTierAllocation(cs, tt, k, next));
+    })();
+    if (ok) { draft = null; draftPreset = null; }
     render();
-  } }, 'Apply split');
+  } }, 'Apply this split');
+  const resetBtn = h('button', { class: 'quiet', type: 'button', onclick: () => { draft = null; draftPreset = null; render(); } }, 'Discard');
   const applyWhy = why();
-  const resetBtn = h('button', { class: 'quiet', type: 'button', onclick: () => { draft = null; render(); } }, 'Discard draft');
   const incomeDelta = h('p', { class: 'delta' });
   const flowDelta = h('p', { class: 'delta' });
-  const preview = h('div', { class: 'pool-preview' }, incomeDelta, flowDelta);
-  const allocControls = h('div', { class: 'form-stack' },
-    ...aRows.map((r) => r.el),
-    preview,
-    h('div', { class: 'btn-row' }, applyBtn, useSuggested, resetBtn),
-    applyWhy,
-    useWhy,
-  );
-  const allocBox = formbox('Req. 7-T / Editor allocation', singleNote, allocControls);
+  const preview = h('div', { class: 'pool-preview', hidden: true }, incomeDelta, flowDelta);
+  const actions = h('div', { class: 'btn-row', hidden: true }, applyBtn, resetBtn);
+  const allocBox = formbox('Who reviews what', h('p', { class: 'note' }, 'Editors split their time between find types.'), nowLine, pre.el, preview, actions, applyWhy);
 
   /** Draft as fractions over discovered tiers, or null. */
   function splitOf(s: GameState): Record<string, number> | null {
@@ -119,6 +149,15 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
     if (sum <= 0) return null;
     return Object.fromEntries(ids.map((id) => [id, (draft?.[id] ?? 0) / sum]));
   }
+
+  // ---------- bottleneck dials ----------
+  const busyDial = dial('Editors busy');
+  const keptDial = dial('Finds kept');
+  const bottleneck = h('p', { class: 'note' });
+  const dialsBox = formbox('Ref. 7-T / Bottleneck',
+    h('div', { class: 'gauges' }, busyDial.el, keptDial.el),
+    bottleneck,
+  );
 
   // ---------- tiers ----------
   const rows = t.tiers.map((tier, i) => {
@@ -150,7 +189,9 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
     field('Certified income', totalV),
   );
 
-  root.append(stack(dialsBox, allocBox, ...rows.map((r) => r.el), figures));
+  const detail = folder({ key: 'pool-detail', title: 'How the pool is doing' }, dialsBox, ...rows.map((r) => r.el), figures);
+
+  root.append(stack(next.el, allocBox, detail.el));
 
   function render(): void {
     const s = ctx.state();
@@ -158,9 +199,30 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
     const finds = findRates(s, t);
     const eic = editorInChiefSplit(s, t);
     const cert = certNow(s, ctx);
-    const suggested = suggestTierAllocation(s, t);
     const discovered = discoveredIds(s);
     const hasPool = N.gt(pool, N.zero);
+
+    const findsTotal = Object.values(finds).reduce((a, x) => N.add(a, x), N.zero);
+    const keptTotal = Object.values(cert.certified).reduce((a, x) => N.add(a, x), N.zero);
+    const discarding = N.gt(cert.discarded, N.zero) && N.ratio(cert.discarded, findsTotal) > 0.0005;
+    const idle = N.gt(cert.idle, N.zero);
+
+    // ----- Next card -----
+    if (discarding) {
+      next.update({
+        label: 'Go to Departments',
+        why: `Editors review ${f.amount(keptTotal)} of ${f.amount(findsTotal)} finds a second. The rest are thrown away.`,
+        secondary: 'A find is a usable piece of typing: a letter, word or phrase. Editors turn finds into bananas.',
+      });
+    } else {
+      next.update({
+        label: null,
+        hint: `${N.gt(findsTotal, N.zero) ? 'Every find is reviewed.' : 'No finds yet. Monkeys at their desks make them.'} A find is a usable piece of typing: a letter, word or phrase.`,
+      });
+    }
+
+    // ----- Folder summary (collapsed line) -----
+    detail.setSummary(`${f.amount(keptTotal)} of ${f.amount(findsTotal)} finds reviewed · ${f.rate(cert.income)}`);
 
     // Figures and dials
     text(poolV, f.rate(pool));
@@ -169,13 +231,9 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
     text(discardedV, f.rate(cert.discarded));
     text(totalV, `${f.rate(cert.income)}`);
     const busy = hasPool ? Math.min(1, N.ratio(cert.demand, pool)) : 0;
-    const findsTotal = Object.values(finds).reduce((a, x) => N.add(a, x), N.zero);
-    const keptTotal = Object.values(cert.certified).reduce((a, x) => N.add(a, x), N.zero);
     const kept = N.gt(findsTotal, N.zero) ? Math.min(1, N.ratio(keptTotal, findsTotal)) : 0;
     busyDial.set(busy, f.meterWord(busy), `Editors busy: ${f.meterPct(busy)}, ${f.meterWord(busy)}`);
     keptDial.set(kept, f.meterWord(kept), `Finds kept: ${f.meterPct(kept)}, ${f.meterWord(kept)}`);
-    const discarding = N.gt(cert.discarded, N.zero);
-    const idle = N.gt(cert.idle, N.zero);
     const limiter = finiteBottleneck(s, t);
     text(bottleneck, limiter === 'editing'
       ? `Bottleneck: Editing. ${discarding ? `${f.rate(cert.discarded)} of submissions are being discarded.` : 'Review capacity is fully committed.'}`
@@ -212,18 +270,17 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
       }
     }
 
-    // Allocation
+    // ----- Allocation: nothing to split until two tiers are discovered -----
     const multi = discovered.length > 1;
-    allocControls.hidden = !multi;
-    singleNote.hidden = multi;
-    allocBox.hidden = discovered.length === 0;
+    show(allocBox, multi);
     if (!multi) {
-      const only = discovered[0];
-      text(singleNote, only ? `Only ${name(only)} is discovered, so every Editor reviews it. Discover more tiers to split Editors.` : '');
       draft = null;
+      draftPreset = null;
       return;
     }
     const cur = currentPercents(s);
+    const presets = presetPercents(s);
+    text(nowLine, `Reviewing now: ${discovered.map((id) => `${name(id)} ${cur[id] ?? 0}%`).join(' · ')}`);
     const split = splitOf(s);
     for (const r of aRows) {
       const id = r.tier.id;
@@ -235,23 +292,22 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
       if (r.input.value !== String(v)) r.input.value = String(v);
       r.input.setAttribute('aria-valuetext', `${v} percent of Editors`);
       text(r.share, `${v}%`);
-      text(r.info, `Current ${cur[id] ?? 0}% · Suggested ${f.pct(suggested[id] ?? 0)}`);
+      text(r.info, `Current ${cur[id] ?? 0}% · Suggested ${presets.sug?.[id] ?? 0}%`);
     }
-    const same = discovered.every((id) => f.pct(s.tierAllocation[id] ?? 0) === f.pct(suggested[id] ?? 0));
-    const canSuggest = !same && ctx.can('applySuggestedAllocation', applySuggestedAllocation);
-    enable(useSuggested, canSuggest);
-    setWhy(useWhy, canSuggest ? null : same ? 'Already on the suggested split.' : 'Closed after Infinity.');
-    resetBtn.hidden = !draft;
-    preview.hidden = !draft;
+    // Chips show the pending pick, or else whichever preset the live split already matches.
+    const live = (['sug', 'common', 'rare'] as const).find((k) => samePercents(presets[k] ?? {}, cur, discovered)) ?? null;
+    pre.select(draft ? draftPreset : live);
     const differs = !!draft && discovered.some((id) => (draft?.[id] ?? 0) !== (cur[id] ?? 0));
+    show(preview, !!draft);
+    show(actions, !!draft);
     const canApply = !!split && differs && ctx.can('setTierAllocation', (cs, tt, k) => setTierAllocation(cs, tt, k, split));
     enable(applyBtn, canApply);
-    setWhy(applyWhy, canApply ? null : !draft ? 'Move a slider to draft a new split.' : !split ? 'Give at least one tier a share.' : !differs ? 'The draft matches the current split.' : 'Closed after Infinity.');
+    setWhy(applyWhy, !draft || canApply ? null : !split ? 'Give at least one tier a share.' : !differs ? 'This is already how Editors are split.' : 'Closed after Infinity.');
     if (draft && split) {
       const c = ctx.preview((cs) => { setTierAllocation(cs, t, nullSink, split); });
       const after = certNow(c, ctx);
-      text(incomeDelta, `Certified income ${f.change(f.rate(cert.income), f.rate(after.income))}`);
-      text(flowDelta, `Idle ${f.change(f.rate(cert.idle), f.rate(after.idle))} · Discarded ${f.change(f.rate(cert.discarded), f.rate(after.discarded))}`);
+      text(incomeDelta, `Income ${f.change(f.rate(cert.income), f.rate(after.income))}`);
+      text(flowDelta, `Thrown away ${f.change(f.rate(cert.discarded), f.rate(after.discarded))} · Idle Editors ${f.change(f.rate(cert.idle), f.rate(after.idle))}`);
     }
   }
 

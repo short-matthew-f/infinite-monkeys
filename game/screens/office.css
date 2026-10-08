@@ -1,2 +1,6 @@
 /* Personnel: most layout comes from game/ui/forms.css. */
 .sheet-pane .office-slots { min-width: 0; }
+.sheet-pane .form-stack.tight { gap: 6px; }
+.sheet-pane .save { display: grid; gap: 4px; }
+.sheet-pane .seatline { font: 400 1rem/1.4 var(--font-body); color: var(--ink); }
+.sheet-pane .slots > .ledger { flex: 1; min-width: 0; }
