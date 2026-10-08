@@ -651,6 +651,8 @@ Recorded so they aren't reintroduced.
 | 46 | The place is the interface: a pop-up floor plan per floor, rooms open their own sheets (Matt, Oct 7 2026) | Roomy, no menu buttons; Egg, Inc.'s map model | Tab bar; cutaway dollhouse; paper theater |
 | 47 | Whimsy is always present, from the first desk (Matt, Oct 7 2026) | Charm carries the early game | Straight-faced early game (amends #15 and §1 pillar 5: absurdity still rises with height, but the floor is never joyless) |
 | 48 | Roomy means space between spaces, not ceiling height (Matt, Oct 7 2026) | Zones breathe; ceilings can stay low until the ceremony | Tall rooms |
+| 49 | Proposed: the building of floors is the map; each room opens full screen with an exit door; no panning (Matt, Oct 8 2026; mockup `design/explorations/tower/`, not yet adopted) | Clear organisation, wings and heads, quarterly rhythm | Pannable pop-up floor with two zoom levels (#46 stays until adopted) |
+| 50 | Proposed: a quarterly budget with discretionary income replaces the free funding slider (§13; behind a tuning switch) | Make the budget count; leftover goes back into the budget | Free shares (today); lines as locked operating funding only |
 
 ### Open
 
@@ -673,6 +675,73 @@ Recorded so they aren't reintroduced.
 | Original zone list as locations | Became window views (C16) |
 
 ---
+
+## 13. Quarterly Budget (proposed, behind a tuning switch)
+
+Status: in `core/` behind `Tuning.budget` (`prototypeBudgetTuning`). The shipped
+game still runs `prototypeTuning`, where `budget` is absent, so nothing changes
+until this is adopted. Mockup: `design/explorations/tower/`.
+
+**Why.** Free funding shares were a solved knob: "Suggested" was nearly always
+right, so the player pressed it whenever something drifted (Matt: "everything
+feels a little chaotic"). The budget makes money allocation the decision, on a
+rhythm.
+
+**Rules.**
+- The budget opens the first time a department exists. Until then every banana
+  goes to the wallet, as today.
+- A quarter lasts `quarterSeconds`. A signed budget has four lines that sum
+  to 1: Recruiting, Construction, Editing and Discretionary (at least
+  `minDiscretionary`).
+- Income splits live by the lines. Discretionary fills the wallet
+  (`s.bananas`), which pays for every manual purchase. Department lines fill
+  department accounts, and each department buys its own levels from its
+  account (`purchase` events with `by: 'department'`).
+- At quarter end the unspent wallet (`sweepShare` of it) is swept into the
+  pot, and a review opens. Signing splits the pot by the new lines. To save
+  for a stage, sign a high discretionary share.
+- Nothing waits for the player. A review left unsigned for a whole quarter
+  closes on the previous lines (`missedReviews`). Offline catch-up runs the
+  same ticks.
+- The heads coordinate how hard each department works: funding shares follow
+  `suggestShares` every tick, and `setShares` is refused in this mode. The
+  budget decides growth; the free slider is gone.
+- Each quarter keeps a report (`QuarterReport`: income, hires, desks, finds
+  certified and discarded, auto-levels, wallet spent, swept), so the review
+  and the heads' presentations are a pure snapshot from core.
+- At the ceremony the budget closes: the accounts and the pot return to the
+  wallet, and the hotel phase is unchanged.
+- `suggestBudget` applies the `suggestShares` rule to growth money. After the
+  tuned discretionary share, it plans the quarter level by level: Editing's
+  projected demand at quarter end first, then Recruiting and Construction
+  together. It's a suggestion. Reports and heads state facts and never say
+  which lines to sign.
+
+**Not built yet (proposed with it).** Requisitions (paid mid-quarter requests
+from heads), an emergency review, and growth-triggered quarters.
+
+**Alternative noted, not built.** Lines as operating funding only (today's
+multiplier, locked per quarter, with no department accounts).
+
+**Sim, casual bot (Oct 8 2026).** Run with `node --import tsx sim/budget-report.ts casual [grid|sweep]`.
+- **Today's economy:** declare at 25.2 min, longest dead gap 190 s counting
+  rebalances.
+- **Best budget variant** (180 s quarters, 70% discretionary): declare at
+  33 min, stage 4 at 20 min, longest gap 630 s.
+- **Where the time goes:** the slowdown sits in Readiness. With output shares
+  automatic and growth money locked per quarter, Editing lags demand for
+  minutes at a time.
+- **Lower discretionary is slower.** At 30% it often never declares, because
+  departments' mechanical auto-buys are worse spenders than the player's own
+  purchases.
+- **Sweeping matters less than expected:** sweep 0, ½ or 1 changes declare by
+  under 2 minutes.
+- **Reviews are rubber stamps for a bot:** only 2 of 11 move the suggested
+  lines by 5% or more. The decision has to come from the player's own
+  trade-off (wallet vs growth), requisitions and the reports, not from
+  following the suggestion.
+- **Before adoption:** retune Readiness under the budget (or add the
+  emergency review), then rerun §10.
 
 ## Appendix A: Playthrough (Hypothesis)
 

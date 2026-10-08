@@ -8,8 +8,11 @@ import type { Tuning } from '../core/index.js';
  * Meaningful: an unlock (stage, research, a department's first level), or a
  * purchase the bot valued at least 5% above waiting.
  */
-export function longestDeadGap(log: DecisionLog, t: Tuning, untilTick: number, opts: { countRebalances?: boolean } = {}): number {
+export function longestDeadGap(log: DecisionLog, t: Tuning, untilTick: number, opts: { countRebalances?: boolean; countReviews?: number } = {}): number {
   const ticks = log.purchases.filter((p) => p.meaningful && p.tick <= untilTick).map((p) => p.tick);
+  // Budget mode: a review counts as action only when the signed lines moved by at least this much.
+  // Department auto-buys never count (they aren't player decisions and aren't in the log).
+  if (opts.countReviews !== undefined) for (const r of log.reviews) if (r.change >= opts.countReviews && r.tick <= untilTick) ticks.push(r.tick);
   // Proposed (M2): a Readiness rebalancing episode is a meaningful action too.
   if (opts.countRebalances) for (const r of readinessRebalances(log)) if (r.tick <= untilTick) ticks.push(r.tick);
   ticks.sort((a, b) => a - b);

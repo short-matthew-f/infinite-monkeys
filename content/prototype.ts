@@ -98,3 +98,10 @@ export const prototypeTuning: Tuning = {
   ],
   offlineCapSeconds: 4 * 3600,
 };
+
+// Proposed (DESIGN.md §13): the quarterly budget. Same tuning plus budget
+// lines; the shipped game still runs `prototypeTuning` until it's adopted.
+export const prototypeBudgetTuning: Tuning = {
+  ...prototypeTuning,
+  budget: { quarterSeconds: 180, suggestedDiscretionary: 0.7, minDiscretionary: 0.1, sweepShare: 1 },
+};

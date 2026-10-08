@@ -13,9 +13,11 @@ import {
   hotelPool,
   meters,
   metersFull,
+  suggestShares,
   secondsToTicks,
 } from './model.js';
 import type { GameState } from './state.js';
+import { activeBudget, autoBuy, bankIncome, maybeEndQuarter, maybeOpenBudget } from './budget.js';
 import { DEPTS, type Tuning } from './tuning.js';
 
 /** Advances the game by exactly one tick. The only way time passes in core. */
@@ -43,16 +45,23 @@ export function catchUp(s: GameState, t: Tuning, sink: EventSink, elapsedSeconds
 
 function stepFinite(s: GameState, t: Tuning, sink: EventSink): void {
   const dt = t.tickSeconds;
+  maybeOpenBudget(s, t, sink);
+  const b = activeBudget(s, t);
+  // Budget mode: the heads coordinate how hard each department works.
+  if (b) s.shares = suggestShares(s, t);
 
   // Recruiting fills free desks; anything beyond waits in the lobby (waste).
   const free = N.max(N.zero, N.sub(s.desks, s.monkeys));
   const hires = N.min(N.mul(deptOutput(s, t, 'recruiting'), dt), free);
   s.monkeys = N.add(s.monkeys, hires);
+  if (b) b.stats.hires += N.toNumber(hires);
 
   // Construction builds up to a buffer above headcount; beyond that is empty floors (waste).
   const buffer = Math.max(t.desks.constructionBufferMin, N.toNumber(s.monkeys) * t.desks.constructionBufferFrac);
   const room = N.max(N.zero, N.sub(N.add(s.monkeys, N.of(buffer)), s.desks));
-  s.desks = N.add(s.desks, N.min(N.mul(deptOutput(s, t, 'construction'), dt), room));
+  const built = N.min(N.mul(deptOutput(s, t, 'construction'), dt), room);
+  s.desks = N.add(s.desks, built);
+  if (b) b.stats.desksBuilt += N.toNumber(built);
 
   // Discovery: the Editor-in-Chief's review of undiscovered tiers accumulates deterministically.
   const eic = editorInChiefSplit(s, t);
@@ -65,7 +74,15 @@ function stepFinite(s: GameState, t: Tuning, sink: EventSink): void {
 
   // Certification and income.
   const cert = certifyTiers(s, t, editingPool(s, t), s.tierAllocation);
-  s.bananas = N.add(s.bananas, N.mul(cert.income, dt));
+  if (b) {
+    // Budget: income splits by the signed lines; departments then buy their own levels.
+    bankIncome(s, b, N.mul(cert.income, dt));
+    b.stats.certifiedFinds += N.toNumber(N.sum(Object.values(cert.certified))) * dt;
+    b.stats.discardedFinds += N.toNumber(cert.discarded) * dt;
+    autoBuy(s, t, b, sink);
+  } else {
+    s.bananas = N.add(s.bananas, N.mul(cert.income, dt));
+  }
 
   // Self-replication at stage 4.
   for (const d of DEPTS) {
@@ -80,6 +97,8 @@ function stepFinite(s: GameState, t: Tuning, sink: EventSink): void {
       sink({ type: 'stageReached', tick: s.tick, stage: m.id });
     }
   }
+
+  if (b) maybeEndQuarter(s, t, b, sink);
 
   // Infinity Readiness: the Stability Window needs all meters full continuously.
   if (!s.stability.permit) {

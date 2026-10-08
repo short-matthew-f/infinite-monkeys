@@ -18,6 +18,32 @@ export interface Shares {
 
 export type Meters = Record<DeptId, number>;
 
+/** Budget lines: the three departments plus the player's discretionary wallet. Sum to 1. */
+export interface BudgetLines extends Shares {
+  discretionary: number;
+}
+
+/** What happened in one quarter, kept for the quarterly review. Plain numbers. */
+export interface QuarterReport {
+  quarter: number;
+  seconds: number;
+  income: number;
+  /** Monkeys seated by Recruiting (automatic) and by hand. */
+  hires: number;
+  manualHires: number;
+  /** Desks built by Construction and bought by hand. */
+  desksBuilt: number;
+  desksBought: number;
+  certifiedFinds: number;
+  discardedFinds: number;
+  /** Levels each department bought from its own account. */
+  autoLevels: Record<DeptId, number>;
+  /** Bananas spent from the wallet. */
+  walletSpent: number;
+  /** Unspent wallet swept back into the pot at quarter end. */
+  swept: number;
+}
+
 export interface FrozenRewardData {
   bananas?: number;
   golden?: number;
@@ -25,7 +51,7 @@ export interface FrozenRewardData {
 }
 
 export type GameEvent =
-  | { type: 'purchase'; tick: number; item: string; cost: number; currency: 'bananas' | 'golden'; bottleneckBefore: Bottleneck; bottleneckAfter: Bottleneck }
+  | { type: 'purchase'; tick: number; item: string; cost: number; currency: 'bananas' | 'golden'; bottleneckBefore: Bottleneck; bottleneckAfter: Bottleneck; by?: 'department' }
   | { type: 'hire'; tick: number; manual: boolean }
   | { type: 'allocationChanged'; tick: number; layer: 'tiers' | 'markets'; previous: Record<string, number>; next: Record<string, number>; suggested: Record<string, number>; objective: Objective }
   | { type: 'fundingChanged'; tick: number; previous: Shares; next: Shares; meters: Meters }
@@ -41,7 +67,10 @@ export type GameEvent =
   | { type: 'commissionOffered'; tick: number; id: string; kind: CommissionKind; deliveries: Record<string, number>; reward: FrozenRewardData; deadlineSeconds: number }
   | { type: 'commissionCompleted'; tick: number; id: string; kind: CommissionKind; ticksTaken: number; productionIncomeForgone: number; reward: FrozenRewardData }
   | { type: 'commissionFailed'; tick: number; id: string }
-  | { type: 'rewardUsed'; tick: number; commission: string; how: string };
+  | { type: 'rewardUsed'; tick: number; commission: string; how: string }
+  | { type: 'budgetOpened'; tick: number }
+  | { type: 'quarterEnded'; tick: number; report: QuarterReport; pot: number; missedReview: boolean }
+  | { type: 'budgetSigned'; tick: number; quarter: number; previous: BudgetLines; next: BudgetLines; pot: number };
 
 export type EventSink = (e: GameEvent) => void;
 

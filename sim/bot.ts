@@ -33,6 +33,8 @@ import {
   researchTier,
   run,
   setShares,
+  signBudget,
+  suggestBudget,
   suggestShares,
   tapHire,
   type EventSink,
@@ -126,6 +128,15 @@ function allStage4(s: GameState): boolean {
 /** Policy upkeep every decision: suggested tier split, and funding shares when they help enough. */
 function upkeep(s: GameState, t: Tuning, bot: BotConfig, sink: EventSink, log?: DecisionLog): void {
   applySuggestedAllocation(s, t, sink);
+  if (t.budget && s.phase === 'finite') {
+    // Budget mode: shares are fixed; at an open review the bot signs the suggested lines.
+    if (s.budget?.reviewDue) {
+      const prev = { ...s.budget.lines };
+      const next = suggestBudget(s, t);
+      if (signBudget(s, t, sink, next)) log?.reviews.push({ tick: s.tick, change: (['recruiting', 'construction', 'editing', 'discretionary'] as const).reduce((a, k) => a + Math.abs(next[k] - prev[k]), 0) / 2 });
+    }
+    return;
+  }
   const suggested = suggestShares(s, t);
   const changed = DEPTS.some((d) => Math.abs(suggested[d] - s.shares[d]) > 1e-3);
   if (!changed) return;
@@ -179,12 +190,14 @@ export interface PurchaseRecord {
 export interface DecisionLog {
   purchases: PurchaseRecord[];
   rebalances: { tick: number; before: number; after: number }[];
+  /** Budget reviews signed, with how much the lines moved (0..1, half the L1 distance). */
+  reviews: { tick: number; change: number }[];
   readinessPinnedTick: number | null;
   declaredTick: number | null;
 }
 
 export function newLog(): DecisionLog {
-  return { purchases: [], rebalances: [], readinessPinnedTick: null, declaredTick: null };
+  return { purchases: [], rebalances: [], reviews: [], readinessPinnedTick: null, declaredTick: null };
 }
 
 /** One decision. Mutates the real state. */

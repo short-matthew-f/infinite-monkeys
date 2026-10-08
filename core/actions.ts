@@ -22,6 +22,7 @@ import {
   zenoCost,
 } from './model.js';
 import type { GameState, HotelUpgrade, MarketState } from './state.js';
+import { activeBudget, closeBudget } from './budget.js';
 import { DEPTS, type DeptId, type Tuning } from './tuning.js';
 
 /** Every number crossing the action boundary must be finite and non-negative. */
@@ -40,6 +41,8 @@ function spendBananas(s: GameState, t: Tuning, sink: EventSink, item: string, co
   if (N.lt(s.bananas, cost)) return false;
   const before = bottleneck(s, t);
   s.bananas = N.sub(s.bananas, cost);
+  const b = activeBudget(s, t);
+  if (b) b.stats.walletSpent += N.toNumber(cost);
   apply();
   sink({ type: 'purchase', tick: s.tick, item, cost: N.toNumber(cost), currency: 'bananas', bottleneckBefore: before, bottleneckAfter: bottleneck(s, t) });
   // An Immediate Commission's payout counts as used at the first purchase after it lands.
@@ -57,6 +60,8 @@ export function tapHire(s: GameState, t: Tuning, sink: EventSink): boolean {
   if (s.phase !== 'finite' || s.tick < s.hireReadyTick) return false;
   if (N.lt(N.sub(s.desks, s.monkeys), N.one)) return false;
   s.monkeys = N.add(s.monkeys, N.one);
+  const b = activeBudget(s, t);
+  if (b) b.stats.manualHires++;
   s.hireReadyTick = s.tick + secondsToTicks(t, hireCooldownSeconds(t, s.zenoLevel));
   sink({ type: 'hire', tick: s.tick, manual: true });
   return true;
@@ -67,6 +72,8 @@ export function buyDesk(s: GameState, t: Tuning, sink: EventSink): boolean {
   return spendBananas(s, t, sink, 'desk', deskCost(s, t), () => {
     s.desks = N.add(s.desks, N.one);
     s.desksBought++;
+    const b = activeBudget(s, t);
+    if (b) b.stats.desksBought++;
   });
 }
 
@@ -120,8 +127,14 @@ export function researchTier(s: GameState, t: Tuning, sink: EventSink, id: strin
   });
 }
 
-/** Funding shares are free to change. Shares must be non-negative and sum to 1. */
+/**
+ * Funding shares are free to change. Shares must be non-negative and sum to 1.
+ * With the quarterly budget on, the heads coordinate finite-phase shares
+ * themselves (they follow suggestShares every tick) and the player steers
+ * through the budget instead (signBudget).
+ */
 export function setShares(s: GameState, t: Tuning, sink: EventSink, next: Shares): boolean {
+  if (t.budget && s.phase === 'finite') return false;
   const vals = DEPTS.map((d) => next[d]);
   if (!vals.every(validAmount) || Math.abs(vals.reduce((a, b) => a + b, 0) - 1) > 1e-6) return false;
   const previous = { ...s.shares };
@@ -204,6 +217,7 @@ export function declareInfinity(s: GameState, t: Tuning, sink: EventSink): boole
     },
     pendingReward: null,
   };
+  closeBudget(s);
   s.phase = 'hotel';
   s.objective = { kind: 'bananas' };
   sink({ type: 'infinityDeclared', tick: s.tick });

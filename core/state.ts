@@ -1,6 +1,6 @@
 import { N, type Num } from './num.js';
 import { seedStreams, type RngStreams } from './rng.js';
-import type { Objective, Shares } from './events.js';
+import type { BudgetLines, Objective, QuarterReport, Shares } from './events.js';
 import { DEPTS, type CommissionKind, type DeptId, type Tuning } from './tuning.js';
 
 export interface DeptState {
@@ -76,6 +76,25 @@ export interface HotelState {
   pendingReward: { commission: string; kind: CommissionKind } | null;
 }
 
+export interface BudgetState {
+  /** The signed lines, locked until the next review. */
+  lines: BudgetLines;
+  /** Each department's account; the department buys its own levels from it. */
+  accounts: Record<DeptId, Num>;
+  /** Swept wallet waiting for a signature, split by the next signed lines. */
+  pot: Num;
+  quarter: number;
+  quarterStartTick: number;
+  /** A review is open: the pot waits and the lines can be signed. */
+  reviewDue: boolean;
+  /** Reviews that closed unsigned (the quarter ran on the previous lines). */
+  missedReviews: number;
+  /** Running totals for the current quarter. */
+  stats: QuarterReport;
+  /** The last finished quarter, for the review. */
+  lastReport: QuarterReport | null;
+}
+
 /** Persists across runs (Publish). */
 export interface SaveState {
   golden: number;
@@ -105,6 +124,8 @@ export interface GameState {
   stability: { heldTicks: number; permit: boolean };
   milestonesReached: string[];
   hotel: HotelState | null;
+  /** Quarterly budget, once opened (budget tuning only). Older saves lack it. */
+  budget?: BudgetState | null;
 }
 
 export function newSave(): SaveState {
@@ -145,6 +166,7 @@ export function createState(t: Tuning, seed: number, save: SaveState = newSave()
     stability: { heldTicks: 0, permit: false },
     milestonesReached: [],
     hotel: null,
+    budget: null,
   };
 }
 

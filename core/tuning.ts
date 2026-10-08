@@ -69,6 +69,24 @@ export interface EpicDef {
   effect: EpicEffect;
 }
 
+/**
+ * The quarterly budget (DESIGN.md §13, proposed). When present, income is split
+ * live by signed budget lines: department lines fill department accounts that
+ * buy their own levels, the discretionary line fills the player's wallet. At
+ * each quarter end the unspent wallet goes back into the pot, which the next
+ * signed budget splits. Absent or null: today's free funding shares.
+ */
+export interface BudgetDef {
+  /** Length of a quarter. */
+  quarterSeconds: number;
+  /** Discretionary share in the suggested budget. */
+  suggestedDiscretionary: number;
+  /** A signed budget must leave at least this much discretionary. */
+  minDiscretionary: number;
+  /** Share of the unspent wallet swept into the pot at quarter end (1 = all of it; the rest stays in the wallet). */
+  sweepShare: number;
+}
+
 export interface Milestone {
   id: string;
   desks: number;
@@ -119,4 +137,5 @@ export interface Tuning {
   };
   epics: EpicDef[];
   offlineCapSeconds: number;
+  budget?: BudgetDef | null;
 }
