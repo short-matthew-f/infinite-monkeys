@@ -55,6 +55,8 @@ export interface BotConfig {
   minGain: number;
   /** Re-balance funding only when the suggested shares improve average meters by this fraction. */
   rebalanceThreshold: number;
+  /** Budget mode: weigh an open request before any other purchase (a player who reads memos first). */
+  requestsFirst?: boolean;
 }
 
 const base = { lookaheadSeconds: 90, terminalSeconds: 120, maxPurchasesPerDecision: 6, minGain: 0.0, rebalanceThreshold: 0.1 };
@@ -64,6 +66,9 @@ export const BOTS: Record<'casual' | 'hard' | 'idler', BotConfig> = {
   hard: { ...base, name: 'hard', decisionSeconds: 2, manualHire: true },
   idler: { ...base, name: 'idler', decisionSeconds: 10, manualHire: false },
 };
+
+/** The casual bot, but it reads memos first: an open request is accepted when it beats waiting, before other purchases. */
+export const MEMO_READER: BotConfig = { ...BOTS.casual, name: 'memo-reader', requestsFirst: true };
 
 export const clone = (s: GameState): GameState => JSON.parse(JSON.stringify(s)) as GameState;
 
@@ -176,7 +181,8 @@ export function score(s: GameState, t: Tuning, bot: BotConfig): number {
     if (bot.manualHire) tapHire(s, t, nullSink);
     run(s, t, nullSink, Math.min(chunk, total - done));
   }
-  const bananas = N.toNumber(s.bananas) + incomeRate(s, t) * bot.terminalSeconds;
+  // Budget mode: the pot (swept wallet, audit findings) is next quarter's money, so it counts too.
+  const bananas = N.toNumber(s.bananas) + N.toNumber(s.budget?.pot ?? N.zero) + incomeRate(s, t) * bot.terminalSeconds;
   if (s.objective.kind !== 'readiness') return bananas;
   // Readiness pinned: progress is the lowest meter, then the average; bananas only break ties.
   const m = meters(s, t);
@@ -221,6 +227,18 @@ export function decide(s: GameState, t: Tuning, bot: BotConfig, sink: EventSink,
     if (c.apply(s, t, sink)) {
       log.purchases.push({ tick: s.tick, id: c.id, gain: 0, meaningful: true });
       upkeep(s, t, bot, sink, log);
+    }
+  }
+
+  if (bot.requestsFirst && s.budget?.requisition) {
+    // Is it worth having? Compare granting with not, as if the money were in hand.
+    const q = s.budget.requisition;
+    const withCash = clone(s);
+    withCash.bananas = N.add(withCash.bananas, N.of(q.price));
+    const granted = clone(withCash);
+    if (grantRequisition(granted, t, nullSink) && score(granted, t, bot) > score(withCash, t, bot)) {
+      if (grantRequisition(s, t, sink)) log.purchases.push({ tick: s.tick, id: 'requisition', gain: 0, meaningful: true });
+      else return; // save up for it: no other purchases while it's open and affordable before it expires
     }
   }
 

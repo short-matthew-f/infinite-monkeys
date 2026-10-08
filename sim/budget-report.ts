@@ -3,14 +3,14 @@
 // with the same bots and metrics.
 
 import { prototypeTuning as TB, classicTuning as T } from '../content/prototype.js';
-import { BOTS, playFinite, type FiniteRun } from './bot.js';
+import { BOTS, MEMO_READER, playFinite, type FiniteRun } from './bot.js';
 import { longestDeadGap } from './metrics.js';
 import type { BudgetDef, GameEvent, Tuning } from '../core/index.js';
 
 const min = (x: number | null) => (x === null ? '—' : `${(x / 60).toFixed(1)}m`);
 const sec = (x: number | null) => (x === null ? '—' : `${x.toFixed(0)}s`);
 
-function play(t: Tuning, bot: keyof typeof BOTS) {
+function play(t: Tuning, bot: keyof typeof BOTS | 'memo') {
   const stages: Record<string, number> = {};
   let autoBuys = 0, manualLevels = 0;
   const req = { offered: 0, granted: 0 };
@@ -20,7 +20,7 @@ function play(t: Tuning, bot: keyof typeof BOTS) {
     if (e.type === 'requisitionOpened') req.offered++;
     if (e.type === 'requisitionClosed' && e.outcome === 'granted') req.granted++;
   };
-  const r: FiniteRun = playFinite(t, BOTS[bot], 1, 3600, sink);
+  const r: FiniteRun = playFinite(t, bot === 'memo' ? MEMO_READER : BOTS[bot], 1, 3600, sink);
   const until = r.log.declaredTick ?? Infinity;
   const firstStage = (n: number) => { const v = Object.entries(stages).filter(([k]) => k.endsWith(`:stage:${n}`)).map(([, v]) => v); return v.length ? Math.min(...v) : null; };
   return {
@@ -31,13 +31,13 @@ function play(t: Tuning, bot: keyof typeof BOTS) {
   };
 }
 
-function row(label: string, t: Tuning, bot: keyof typeof BOTS) {
+function row(label: string, t: Tuning, bot: keyof typeof BOTS | 'memo') {
   const x = play(t, bot);
   console.log(`${label.padEnd(44)} declare ${min(x.declare).padStart(6)} stage4 ${min(x.s4).padStart(6)} | gap ${sec(x.gap).padStart(5)} (counting all decisions ${sec(x.gapAct).padStart(5)}) | reviews ${String(x.reviews).padStart(3)} (${x.bigReviews} moved ≥5%) | requisitions ${x.req.granted}/${x.req.offered} paid | levels auto ${x.autoBuys} / hand ${x.manualLevels}`);
 }
 
 const variant = (b: Partial<BudgetDef>): Tuning => ({ ...TB, budget: { ...TB.budget!, ...b } });
-const bot = (process.argv[2] ?? 'casual') as keyof typeof BOTS;
+const bot = (process.argv[2] ?? 'casual') as keyof typeof BOTS | 'memo';
 const mode = process.argv[3] ?? 'grid';
 console.log(`# ${bot} bot, ${mode}\n`);
 row('today (free shares)', T, bot);
@@ -49,4 +49,20 @@ if (mode === 'requisitions') {
   const rq = TB.budget!.requisitions!;
   row('no requisitions', variant({ requisitions: null }), bot);
   for (const f of [1, 0.8, 0.6]) for (const l of [3, 5, 10]) row(`requisitions ${l} levels at ${f}×`, variant({ requisitions: { ...rq, levels: l, priceFactor: f } }), bot);
+}
+if (mode === 'projects') {
+  const base = TB.budget!;
+  row('no projects', variant({ projects: [] }), bot);
+  for (const f of (process.argv[4] ?? "1,0.5,0.25").split(",").map(Number)) row(`project prices ×${f}`, variant({ projects: base.projects.map((p) => ({ ...p, price: p.price * f })) }), bot);
+}
+if (mode === 'cadence') {
+  const base = TB.budget!;
+  for (const [open, cool] of [[45, 10], [60, 10]] as const)
+    for (const f of [0.4, 0.5]) row(`open ${open}s cool ${cool}s prices ×${f}`, variant({ requisitions: { ...base.requisitions!, openSeconds: open, cooldownSeconds: cool }, projects: base.projects.map((p) => ({ ...p, price: p.price * f })) }), bot);
+}
+if (mode === 'comp') {
+  for (const k of [1, 1.25, 1.5, 2]) {
+    const depts = Object.fromEntries(Object.entries(TB.depts).map(([d, v]) => [d, { ...v, stageCosts: v.stageCosts.map((c) => c * k) }])) as Tuning['depts'];
+    row(`stage costs ×${k}`, { ...TB, depts }, bot);
+  }
 }

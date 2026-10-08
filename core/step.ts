@@ -16,8 +16,9 @@ import {
   secondsToTicks,
 } from './model.js';
 import type { GameState } from './state.js';
-import { activeBudget, autoBuy, headShares, maybeRequisition, bankIncome, maybeEndQuarter, maybeOpenBudget } from './budget.js';
+import { activeBudget, autoBuy, headShares, maybeRequisition, settleAudits, bankIncome, maybeEndQuarter, maybeOpenBudget } from './budget.js';
 import { DEPTS, type Tuning } from './tuning.js';
+import { fadeOffice, offlineBonusSeconds } from './office.js';
 
 /** Advances the game by exactly one tick. The only way time passes in core. */
 export function step(s: GameState, t: Tuning, sink: EventSink): void {
@@ -37,7 +38,8 @@ export function run(s: GameState, t: Tuning, sink: EventSink, ticks: number): vo
  * construction and asserted in tests.
  */
 export function catchUp(s: GameState, t: Tuning, sink: EventSink, elapsedSeconds: number): number {
-  const ticks = Math.floor(Math.max(0, Math.min(elapsedSeconds, t.offlineCapSeconds)) / t.tickSeconds);
+  const cap = t.offlineCapSeconds + offlineBonusSeconds(s, t);
+  const ticks = Math.floor(Math.max(0, Math.min(elapsedSeconds, cap)) / t.tickSeconds);
   run(s, t, sink, ticks);
   return ticks;
 }
@@ -80,6 +82,8 @@ function stepFinite(s: GameState, t: Tuning, sink: EventSink): void {
     b.stats.discardedFinds += N.toNumber(cert.discarded) * dt;
     autoBuy(s, t, b, sink);
     maybeRequisition(s, t, b, sink);
+    fadeOffice(s, t, dt);
+    settleAudits(s, b, sink);
   } else {
     s.bananas = N.add(s.bananas, N.mul(cert.income, dt));
   }

@@ -1,7 +1,7 @@
 // Event interface (PROTOTYPE.md §7). Core emits; game/ and sim/ consume.
 // Fields are plain numbers so events serialize directly to JSON.
 
-import type { CommissionKind, DeptId } from './tuning.js';
+import type { CommissionKind, DeptId, HeadId } from './tuning.js';
 
 export type Objective =
   | { kind: 'bananas' }
@@ -44,6 +44,10 @@ export interface QuarterReport {
   ranOnOldLines: boolean;
   /** Requisitions the heads filed this quarter, and how each closed. */
   requisitions: { offered: number; granted: number; declined: number; expired: number };
+  /** Every request this quarter and how it closed (accepted, declined, expired), for Accounting's slides. */
+  requests: { kind: string; from: HeadId; dept: DeptId | null; price: number; outcome: 'granted' | 'declined' | 'expired' }[];
+  /** Funds the quarter's audits found (paid into the pot). */
+  auditFound: number;
   /** Unspent wallet swept back into the pot at quarter end. */
   swept: number;
 }
@@ -75,8 +79,12 @@ export type GameEvent =
   | { type: 'budgetOpened'; tick: number }
   | { type: 'quarterEnded'; tick: number; report: QuarterReport; pot: number; missedReview: boolean }
   | { type: 'budgetSigned'; tick: number; quarter: number; previous: BudgetLines; next: BudgetLines; pot: number }
-  | { type: 'requisitionOpened'; tick: number; dept: DeptId; levels: number; price: number }
-  | { type: 'requisitionClosed'; tick: number; dept: DeptId; outcome: 'granted' | 'declined' | 'expired'; price: number };
+  | { type: 'requisitionOpened'; tick: number; kind: string; from: HeadId; dept: DeptId | null; levels: number; price: number }
+  | { type: 'requisitionClosed'; tick: number; kind: string; from: HeadId; dept: DeptId | null; outcome: 'granted' | 'declined' | 'expired'; price: number }
+  /** An accepted project took effect (the payoff moment). */
+  | { type: 'projectDone'; tick: number; project: string; from: HeadId }
+  /** An audit came back: funds found go to the pot. */
+  | { type: 'auditFound'; tick: number; amount: number };
 
 export type EventSink = (e: GameEvent) => void;
 

@@ -217,6 +217,7 @@ export function declareInfinity(s: GameState, t: Tuning, sink: EventSink): boole
     },
     pendingReward: null,
   };
+  const hadBudget = !!s.budget;
   closeBudget(s);
   s.phase = 'hotel';
   s.objective = { kind: 'bananas' };
@@ -230,6 +231,9 @@ export function declareInfinity(s: GameState, t: Tuning, sink: EventSink): boole
   if (!first) throw new Error('ceremony market missing from tuning');
   first.status = 'inTransit';
   first.workLeft = t.hotel.busWaitSeconds;
+  // The heads ran funding under the budget; at the ceremony they hand it back as an even split,
+  // where every new run starts (their last finite split would otherwise carry into the hotel).
+  if (hadBudget) s.shares = { recruiting: 1 / 3, construction: 1 / 3, editing: 1 / 3 };
   return true;
 }
 

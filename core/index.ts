@@ -8,3 +8,4 @@ export * from './commissions.js';
 export * from './step.js';
 export * from './actions.js';
 export * from './budget.js';
+export * from './office.js';

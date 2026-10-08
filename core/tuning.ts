@@ -91,6 +91,47 @@ export interface BudgetDef {
   readinessEditingShareCap: number;
   /** Requisitions: the short department's head asks the wallet for levels at a bulk rate. Null turns them off. */
   requisitions: RequisitionDef | null;
+  /**
+   * Projects the support offices (and department heads) request mid-quarter,
+   * through the same one-at-a-time memo as requisitions. Empty: none.
+   */
+  projects: ProjectDef[];
+  /** Morale: 1 normally; events raise it, it fades back to 1, never below. Multiplies typing and department output. */
+  morale: { max: number; fadePerSecond: number };
+}
+
+/** Who files a request. */
+export type HeadId = DeptId | 'facilities' | 'accounting' | 'training';
+
+/** What an accepted project does. Every effect is an upside; declining costs nothing. */
+export type ProjectEffect =
+  /** Morale rises by `add` (capped), then fades. */
+  | { type: 'morale'; add: number }
+  /** A multiplier for a while: all department output, or editors' review speed. */
+  | { type: 'timed'; target: 'output' | 'review'; mult: number; seconds: number }
+  /** A permanent multiplier per time owned (stacks up to `max`). */
+  | { type: 'perm'; target: PermTarget; mult: number }
+  /** Extra time-away allowance per time owned. */
+  | { type: 'offline'; seconds: number }
+  /** The fee comes back as `returnMult` × fee into the pot after `seconds`. */
+  | { type: 'audit'; returnMult: number; seconds: number }
+  /** One level of review research (cheaper review). */
+  | { type: 'reviewResearch' };
+
+export type PermTarget = 'recruiting' | 'review' | 'levelCost' | 'stageCost' | 'moraleFade';
+
+export interface ProjectDef {
+  id: string;
+  from: HeadId;
+  /** Price as a share of a quarter's reference wallet income (income × quarterSeconds × suggestedDiscretionary). */
+  price: number;
+  /** Price multiplier per time already accepted (permanent stacks get dearer). */
+  priceGrowth: number;
+  /** Times it can be accepted; null = repeatable. */
+  max: number | null;
+  /** Offered once this milestone is reached and/or some department reaches this stage. */
+  unlock: { milestone?: string; minStage?: number };
+  effect: ProjectEffect;
 }
 
 export interface RequisitionDef {

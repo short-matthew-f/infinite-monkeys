@@ -5,6 +5,7 @@ import { N, type Num } from './num.js';
 import type { Bottleneck, Meters, Objective } from './events.js';
 import type { CommissionState, GameState, HotelUpgrade } from './state.js';
 import { DEPTS, type DeptId, type Tuning } from './tuning.js';
+import { moraleMult, permMult, timedMult } from './office.js';
 
 // ---------- epics ----------
 
@@ -22,7 +23,9 @@ function epicMult(s: GameState, t: Tuning, pick: (e: Tuning['epics'][number]['ef
   return m;
 }
 
-export const reviewSpeedMult = (s: GameState, t: Tuning) => epicMult(s, t, (e) => (e.type === 'reviewSpeed' ? e.mult : null));
+/** Review speed: epics, plus the offices' review boosts (finite phase only). */
+export const reviewSpeedMult = (s: GameState, t: Tuning) =>
+  epicMult(s, t, (e) => (e.type === 'reviewSpeed' ? e.mult : null)) * timedMult(s, 'review') * permMult(s, t, 'review');
 export const onboardingMult = (s: GameState, t: Tuning) => epicMult(s, t, (e) => (e.type === 'onboardingTime' ? e.mult : null));
 export const marketCostMult = (s: GameState, t: Tuning, market: string) =>
   epicMult(s, t, (e) => (e.type === 'marketReviewCost' && e.market === market ? e.mult : null));
@@ -40,20 +43,21 @@ export function capability(s: GameState, t: Tuning, d: DeptId): Num {
   return N.of(st.level * def.perLevel * (def.stageMult[st.stage - 1] ?? 1) * st.rep);
 }
 
-/** Effective output = capability × funding effect. */
+/** Effective output = capability × funding effect × the offices' boosts (morale, team building, bathrooms). */
 export function deptOutput(s: GameState, t: Tuning, d: DeptId): Num {
-  return N.mul(capability(s, t, d), fundingEffect(t, s.shares[d]));
+  const office = moraleMult(s) * timedMult(s, 'output') * (d === 'recruiting' ? permMult(s, t, 'recruiting') : 1);
+  return N.mul(capability(s, t, d), fundingEffect(t, s.shares[d]) * office);
 }
 
 export function deptLevelCost(s: GameState, t: Tuning, d: DeptId): Num {
   const def = t.depts[d];
-  return N.mul(N.pow(def.levelCostGrowth, s.depts[d].level), def.levelCostBase);
+  return N.mul(N.pow(def.levelCostGrowth, s.depts[d].level), def.levelCostBase * permMult(s, t, 'levelCost'));
 }
 
 export function deptStageCost(s: GameState, t: Tuning, d: DeptId): Num | null {
   const st = s.depts[d].stage;
   if (st >= 4) return null;
-  return N.of(t.depts[d].stageCosts[st - 1] as number);
+  return N.of((t.depts[d].stageCosts[st - 1] as number) * permMult(s, t, 'stageCost'));
 }
 
 export function deskCost(s: GameState, t: Tuning): Num {
@@ -72,7 +76,7 @@ export function hireCooldownSeconds(t: Tuning, zenoLevel: number): number {
 // ---------- finite production ----------
 
 export function keystrokeRate(s: GameState, t: Tuning): Num {
-  return N.mul(s.monkeys, t.typingSpeed * t.typingResearch.mult ** s.typingLevel);
+  return N.mul(s.monkeys, t.typingSpeed * t.typingResearch.mult ** s.typingLevel * moraleMult(s));
 }
 
 /** Review cost of a tier after review research (tier ordering is unaffected: the multiplier is uniform). */

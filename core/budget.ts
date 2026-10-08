@@ -18,7 +18,9 @@ import { N, type Num } from './num.js';
 import type { BudgetLines, EventSink, QuarterReport } from './events.js';
 import { capability, certifyTiers, deptLevelCost, deptOutput, editingPool, finiteBottleneck, hiredEditingCapacity, reviewSpeedMult, secondsToTicks, suggestShares } from './model.js';
 import type { BudgetState, GameState } from './state.js';
-import { DEPTS, type DeptId, type Tuning } from './tuning.js';
+import { DEPTS, type DeptId, type ProjectDef, type Tuning } from './tuning.js';
+import { newOffice, projectAvailable } from './office.js';
+import { nextFloat } from './rng.js';
 import { run } from './step.js';
 import { nullSink } from './events.js';
 
@@ -30,7 +32,7 @@ export function emptyReport(quarter: number): QuarterReport {
   return {
     quarter, seconds: 0, income: 0, hires: 0, manualHires: 0, desksBuilt: 0, desksBought: 0,
     certifiedFinds: 0, discardedFinds: 0, autoLevels: { recruiting: 0, construction: 0, editing: 0 },
-    ranOnOldLines: false, requisitions: { offered: 0, granted: 0, declined: 0, expired: 0 }, walletSpent: 0, swept: 0,
+    ranOnOldLines: false, requisitions: { offered: 0, granted: 0, declined: 0, expired: 0 }, requests: [], auditFound: 0, walletSpent: 0, swept: 0,
   };
 }
 
@@ -129,6 +131,7 @@ export function maybeOpenBudget(s: GameState, t: Tuning, sink: EventSink): void 
     requisition: null,
     lastRequisitionTick: s.tick,
   };
+  s.office = newOffice();
   sink({ type: 'budgetOpened', tick: s.tick });
 }
 
@@ -169,7 +172,7 @@ export function maybeEndQuarter(s: GameState, t: Tuning, b: BudgetState, sink: E
     b.pot = N.zero;
     b.missedReviews++;
   }
-  if (b.requisition) closeRequisition(s, t, b, sink, 'expired');
+  if (b.requisition) closeRequisition(s, b, sink, 'expired');
   b.stats.seconds = (s.tick - b.quarterStartTick) * t.tickSeconds;
   b.stats.ranOnOldLines = missedReview;
   const swept = N.mul(s.bananas, t.budget.sweepShare);
@@ -198,17 +201,22 @@ export function signBudget(s: GameState, t: Tuning, sink: EventSink, next: Budge
   return true;
 }
 
-// ---------- requisitions ----------
+// ---------- requisitions and projects ----------
 //
-// Mid-quarter, the head of the short department files a requisition: a
-// block of levels for its department at a bulk rate, paid from the wallet.
-// "Short" uses suggestBudget's rule: Editing while review demand outruns the
-// editing pool, otherwise the lower-capability of Recruiting and
-// Construction. The memo states the need and the price, never advice. It
-// waits a fixed time (or until quarter end) and then expires; nothing waits
-// for the player.
+// Mid-quarter the heads file requests, one at a time, as memos. Two kinds:
+// - 'levels': the short department's head asks for a block of levels at a
+//   bulk rate. Short uses suggestBudget's rule: Editing while review demand
+//   outruns the editing pool, otherwise the lower-capability of Recruiting
+//   and Construction.
+// - projects (t.budget.projects): the support offices' and heads' projects
+//   (pizza parties, audits, managers...), priced as a share of a quarter's
+//   reference wallet income so they stay meaningful as the Bureau grows.
+// The price is quoted when the memo is filed. Accepting pays from the
+// wallet; declining costs nothing. Unanswered memos expire, and nothing
+// waits for the player. Which request comes next is drawn from the gameplay
+// stream, so live play and catch-up agree.
 
-/** The department whose head would file a requisition now. */
+/** The department whose head would file a level requisition now. */
 export function requisitionDept(s: GameState, t: Tuning): DeptId {
   if (finiteBottleneck(s, t) === 'editing') return 'editing';
   return N.lte(capability(s, t, 'recruiting'), capability(s, t, 'construction')) ? 'recruiting' : 'construction';
@@ -222,31 +230,46 @@ export function levelsListPrice(s: GameState, t: Tuning, d: DeptId, levels: numb
   return N.mul(deptLevelCost(s, t, d), (Math.pow(g, levels) - 1) / (g - 1));
 }
 
-/** The open requisition's price right now (the levels' list price at the bulk rate), or null. */
-export function requisitionPrice(s: GameState, t: Tuning): Num | null {
-  const b = activeBudget(s, t);
-  const r = t.budget?.requisitions;
-  if (!b?.requisition || !r) return null;
-  return N.mul(levelsListPrice(s, t, b.requisition.dept, r.levels), r.priceFactor);
+/** A quarter's reference wallet income: what projects are priced against. Independent of the signed lines. */
+export function referenceWalletIncome(s: GameState, t: Tuning): Num {
+  const bd = t.budget;
+  if (!bd) return N.zero;
+  return N.mul(certifyTiers(s, t, editingPool(s, t), s.tierAllocation).income, bd.quarterSeconds * bd.suggestedDiscretionary);
 }
 
-function closeRequisition(s: GameState, t: Tuning, b: BudgetState, sink: EventSink, outcome: 'granted' | 'declined' | 'expired', price?: Num): void {
+export function projectDef(t: Tuning, id: string): ProjectDef | null {
+  return t.budget?.projects.find((p) => p.id === id) ?? null;
+}
+
+/** What a project would cost if filed now. */
+export function projectPrice(s: GameState, t: Tuning, p: ProjectDef): Num {
+  const owned = s.office?.owned[p.id] ?? 0;
+  return N.mul(referenceWalletIncome(s, t), p.price * p.priceGrowth ** owned);
+}
+
+/** The open request's quoted price, or null. */
+export function requisitionPrice(s: GameState, t: Tuning): Num | null {
+  const b = activeBudget(s, t);
+  return b?.requisition ? N.of(b.requisition.price) : null;
+}
+
+function closeRequisition(s: GameState, b: BudgetState, sink: EventSink, outcome: 'granted' | 'declined' | 'expired'): void {
   const q = b.requisition;
   if (!q) return;
-  const r = t.budget?.requisitions;
-  const p = price ?? (r ? N.mul(levelsListPrice(s, t, q.dept, r.levels), r.priceFactor) : N.zero);
   b.requisition = null;
   b.lastRequisitionTick = s.tick;
   b.stats.requisitions[outcome]++;
-  sink({ type: 'requisitionClosed', tick: s.tick, dept: q.dept, outcome, price: N.toNumber(p) });
+  b.stats.requests.push({ kind: q.kind, from: q.from, dept: q.dept, price: q.price, outcome });
+  sink({ type: 'requisitionClosed', tick: s.tick, kind: q.kind, from: q.from, dept: q.dept, outcome, price: q.price });
 }
 
-/** Expires an unanswered requisition, or files a new one once the cooldown has passed. */
+/** Expires an unanswered request, or files the next one once the cooldown has passed. */
 export function maybeRequisition(s: GameState, t: Tuning, b: BudgetState, sink: EventSink): void {
   const r = t.budget?.requisitions;
   if (!r) return;
+  s.office ??= newOffice();
   if (b.requisition) {
-    if (s.tick >= b.requisition.expiresTick) closeRequisition(s, t, b, sink, 'expired');
+    if (s.tick >= b.requisition.expiresTick) closeRequisition(s, b, sink, 'expired');
     return;
   }
   if (s.tick - b.lastRequisitionTick < secondsToTicks(t, r.cooldownSeconds)) return;
@@ -254,34 +277,88 @@ export function maybeRequisition(s: GameState, t: Tuning, b: BudgetState, sink: 
   const quarterEnd = b.quarterStartTick + secondsToTicks(t, t.budget!.quarterSeconds);
   const expiresTick = s.tick + secondsToTicks(t, r.openSeconds);
   if (expiresTick > quarterEnd) return;
+  // What's on offer: a level block from the short department, and every available project.
   const dept = requisitionDept(s, t);
-  if (s.depts[dept].level === 0) return;
-  b.requisition = { dept, openedTick: s.tick, expiresTick };
+  const options: string[] = [];
+  if (s.depts[dept].level > 0) options.push('levels');
+  for (const p of t.budget!.projects) if (projectAvailable(s, p)) options.push(p.id);
+  // Never the same kind twice in a row while there's a choice.
+  const pool = options.length > 1 ? options.filter((k) => k !== b.lastRequisitionKind) : options;
+  if (!pool.length) return;
+  const kind = pool[Math.min(pool.length - 1, Math.floor(nextFloat(s.rng.gameplay) * pool.length))]!;
+  const p = kind === 'levels' ? null : projectDef(t, kind)!;
+  const price = p ? projectPrice(s, t, p) : N.mul(levelsListPrice(s, t, dept, r.levels), r.priceFactor);
+  b.requisition = { kind, from: p ? p.from : dept, dept: p ? null : dept, price: N.toNumber(price), openedTick: s.tick, expiresTick };
+  b.lastRequisitionKind = kind;
   b.stats.requisitions.offered++;
-  sink({ type: 'requisitionOpened', tick: s.tick, dept, levels: r.levels, price: N.toNumber(requisitionPrice(s, t)!) });
+  sink({ type: 'requisitionOpened', tick: s.tick, kind, from: b.requisition.from, dept: b.requisition.dept, levels: p ? 0 : r.levels, price: N.toNumber(price) });
 }
 
-/** Pays the open requisition from the wallet: the department gains its levels at once. */
+/** Accepts the open request, paying its quoted price from the wallet. */
 export function grantRequisition(s: GameState, t: Tuning, sink: EventSink): boolean {
   const b = activeBudget(s, t);
   const r = t.budget?.requisitions;
-  const price = requisitionPrice(s, t);
-  if (!b?.requisition || !r || !price || N.lt(s.bananas, price)) return false;
-  const d = b.requisition.dept;
+  const q = b?.requisition;
+  if (!b || !q || !r) return false;
+  const price = N.of(q.price);
+  if (N.lt(s.bananas, price)) return false;
   const before = finiteBottleneck(s, t);
   s.bananas = N.sub(s.bananas, price);
-  b.stats.walletSpent += N.toNumber(price);
-  s.depts[d].level += r.levels;
-  sink({ type: 'purchase', tick: s.tick, item: `${d}:requisition:${s.depts[d].level}`, cost: N.toNumber(price), currency: 'bananas', bottleneckBefore: before, bottleneckAfter: finiteBottleneck(s, t) });
-  closeRequisition(s, t, b, sink, 'granted', price);
+  b.stats.walletSpent += q.price;
+  if (q.kind === 'levels' && q.dept) {
+    s.depts[q.dept].level += r.levels;
+    sink({ type: 'purchase', tick: s.tick, item: `${q.dept}:requisition:${s.depts[q.dept].level}`, cost: q.price, currency: 'bananas', bottleneckBefore: before, bottleneckAfter: finiteBottleneck(s, t) });
+  } else {
+    const p = projectDef(t, q.kind);
+    if (p) applyProject(s, t, p, q.price);
+    sink({ type: 'purchase', tick: s.tick, item: `project:${q.kind}`, cost: q.price, currency: 'bananas', bottleneckBefore: before, bottleneckAfter: finiteBottleneck(s, t) });
+    sink({ type: 'projectDone', tick: s.tick, project: q.kind, from: q.from });
+  }
+  closeRequisition(s, b, sink, 'granted');
   return true;
 }
 
-/** Turns the open requisition down. The cooldown starts as if it had expired. */
+function applyProject(s: GameState, t: Tuning, p: ProjectDef, price: number): void {
+  const o = (s.office ??= newOffice());
+  o.owned[p.id] = (o.owned[p.id] ?? 0) + 1;
+  const e = p.effect;
+  switch (e.type) {
+    case 'morale':
+      o.morale = Math.min(t.budget!.morale.max, o.morale + e.add);
+      break;
+    case 'timed':
+      o.timed.push({ target: e.target, mult: e.mult, untilTick: s.tick + secondsToTicks(t, e.seconds), project: p.id });
+      break;
+    case 'audit':
+      o.audits.push({ amount: price * e.returnMult, dueTick: s.tick + secondsToTicks(t, e.seconds) });
+      break;
+    case 'reviewResearch':
+      s.reviewLevel++;
+      break;
+    case 'perm':
+    case 'offline':
+      break; // owned count is the effect
+  }
+}
+
+/** Audits that are due pay their findings into the pot. */
+export function settleAudits(s: GameState, b: BudgetState, sink: EventSink): void {
+  const o = s.office;
+  if (!o || !o.audits.length || !o.audits.some((a) => a.dueTick <= s.tick)) return;
+  for (const a of o.audits) {
+    if (a.dueTick > s.tick) continue;
+    b.pot = N.add(b.pot, N.of(a.amount));
+    b.stats.auditFound += a.amount;
+    sink({ type: 'auditFound', tick: s.tick, amount: a.amount });
+  }
+  o.audits = o.audits.filter((a) => a.dueTick > s.tick);
+}
+
+/** Turns the open request down. The cooldown starts as if it had expired. */
 export function declineRequisition(s: GameState, t: Tuning, sink: EventSink): boolean {
   const b = activeBudget(s, t);
   if (!b?.requisition) return false;
-  closeRequisition(s, t, b, sink, 'declined');
+  closeRequisition(s, b, sink, 'declined');
   return true;
 }
 
@@ -328,6 +405,9 @@ export function closeBudget(s: GameState): void {
   if (!b) return;
   let total = b.pot;
   for (const d of DEPTS) total = N.add(total, b.accounts[d]);
+  // Audits still under way report at the ceremony.
+  for (const a of s.office?.audits ?? []) total = N.add(total, N.of(a.amount));
+  if (s.office) s.office.audits = [];
   s.bananas = N.add(s.bananas, total);
   s.budget = null;
 }

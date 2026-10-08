@@ -104,6 +104,24 @@ export const classicTuning: Tuning = {
 // The shipped tuning: the classic economy plus the quarterly budget (DESIGN.md §13).
 export const prototypeTuning: Tuning = {
   ...classicTuning,
+  // Stages cost 25% more than classic: the heads' projects (morale, managers, audits...)
+  // speed the climb, and this keeps the casual game inside 25-35 minutes (sim, Oct 8 2026).
+  depts: Object.fromEntries(Object.entries(classicTuning.depts).map(([d, v]) => [d, { ...v, stageCosts: v.stageCosts.map((c) => c * 1.25) }])) as Tuning['depts'],
   budget: { quarterSeconds: 180, suggestedDiscretionary: 0.7, minDiscretionary: 0.1, sweepShare: 1, editingShareCap: 0.35, readinessEditingShareCap: 0.8,
-    requisitions: { levels: 3, priceFactor: 0.8, openSeconds: 45, cooldownSeconds: 40 } },
+    requisitions: { levels: 3, priceFactor: 0.8, openSeconds: 60, cooldownSeconds: 10 },
+    morale: { max: 1.6, fadePerSecond: 0.002 },
+    // Projects the heads request mid-quarter. Price: share of a quarter's reference wallet income.
+    projects: [
+      { id: 'pizzaParty', from: 'facilities', price: 0.075, priceGrowth: 1, max: null, unlock: { milestone: 'building' }, effect: { type: 'morale', add: 0.3 } },
+      { id: 'teamBuilding', from: 'facilities', price: 0.175, priceGrowth: 1, max: null, unlock: { minStage: 2 }, effect: { type: 'timed', target: 'output', mult: 1.5, seconds: 180 } },
+      { id: 'escapeRoom', from: 'facilities', price: 0.15, priceGrowth: 1, max: null, unlock: { minStage: 2 }, effect: { type: 'timed', target: 'review', mult: 1.4, seconds: 180 } },
+      { id: 'bathrooms', from: 'construction', price: 0.2, priceGrowth: 1.6, max: 3, unlock: { milestone: 'building' }, effect: { type: 'perm', target: 'recruiting', mult: 1.25 } },
+      { id: 'breakRoom', from: 'construction', price: 0.1, priceGrowth: 1, max: 1, unlock: { milestone: 'building' }, effect: { type: 'offline', seconds: 2 * 3600 } },
+      { id: 'snackMachine', from: 'construction', price: 0.125, priceGrowth: 1, max: 1, unlock: { milestone: 'building' }, effect: { type: 'perm', target: 'moraleFade', mult: 0.5 } },
+      { id: 'audit', from: 'accounting', price: 0.2, priceGrowth: 1, max: null, unlock: { minStage: 2 }, effect: { type: 'audit', returnMult: 1.5, seconds: 60 } },
+      { id: 'efficiencyFinding', from: 'accounting', price: 0.25, priceGrowth: 1.6, max: 5, unlock: { minStage: 2 }, effect: { type: 'perm', target: 'levelCost', mult: 0.9 } },
+      { id: 'managers', from: 'training', price: 0.25, priceGrowth: 1.6, max: 3, unlock: { milestone: 'building' }, effect: { type: 'perm', target: 'stageCost', mult: 0.75 } },
+      { id: 'communicationClass', from: 'training', price: 0.2, priceGrowth: 1.6, max: 3, unlock: { minStage: 2 }, effect: { type: 'perm', target: 'review', mult: 1.15 } },
+      { id: 'speedReading', from: 'training', price: 0.2, priceGrowth: 1.6, max: 3, unlock: { minStage: 2 }, effect: { type: 'reviewResearch' } },
+    ] },
 };

@@ -1,7 +1,7 @@
 // Typed boundary for tower-art.js: the Bureau as a building of floors.
 import type { FloorProps } from './floor-art.js';
 
-export type FloorId = 'personnel' | 'pool' | 'departments' | 'research' | 'director';
+export type FloorId = 'personnel' | 'pool' | 'departments' | 'admin' | 'research' | 'director';
 export type DeptId = 'recruiting' | 'construction' | 'editing';
 
 export interface TowerFloor {
@@ -34,3 +34,5 @@ export function floorHint(id: string, props: FloorProps): string;
 export function floorTag(id: string, props: FloorProps): string;
 /** "Level 2, stage 1 of 4" for a Departments wing. */
 export function deptHint(id: DeptId, props: FloorProps): string;
+/** One line of status for an Administration wing (facilities | accounting | training). */
+export function officeHint(id: 'facilities' | 'accounting' | 'training', props: FloorProps): string;

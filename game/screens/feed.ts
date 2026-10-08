@@ -2,6 +2,7 @@
 // Lines come from core events and from ambient flavor on a game-time schedule.
 // Choosing flavor draws from state.rng.presentation only (HANDOFF rule 5).
 import { DEPTS, nextFloat, type DeptId, type GameEvent } from '../../core/index.js';
+import { HEAD_NAMES, factFor, projectTitle } from '../world/projects.js';
 import type { Ctx, Screen } from '../ctx.js';
 import { h, text } from '../ui/dom.js';
 import * as f from '../ui/format.js';
@@ -144,13 +145,23 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
         break;
       }
       case 'requisitionOpened':
-        push(e.tick, `${DEPT_NAMES[e.dept]} has filed a requisition: ${plural(e.levels, 'level', 'levels')} for ${f.bananaText(e.price)}.`);
+        if (e.kind === 'levels' && e.dept) push(e.tick, `Head of ${DEPT_NAMES[e.dept]} has filed a requisition: ${plural(e.levels, 'level', 'levels')} for ${f.bananaText(e.price)}.`);
+        else push(e.tick, `The ${HEAD_NAMES[e.from]} has filed a request: ${projectTitle(e.kind)}, ${f.bananaText(e.price)}. ${factFor(t, e.kind)}.`);
         break;
       case 'requisitionClosed': {
         const word = e.outcome === 'granted' ? 'granted' : e.outcome === 'declined' ? 'declined' : 'expired unanswered';
-        push(e.tick, `${DEPT_NAMES[e.dept]} requisition ${word}.`);
+        if (e.kind === 'levels' && e.dept) push(e.tick, `Head of ${DEPT_NAMES[e.dept]} requisition ${word}.`);
+        else push(e.tick, `${projectTitle(e.kind)} (${HEAD_NAMES[e.from]}): ${e.outcome === 'granted' ? 'accepted' : word}.`);
         break;
       }
+      case 'projectDone': {
+        const owned = ctx.state().office?.owned[e.project] ?? 0;
+        push(e.tick, `${projectTitle(e.project)} is done. ${factFor(t, e.project, { n: owned })}.`);
+        break;
+      }
+      case 'auditFound':
+        push(e.tick, `The audit is back: ${f.bananaText(e.amount)} found, and they go to the pot.`, false, true);
+        break;
       default:
         break;
     }

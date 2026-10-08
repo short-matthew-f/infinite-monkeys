@@ -13,6 +13,9 @@ import { office } from './screens/office.js';
 import { pool } from './screens/pool.js';
 import { readiness } from './screens/readiness.js';
 import { research } from './screens/research.js';
+import { accounting, facilities, training } from './screens/admin.js';
+import { Payoffs } from './world/payoff.js';
+import { OFFICE_IDS } from './world/projects.js';
 import { text } from './ui/dom.js';
 import * as f from './ui/format.js';
 import { cueCandidates } from './world/advisor.js';
@@ -20,8 +23,8 @@ import { CueView } from './world/cue.js';
 import { Ernest } from './world/ernest.js';
 import { progress } from './world/progress.js';
 import { RoomView, type Room } from './world/room.js';
-import { Tower, floorProps, type BudgetView } from './world/tower.js';
-import { floorHint } from './world/tower-art.js';
+import { Tower, directorFloor, floorProps, type BudgetView } from './world/tower.js';
+import { floorHint, officeHint } from './world/tower-art.js';
 
 // The place is the interface: each floor of the building opens its room, full screen.
 const ROOMS: Room[] = [
@@ -29,8 +32,14 @@ const ROOMS: Room[] = [
   { id: 'pool', name: 'Typing Pool', form: 'Form 7-T', disc: 2, screen: pool },
   { id: 'departments', name: 'Departments', form: 'Form 5-D', disc: 3, screen: departments },
   { id: 'research', name: 'Records Library', form: 'Form 4-R', disc: 4, screen: research },
-  { id: 'director', name: "Director's Office", form: 'Form 9-R', disc: 5, screen: readiness },
+  // The Administration floor appears with the budget; its three offices are all on floor 5.
+  { id: 'facilities', name: 'Facilities Office', form: 'Form 2-F', disc: 5, screen: facilities },
+  { id: 'accounting', name: 'Accounting Office', form: 'Form 1-A', disc: 5, screen: accounting },
+  { id: 'training', name: 'Training Office', form: 'Form 6-T', disc: 5, screen: training },
+  // The Director's Office moves up a floor when the Administration floor is built beneath it.
+  { id: 'director', name: "Director's Office", form: 'Form 9-R', get disc() { return directorFloor(!!state.office); }, screen: readiness },
 ];
+const isOffice = (id: string): boolean => (OFFICE_IDS as readonly string[]).includes(id);
 
 const t = prototypeTuning;
 
@@ -152,6 +161,10 @@ rooms.register(ROOMS);
 const ceremony = new Ceremony(stage, ctx);
 ceremony.onClose = () => (dirty = true);
 const memo = new MemoView(stage, ctx);
+const payoffs = new Payoffs(stage, ctx, {
+  room: () => (rooms.current ? { id: rooms.current.id, el: rooms.el } : null),
+  busy: () => ceremony.isOpen,
+});
 const cooler = new Cooler(stage, ctx);
 addEventListener('pointerdown', () => cooler.poke(), { capture: true });
 addEventListener('keydown', () => cooler.poke(), { capture: true });
@@ -179,6 +192,8 @@ rooms.onClose = (room) => {
 };
 
 tower.onOpen = (id, _from, dept) => {
+  // An Administration wing opens that office's room.
+  if (id === 'admin') return openRoom(dept ?? 'facilities', dept);
   // A wing opens its own department's view; the cued department's view is used otherwise.
   if (id === 'departments') dispatchEvent(new CustomEvent('im:dept-view', { detail: dept ?? (cues.cue?.room === 'departments' ? cues.cue.view : undefined) ?? 'summary' }));
   openRoom(id, dept);
@@ -209,11 +224,22 @@ function closeDir(): void {
   dirbtn.setAttribute('aria-expanded', 'false');
   $('reset-confirm').hidden = true;
 }
-const roomHint = (id: string): string => floorHint(id, floorProps(state, t));
-$('dirlist').innerHTML = ROOMS.map((r) => `<li><button data-room="${r.id}" aria-current="false"><span class="disc" aria-hidden="true">${r.disc}</span><span class="nm">${r.name}<span class="hn"></span></span></button></li>`).join('');
+const roomHint = (id: string): string => (isOffice(id) ? officeHint(id as (typeof OFFICE_IDS)[number], floorProps(state, t)) : floorHint(id, floorProps(state, t)));
+/** The Directory lists the Administration offices only once the budget has opened. */
+let dirAdmin: boolean | null = null;
+function buildDir(): void {
+  const admin = !!state.office;
+  if (admin === dirAdmin) return;
+  dirAdmin = admin;
+  $('dirlist').innerHTML = ROOMS.filter((r) => admin || !isOffice(r.id)).map((r) => `<li><button data-room="${r.id}" aria-current="false"><span class="disc" aria-hidden="true">${r.disc}</span><span class="nm">${r.name}<span class="hn"></span></span></button></li>`).join('');
+  $('dir-range').textContent = `The Bureau · Floors 1–${admin ? 6 : 5}`;
+  $('dir-more').textContent = String(admin ? 7 : 6);
+  markDirectory(rooms.current?.id ?? null);
+}
 function markDirectory(id: string | null): void {
   for (const b of dir.querySelectorAll<HTMLElement>('[data-room]')) b.setAttribute('aria-current', String(b.dataset.room === id));
 }
+buildDir();
 dirbtn.addEventListener('click', () => {
   const opening = dir.hidden;
   dir.hidden = !opening;
@@ -332,7 +358,9 @@ startLoop(() => state, t, sink, () => {
   rooms.render();
   if (ceremony.isOpen) ceremony.render();
   memo.render();
-  cooler.suppressed = !!rooms.current || ceremony.isOpen;
+  buildDir();
+  payoffs.render();
+  cooler.suppressed = !!rooms.current || ceremony.isOpen || payoffs.active;
   cooler.render();
   ernest.update(rooms.current?.id ?? null);
   updateCue();

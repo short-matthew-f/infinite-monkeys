@@ -19,6 +19,7 @@
 /* a soft shade under the ceiling, drawn once in CSS */
 .flr::before { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none; box-shadow: inset 0 12px 10px -10px color-mix(in srgb, var(--screen) 55%, transparent); }
 .flr-personnel { flex-grow: 1.5; }
+.flr[hidden] { display: none; }
 .flr-art { position: absolute; inset: 0; width: 100%; height: 100%; display: block; overflow: visible; }
 
 /* art: wall, wainscot, floor strip, ceiling */
@@ -31,8 +32,9 @@
 .tw-road { fill: color-mix(in srgb, var(--concrete) 62%, var(--screen)); }
 .tw-rug { fill: color-mix(in srgb, var(--alert) 30%, var(--pad)); stroke: var(--edge); stroke-width: 1.2; }
 .tw-roof { fill: color-mix(in srgb, var(--concrete) 60%, var(--screen)); }
-.tw-pe { --tint: var(--mustard); } .tw-pl { --tint: var(--olive); } .tw-dp { --tint: var(--concrete); } .tw-lb { --tint: var(--phosphor-green); } .tw-dr { --tint: var(--walnut); }
+.tw-ad { --tint: var(--mustard); } .tw-pe { --tint: var(--mustard); } .tw-pl { --tint: var(--olive); } .tw-dp { --tint: var(--concrete); } .tw-lb { --tint: var(--phosphor-green); } .tw-dr { --tint: var(--walnut); }
 .tw-wing { fill: color-mix(in srgb, var(--tint, var(--concrete)) 12%, var(--pad)); }
+.tw-wing.w-f { --tint: var(--tangerine); } .tw-wing.w-a { --tint: var(--olive); } .tw-wing.w-t { --tint: var(--alert); }
 .tw-wing.w-r { --tint: var(--tangerine); } .tw-wing.w-c { --tint: var(--mustard); } .tw-wing.w-e { --tint: var(--olive); }
 .mbar { transform-box: fill-box; transform-origin: 50% 100%; }
 .walker .wb { animation: wbob .28s steps(2, jump-none) infinite; }
@@ -85,7 +87,7 @@
 .hit, .wing { position: absolute; z-index: 4; background: transparent; border: 0; padding: 0; margin: 0; cursor: pointer; }
 .hit { inset: 0; }
 .wing { top: 0; bottom: 0; width: 33.34%; }
-.wing-recruiting { left: 0; } .wing-construction { left: 33.33%; } .wing-editing { left: 66.66%; }
+.wing-recruiting, .wing-facilities { left: 0; } .wing-construction, .wing-accounting { left: 33.33%; } .wing-editing, .wing-training { left: 66.66%; }
 .hit:focus-visible, .wing:focus-visible { outline: 3px solid var(--focus); outline-offset: -6px; box-shadow: inset 0 0 0 9px var(--paper); }
 .hit:active, .wing:active { background: color-mix(in srgb, var(--glow) 30%, transparent); }
 @media (hover: hover) { .hit:hover, .wing:hover { background: color-mix(in srgb, var(--glow) 18%, transparent); } }

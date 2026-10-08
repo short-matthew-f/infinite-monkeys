@@ -6,9 +6,10 @@
 // The markup is built once. Each floor's art is replaced only when its picture
 // changes; small live numbers are patched in place. Every number comes from
 // core (floorProps) and is never computed here.
-import { DEPTS, N, finiteBottleneck, meters, type GameState, type Tuning } from '../../core/index.js';
+import { DEPTS, N, finiteBottleneck, meters, moraleMult, type GameState, type Tuning } from '../../core/index.js';
 import type { FloorProps } from './floor-art.js';
-import { FLOOR_BOX, FLOOR_NAMES, buildTower, deptHint, floorHint, patchLive, roofSVG, towerKey, type FloorId } from './tower-art.js';
+import { FLOOR_BOX, FLOOR_NAMES, buildTower, deptHint, floorHint, officeHint, patchLive, roofSVG, towerKey, type FloorId } from './tower-art.js';
+import { OFFICE_IDS, OFFICE_SHORT } from './projects.js';
 import type { Cue } from './advisor.js';
 import './tower.css';
 
@@ -17,8 +18,11 @@ const WALK_SPEED = 80; // art units per second
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const DEPT_NAMES = { recruiting: 'Recruiting', construction: 'Construction', editing: 'Editing' } as const;
 /** Top to bottom, as the building stands. */
-const ORDER: FloorId[] = ['director', 'research', 'departments', 'pool', 'personnel'];
-const DISC: Record<FloorId, number> = { personnel: 1, pool: 2, departments: 3, research: 4, director: 5 };
+const ORDER: FloorId[] = ['director', 'admin', 'research', 'departments', 'pool', 'personnel'];
+/** Floor numbers. The Administration floor sits at 5 once it exists, which moves the Director's Office to 6. */
+const DISC: Record<FloorId, number> = { personnel: 1, pool: 2, departments: 3, research: 4, admin: 5, director: 5 };
+/** The Director's floor number, with or without the Administration floor under it. */
+export const directorFloor = (admin: boolean): number => (admin ? 6 : 5);
 
 /** Art props from game state. Every value is read from state or core; nothing is computed here. */
 export function floorProps(s: GameState, t: Tuning): FloorProps {
@@ -42,6 +46,22 @@ export function floorProps(s: GameState, t: Tuning): FloorProps {
     tutorial: seated <= 1,
     meters: meters(s, t),
     bottleneck: s.phase === 'finite' ? finiteBottleneck(s, t) : null,
+    office: s.office ? officeProps(s, t) : undefined,
+  };
+}
+
+/** The support offices on the building: morale from core's moraleMult, amenities from the owned counts. */
+function officeProps(s: GameState, t: Tuning): NonNullable<FloorProps['office']> {
+  const o = s.office!;
+  const morale = moraleMult(s);
+  const max = t.budget?.morale.max ?? 1;
+  return {
+    on: true,
+    morale,
+    // The needle's place on the dial: a ratio for drawing only.
+    moraleFrac: max > 1 ? Math.max(0, Math.min(1, (morale - 1) / (max - 1))) : 0,
+    built: { bathrooms: (o.owned.bathrooms ?? 0) > 0, breakRoom: (o.owned.breakRoom ?? 0) > 0, snackMachine: (o.owned.snackMachine ?? 0) > 0 },
+    audit: o.audits.length > 0,
   };
 }
 
@@ -141,6 +161,18 @@ export class Tower {
         f.append(w);
       }
       this.pileNote = f.querySelector('.wnote') as HTMLElement;
+    } else if (id === 'admin') {
+      // Administration: three wings, each with its head. A wing opens that office's room.
+      f.hidden = true;
+      for (const o of OFFICE_IDS) {
+        const w = el('button', `wing wing-${o}`, `<span class="wlab"><span data-live="adm-${o}">${OFFICE_SHORT[o]}</span></span>`);
+        w.type = 'button';
+        w.dataset.room = 'admin';
+        w.dataset.dept = o;
+        w.setAttribute('aria-label', `${OFFICE_SHORT[o]} office`);
+        this.hits.set(`admin:${o}`, w);
+        f.append(w);
+      }
     } else {
       const b = el('button', 'hit');
       b.type = 'button';
@@ -185,9 +217,19 @@ export class Tower {
       }
     }
     patchLive(this.host, p);
+    this.setAdmin(!!p.office?.on);
     this.labels(p);
     this.setBottleneck(p.bottleneck);
     return rebuilt;
+  }
+
+  /** The Administration floor shows once the budget has opened; the Director's Office moves up a floor. */
+  private setAdmin(on: boolean): void {
+    const f = this.floors.get('admin');
+    if (!f || f.hidden === !on) return;
+    f.hidden = !on;
+    const disc = this.floors.get('director')?.querySelector('.disc');
+    if (disc) disc.textContent = String(directorFloor(on));
   }
 
   /** The quarterly budget on the building. Null (classic, or before the budget opens) shows nothing new. */
@@ -242,6 +284,7 @@ export class Tower {
       if (b && b.getAttribute('aria-label') !== v) b.setAttribute('aria-label', v);
     };
     for (const id of ['personnel', 'pool', 'research', 'director'] as const) set(this.hits.get(id), `${FLOOR_NAMES[id]}: ${floorHint(id, p)}`);
+    for (const o of OFFICE_IDS) set(this.hits.get(`admin:${o}`), `${OFFICE_SHORT[o]} office: ${officeHint(o, p)}`);
     for (const d of DEPTS) {
       const pile = p.bottleneck === 'editing' && d === 'editing' ? '. Pages are piling up' : '';
       set(this.hits.get(`departments:${d}`), `${DEPT_NAMES[d]}: ${deptHint(d, p)}${pile}${this.acctNote[d] ?? ''}`);
@@ -279,7 +322,8 @@ export class Tower {
 
   /** The button to give focus back to when a room closes. */
   focusFloor(id: string, dept?: string): void {
-    const b = (id === 'departments' ? this.hits.get(`departments:${dept ?? 'recruiting'}`) ?? this.hits.get('departments:recruiting') : this.hits.get(id)) as HTMLElement | undefined;
+    const office = (OFFICE_IDS as readonly string[]).includes(id) ? this.hits.get(`admin:${id}`) : undefined;
+    const b = (office ?? (id === 'departments' ? this.hits.get(`departments:${dept ?? 'recruiting'}`) ?? this.hits.get('departments:recruiting') : this.hits.get(id))) as HTMLElement | undefined;
     b?.focus({ preventScroll: true });
   }
 

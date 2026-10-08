@@ -12,10 +12,11 @@
 //   forecast       <- previewQuarter(); it runs a whole quarter on a clone, so it is debounced
 //   signing        <- signBudget() through ctx.act
 // Slides state facts only. They never say what to buy or which lines to sign.
-import { DEPTS, N, certifyTiers, editingPool, previewQuarter, quarterSecondsLeft, signBudget, suggestBudget, validLines, type BudgetLines, type DeptId, type GameEvent, type QuarterReport, type Tuning, type GameState, type QuarterPreview } from '../../core/index.js';
+import { DEPTS, N, certifyTiers, editingPool, previewQuarter, projectDef, quarterSecondsLeft, signBudget, suggestBudget, validLines, type BudgetLines, type DeptId, type GameEvent, type QuarterReport, type Tuning, type GameState, type QuarterPreview } from '../../core/index.js';
 import type { Ctx } from '../ctx.js';
 import { attr, text } from '../ui/dom.js';
-import { count, rate } from '../ui/format.js';
+import { bananas, count, rate } from '../ui/format.js';
+import { DEPT_LABEL, projectFact, projectTitle } from './projects.js';
 import { CLIP, SIGNATURE, arrivalSVG, barChart, creamPie, lineChart, potBandSVG, stripSVG } from './ceremony-art.js';
 import './ceremony.css';
 
@@ -33,6 +34,8 @@ interface Slide {
   stamp?: Stamp;
   /** The head hurries past this one. */
   fast?: boolean;
+  /** Reading time for a slide of lists (ms), instead of the usual. */
+  dwell?: number;
 }
 interface Head {
   who: string;
@@ -55,7 +58,7 @@ interface Snapshot {
 const LINES: readonly LineId[] = [...DEPTS, 'discretionary'];
 const NAMES: Record<LineId, string> = { recruiting: 'Recruiting', construction: 'Construction', editing: 'Editing', discretionary: 'Discretionary' };
 const BLURB: Record<LineId, string> = { recruiting: 'hires monkeys', construction: 'builds desks', editing: 'reads the finds', discretionary: 'your wallet' };
-const HEAD_NAMES = ['Head Recruiter', 'Foreman', 'Chief Editor'];
+const HEAD_NAMES = ['Head Recruiter', 'Foreman', 'Chief Editor', 'Chief Accountant'];
 
 /** How long a slide stays up (ms). Reading time carries meaning, so reduced motion lengthens it. */
 const DWELL = { normal: 3200, stamp: 3600, fast: 1300 };
@@ -148,7 +151,7 @@ const samePct = (a: BudgetLines, b: BudgetLines) => {
 // ---------- the presentations ----------
 
 /** Builds the three heads' slides from the quarter's report. Facts only. */
-function buildHeads(r: QuarterReport): Head[] {
+function buildHeads(r: QuarterReport, t: Tuning): Head[] {
   const q = `Q${r.quarter}`;
   const reqs = r.requisitions;
   const title = (clip: string, name: string, sub: string) => `<div class="sl title"><div class="clip">${clip}</div><b>${esc(name)}</b><span>${esc(sub)}</span></div>`;
@@ -178,7 +181,69 @@ function buildHeads(r: QuarterReport): Head[] {
     { t: 'spin', say: total > 0 ? '“Here is our quarter as a pie. It is a banana cream pie.”' : '“Nothing came in to read. The pie is untouched.”', html: `<div class="sl"><b>Finds: certified vs discarded</b>${creamPie(dFrac, [`CERTIFIED ${count(r.certifiedFinds)} · ${pctOf(r.certifiedFinds)}`, `DISCARDED ${count(r.discardedFinds)} · ${pctOf(r.discardedFinds)}`])}</div>` },
     { t: 'wipe', say: `“${count(r.discardedFinds)} ${plural(r.discardedFinds, 'find was', 'finds were')} discarded. Our account bought ${levels(r.autoLevels.editing)}.”`, html: `<div class="sl take"><span class="big">${count(r.discardedFinds)} discarded</span><p>${count(r.certifiedFinds)} certified. ${levelLine('editing')}</p></div>`, stamp: r.discardedFinds > 0 ? ['bad', 'Finds discarded'] : ['ok', 'None discarded'] },
   ] };
-  return [recruiting, construction, editing];
+  const heads = [recruiting, construction, editing];
+  if (hasAccountantDeck(r)) heads.push(accountantDeck(r, t));
+  return heads;
+}
+
+// ---------- the Chief Accountant's deck: what the quarter's requests cost, what they did, what went unanswered ----------
+
+/** The deck is for quarters with requests to account for (or an audit that came back). */
+export const hasAccountantDeck = (r: QuarterReport | null): boolean => !!r && (r.requests.length > 0 || r.auditFound > 0);
+
+type Req = QuarterReport['requests'][number];
+const SLIDE_ROWS = 3;
+
+/** What a request is called and what it offered, from its project definition (or the level block). */
+function describeRequest(t: Tuning, q: Req): { title: string; fact: string } {
+  if (q.kind === 'levels' && q.dept) {
+    const n = t.budget?.requisitions?.levels ?? 0;
+    return { title: `${n} levels of ${DEPT_LABEL[q.dept]}`, fact: `${DEPT_LABEL[q.dept]} +${n} levels at a bulk price` };
+  }
+  const p = projectDef(t, q.kind);
+  return { title: projectTitle(q.kind), fact: p ? projectFact(t, p) : '' };
+}
+
+function accountantDeck(r: QuarterReport, t: Tuning): Head {
+  const q = `Q${r.quarter}`;
+  const yes = r.requests.filter((x) => x.outcome === 'granted');
+  const missed = r.requests.filter((x) => x.outcome !== 'granted');
+  const spent = yes.reduce((a, x) => a + x.price, 0);
+  /** A list slide: at most SLIDE_ROWS rows, then a line for the rest. */
+  const rows = (items: string[], total: number) => {
+    const shown = items.slice(0, SLIDE_ROWS);
+    const rest = total - shown.length;
+    return `<ul>${shown.join('')}${rest > 0 ? `<li class="more"><b>and ${count(rest)} more</b></li>` : ''}</ul>`;
+  };
+  const li = (title: string, right: string, fx = '') => `<li><b>${esc(title)}</b><span class="pr">${esc(right)}</span>${fx ? `<span class="fx">${esc(fx)}</span>` : ''}</li>`;
+
+  const slides: Slide[] = [
+    { t: 'zoom', say: '“I have audited the requests. All of them. Twice.”', html: `<div class="sl title"><div class="clip">${CLIP.ledger}${CLIP.lens}</div><b>${q} Requests &amp; Audit</b><span>presented by the Chief Accountant</span></div>` },
+    {
+      t: 'spin', dwell: 4600,
+      say: yes.length ? `“${count(r.requests.length)} ${plural(r.requests.length, 'request')} came in. We said yes to ${count(yes.length)}. It cost ${bananas(spent)}.”` : `“${count(r.requests.length)} ${plural(r.requests.length, 'request')} came in. We said yes to none. It cost nothing.”`,
+      html: `<div class="sl ledger"><b>Here’s what we spent</b>${yes.length ? rows(yes.map((x) => li(describeRequest(t, x).title, bananas(x.price))), yes.length) : '<p class="none">Nothing accepted.</p>'}<p class="sum"><b>Total</b> <span class="pr">${bananas(spent)}</span></p></div>`,
+    },
+    {
+      t: 'wipe', dwell: 5200,
+      say: r.auditFound > 0 ? `“Here is what it did. The audit found ${bananas(r.auditFound)}.”` : '“Here is what it did. I have the receipts.”',
+      html: `<div class="sl ledger"><b>Here’s what it did</b>${yes.length || r.auditFound > 0 ? rows([...yes.map((x) => { const d = describeRequest(t, x); return li(d.title, '', d.fact); }), ...(r.auditFound > 0 ? [li('Audit', bananas(r.auditFound), 'Funds found, paid into the pot.')] : [])], yes.length + (r.auditFound > 0 ? 1 : 0)) : '<p class="none">Nothing to report.</p>'}</div>`,
+    },
+  ];
+  if (missed.length) {
+    slides.push({
+      t: 'blinds', dwell: 5200,
+      say: '“These were filed and not accepted. I have noted them.”',
+      html: `<div class="sl ledger"><b>A missed opportunity</b>${rows(missed.map((x) => { const d = describeRequest(t, x); return li(d.title, bananas(x.price), `${d.fact}. ${x.outcome === 'declined' ? 'Declined' : 'Expired unanswered'}.`); }), missed.length)}</div>`,
+    });
+  }
+  slides.push({
+    t: 'blinds',
+    say: `“Per the audit, lifetime earnings are minus one twelfth of a banana. Spent on requests: ${bananas(spent)}.”`,
+    html: `<div class="sl take"><span class="big">−1/12 🍌</span><p>lifetime earnings, per the audit · spent on requests ${bananas(spent)}${r.auditFound > 0 ? ` · audits found ${bananas(r.auditFound)}` : ''}</p></div>`,
+    stamp: ['ok', 'Noted'],
+  });
+  return { who: HEAD_NAMES[3]!, h: 3, slides };
 }
 
 // ---------- the ceremony ----------
@@ -326,7 +391,7 @@ export class Ceremony {
       <div class="cer-top"><p class="cer-typed" id="cer-title" data-ref="title"></p><button type="button" class="cer-btn" data-ref="close" aria-label="Close the review without signing"><span>Close</span></button></div>
       <div class="cer-body" data-ref="body">
         <section class="cer-sec" data-pane="arrive" aria-label="Arrival">
-          <div class="cer-stage"><svg viewBox="0 0 360 200" preserveAspectRatio="xMidYMid meet" aria-hidden="true">${arrivalSVG('QUARTERLY REVIEW', true)}</svg></div>
+          <div class="cer-stage"><svg viewBox="0 0 360 200" preserveAspectRatio="xMidYMid meet" aria-hidden="true">${arrivalSVG('QUARTERLY REVIEW', true, hasAccountantDeck(this.snap.report))}</svg></div>
           <div class="cer-pane">
             <p class="cer-say" data-ref="arriveSay"></p>
             <p class="cer-fact" data-ref="arriveMissed" hidden></p>
@@ -493,7 +558,7 @@ export class Ceremony {
 
   private presStart(): void {
     if (!this.snap.report) return this.toBudget();
-    this.heads = buildHeads(this.snap.report);
+    this.heads = buildHeads(this.snap.report, this.ctx.t);
     this.pi = 0;
     this.si = 0;
     this.paused = false;
@@ -527,7 +592,7 @@ export class Ceremony {
   private schedule(sl: Slide): void {
     clearTimeout(this.presT);
     if (this.paused) return;
-    const base = sl.fast ? DWELL.fast : sl.stamp ? DWELL.stamp : DWELL.normal;
+    const base = sl.dwell ?? (sl.fast ? DWELL.fast : sl.stamp ? DWELL.stamp : DWELL.normal);
     this.presT = window.setTimeout(() => this.presNext(), this.rm.matches ? base * 1.4 : base);
   }
 

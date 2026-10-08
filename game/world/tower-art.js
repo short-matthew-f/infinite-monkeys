@@ -11,13 +11,15 @@
 // status tag, which the page lays over the art.
 /* eslint-disable */
 import { CAST, CANDIDATE, EDITOR, T, f1, hash, pbox, lamp, ficus, snake, seatSVG, stand, deskMark, shelfBooks, volume, drawers } from './floor-art.js';
+import { CA, FM, TO, clipboard, moraleDial, needleAngle, pizzaBox } from './office-art.js';
 
 const W = 400, H = 96, YB = 86;
 const TIER_IDS = ['letters', 'words', 'phrases', 'sentences'];
 const DEPT_IDS = ['recruiting', 'construction', 'editing'];
-export const FLOOR_BOX = { personnel: [W, 134], pool: [W, H], departments: [W, H], research: [W, H], director: [W, H] };
-export const FLOOR_NAMES = { personnel: 'Personnel', pool: 'Typing Pool', departments: 'Departments', research: 'Records Library', director: "Director's Office" };
+export const FLOOR_BOX = { personnel: [W, 134], pool: [W, H], departments: [W, H], admin: [W, H], research: [W, H], director: [W, H] };
+export const FLOOR_NAMES = { personnel: 'Personnel', pool: 'Typing Pool', departments: 'Departments', admin: 'Administration', research: 'Records Library', director: "Director's Office" };
 const DEPT_NAMES = { recruiting: 'Recruiting', construction: 'Construction', editing: 'Editing' };
+const moralePct = (p) => `${Math.round(((p.office && p.office.morale) || 1) * 100)}%`;
 
 const count = (n) => Math.max(0, Math.floor(n)).toLocaleString('en-US');
 
@@ -36,6 +38,9 @@ function norm(p) {
     tiers: TIER_IDS.map(tierState), depts: DEPT_IDS.map(dept),
     editors: e < 1 ? 0 : 1, permit: p.permit ? 1 : 0,
     pile: p.bottleneck === 'editing' ? 1 : 0,
+    // the Administration floor and the amenities the Foreman has built; morale is patched in place, never part of the picture
+    admin: p.office && p.office.on ? 1 : 0,
+    amen: p.office && p.office.on ? [!!p.office.built.bathrooms, !!p.office.built.breakRoom, !!p.office.built.snackMachine].map(Number) : [0, 0, 0],
   };
 }
 export const towerKey = (p) => JSON.stringify(norm(p));
@@ -47,6 +52,7 @@ export function floorHint(id, p) {
     case 'personnel': return free > 0 ? `${count(free)} desk${free === 1 ? '' : 's'} free` : 'Every desk is taken';
     case 'pool': return `${count(seated)} seated${free > 0 ? ` · ${count(free)} free` : ''}`;
     case 'departments': return 'Recruiting, Construction, Editing';
+    case 'admin': return `Facilities, Accounting, Training. Morale ${moralePct(p)}`;
     case 'research': { const d = (p.tiers || []).filter((t) => t.state === 'discovered').length; return `${d} of ${(p.tiers || []).length} tiers discovered`; }
     case 'director': { if (p.permit) return 'Permit stamped'; const m = p.meters || {}; const full = DEPT_IDS.filter((k) => (m[k] || 0) >= 1 - 1e-9).length; return `${full} of 3 meters full`; }
     default: return '';
@@ -59,7 +65,16 @@ export function floorTag(id, p) {
     case 'personnel': return free > 0 ? `${count(free)} desk${free === 1 ? '' : 's'} free` : 'Desks full';
     case 'research': { const d = (p.tiers || []).filter((t) => t.state === 'discovered').length; return `${d} of ${(p.tiers || []).length} tiers`; }
     case 'director': { if (p.permit) return 'Permit stamped'; const m = p.meters || {}; return `${DEPT_IDS.filter((k) => (m[k] || 0) >= 1 - 1e-9).length} of 3 meters`; }
+    case 'admin': return `Morale ${moralePct(p)}`;
     default: return floorHint(id, p);
+  }
+}
+export function officeHint(id, p) {
+  const o = p.office || {};
+  switch (id) {
+    case 'facilities': return `Morale ${moralePct(p)}`;
+    case 'accounting': return o.audit ? 'An audit is under way' : 'Audits and efficiency findings';
+    default: return 'Courses for managers, editors and readers';
   }
 }
 export function deptHint(id, p) {
@@ -69,13 +84,21 @@ export function deptHint(id, p) {
 
 /** Patches the live numbers in place: [data-live] text, [data-bar] meter fills. */
 export function patchLive(root, p) {
+  const o = p.office || {};
+  const mor = moralePct(p);
+  const live = { 'morale-pct': mor, 'adm-facilities': `Morale ${mor}`, 'adm-accounting': o.audit ? 'Audit under way' : 'Accounting', 'adm-training': 'Training' };
   for (const el of root.querySelectorAll('[data-live]')) {
     const k = el.dataset.live;
-    const v = DEPT_IDS.includes(k) ? `${DEPT_NAMES[k]} Lv ${count((p.depts[k] || {}).level || 0)}` : k === 'free-board' ? String(Math.max(0, Math.floor(p.desks) - Math.floor(p.seated))) : floorTag(k, p);
+    const v = k in live ? live[k] : DEPT_IDS.includes(k) ? `${DEPT_NAMES[k]} Lv ${count((p.depts[k] || {}).level || 0)}` : k === 'free-board' ? String(Math.max(0, Math.floor(p.desks) - Math.floor(p.seated))) : floorTag(k, p);
     if (el.textContent !== v) el.textContent = v;
   }
   for (const el of root.querySelectorAll('[data-bar]')) {
     const v = `scaleY(${Math.max(0.03, Math.min(1, (p.meters || {})[el.dataset.bar] || 0)).toFixed(2)})`;
+    if (el.style.transform !== v) el.style.transform = v;
+  }
+  // the morale dial's needle: one rotate
+  for (const el of root.querySelectorAll('[data-needle]')) {
+    const v = `rotate(${needleAngle(o.moraleFrac || 0).toFixed(1)}deg)`;
     if (el.style.transform !== v) el.style.transform = v;
   }
 }
@@ -101,6 +124,8 @@ function personnelFloor(n) {
   s += pbox({ x: 126, yb, w: 34, h: 56, d: 7, c: 'concrete', tabs: false, extra: `<rect x="130" y="${yb - 51}" width="26" height="51" fill="var(--glow)" stroke="var(--edge)" stroke-width="1.2"/><polygon points="130,${yb - 51} 130,${yb} 119,${yb + 4} 119,${yb - 55}" fill="var(--olive)" stroke="var(--edge)" stroke-width="1.1"/><circle cx="122" cy="${yb - 26}" r="1.6" class="brass"/>` });
   s += `<rect class="fr c-mustard" x="124" y="${yb - 70}" width="38" height="9" rx="1.5"/><text class="sg sm" x="143" y="${yb - 62.6}" style="font-size:7.4px;letter-spacing:.1em">LOBBY</text>`;
   s += ficus(182, yb, .55);
+  // More bathrooms: a second door by the lobby, once the Foreman has built it
+  if (n.amen[0]) s += pbox({ x: 70, yb, w: 30, h: 48, d: 6, c: 'concrete', tabs: false, extra: `<rect x="74" y="${yb - 43}" width="22" height="43" fill="var(--screen)" stroke="var(--edge)" stroke-width="1.1"/><path d="M76 ${yb - 41}L92 ${yb - 38}V${yb}H76Z" fill="var(--walnut)" stroke="var(--edge)" stroke-width="1.1"/><circle cx="89" cy="${yb - 22}" r="1.4" class="brass"/><rect x="73" y="${yb - 58}" width="24" height="9" rx="1.5" class="brass"/><text class="sg sm" x="85" y="${yb - 51}" style="font-size:7px">WC</text>` });
   // the clerk's desk and the filing cabinet
   s += seat(41, 236, yb, .74, { over: CLERK });
   s += pbox({ x: 288, yb, w: 28, h: 46, d: 7, c: 'steel', extra: drawers(288, yb - 40, 28, 2, 18, false) });
@@ -125,6 +150,9 @@ function poolFloor(n) {
     else if (i < drawn + vac) s += seat(i, xs[i], YB, k, { vacant: true });
     else s += mark(xs[i], YB, k, i > drawn + vac);
   }
+  // Break room (a nook with a couch) and the snack machine, once built
+  if (n.amen[1]) s += `<rect x="108" y="46" width="34" height="${YB - 46}" fill="color-mix(in srgb, var(--olive) 30%, var(--screen))" opacity=".5" stroke="var(--edge)" stroke-width="1.2" stroke-dasharray="4 3"/><g><rect x="112" y="${YB - 20}" width="26" height="9" rx="4" fill="color-mix(in srgb, var(--alert) 55%, var(--walnut))" stroke="var(--edge)" stroke-width="1.2"/><rect x="109" y="${YB - 14}" width="32" height="12" rx="4" fill="color-mix(in srgb, var(--alert) 65%, var(--walnut))" stroke="var(--edge)" stroke-width="1.2"/></g><rect x="110" y="40" width="30" height="8" rx="1.5" class="brass"/><text class="sg sm" x="125" y="46.2" style="font-size:5.6px">BREAK ROOM</text>`;
+  if (n.amen[2]) s += `<g><rect class="fr c-steel" x="144" y="${YB - 42}" width="14" height="42" rx="1.5"/><rect x="146" y="${YB - 38}" width="10" height="20" fill="var(--screen)"/><path d="M147 ${YB - 32}h8M147 ${YB - 26}h8" stroke="var(--mustard)" stroke-width="2"/><rect x="146" y="${YB - 13}" width="10" height="5" fill="var(--screen)"/></g>`;
   // the pneumatic tube up the right wall, with its capsule
   s += `<g><rect class="fr c-steel" x="388" y="2" width="8" height="${YB - 2}" rx="2"/><rect x="386" y="${YB - 8}" width="12" height="7" rx="2" class="brass"/><g class="cap"><rect x="389.5" y="${YB - 26}" width="5" height="11" rx="2.4" fill="var(--edge)" stroke="var(--screen)" stroke-width=".8"/></g></g>`;
   return s;
@@ -159,6 +187,26 @@ function departmentsFloor(n) {
     Array.from({ length: sheets }, (_, k) => `<rect class="page" x="${360 + (k % 3) * 2 - (k > 6 ? 3 : 0)}" y="${YB - 16 - k * 4.4}" width="${27 - (k % 2) * 2}" height="4" rx=".8" transform="rotate(${((k * 37) % 9) - 4} 372 ${YB - 14 - k * 4.4})"/>`).join('') + `</g>`;
   if (n.pile) s += `<g><path d="M392 ${YB - 62}l9 15h-18z" fill="var(--alert)" stroke="var(--edge)" stroke-width="1.4" stroke-linejoin="round"/><path d="M392 ${YB - 58}v7" stroke="var(--edge)" stroke-width="2" stroke-linecap="round"/><circle cx="392" cy="${YB - 48.5}" r="1.2" fill="var(--edge)"/></g>`;
   s += stageLamps(390, 68, se);
+  return s;
+}
+
+
+/* ===== the Administration floor: Facilities, Accounting, Training ===== */
+function adminFloor(n) {
+  let s = back('tw-ad') + wing(0, 'w-f') + wing(133, 'w-a') + wing(266, 'w-t') + hanging(66) + hanging(200) + hanging(332);
+  // Facilities: a party table, the manager with a clipboard, the brass morale dial
+  s += pbox({ x: 8, yb: YB, w: 42, h: 15, d: 6, c: 'walnut', tabs: false }) + pizzaBox(24, YB - 15, 26) + pizzaBox(24, YB - 22, 26, true) + pizzaBox(42, YB - 15, 20);
+  // the floor's plate hides the top left of the wing: the manager is drawn small, so his face clears it
+  s += standing(70, YB - 6, .52, FM, { xr: clipboard(2, -58) });
+  s += moraleDial(108, 58, 14);
+  // Accounting: the Chief Accountant at the ledger, a filing cabinet, a chart on the wall
+  s += `<rect x="144" y="26" width="26" height="22" fill="var(--paper)" stroke="var(--walnut)" stroke-width="2.4"/><path d="M148 43l6 -8l5 4l8 -10" stroke="var(--olive)" stroke-width="1.8" fill="none"/>`;
+  s += seat(2, 204, YB, .72, { over: Object.assign({}, CA, { beh: 'read' }), dw: 84 });
+  s += pbox({ x: 238, yb: YB, w: 24, h: 46, d: 6, c: 'steel', extra: drawers(238, YB - 40, 24, 3, 13, false) });
+  // Training: a chalkboard, the officer with a pointer, a trainee at a desk
+  s += `<rect x="274" y="14" width="56" height="34" rx="2" fill="var(--paper)" stroke="var(--walnut)" stroke-width="3"/><path d="M280 26h34M280 34h22" stroke="var(--olive)" stroke-width="2.4" stroke-linecap="round"/><rect x="316" y="30" width="9" height="9" fill="none" stroke="var(--alert)" stroke-width="1.6"/>`;
+  s += seat(9, 306, YB, .5, { over: { beh: 'type', head: 'pencil' }, dw: 60 });
+  s += standing(362, YB - 6, .66, TO, { hl: [-30, -84], xl: `<path d="M-30 -84l-30 -22" stroke="var(--walnut)" stroke-width="2.4" stroke-linecap="round"/><circle cx="-60" cy="-106" r="2.2" fill="var(--alert)"/>` });
   return s;
 }
 
@@ -206,9 +254,9 @@ function directorFloor(n) {
 export function buildTower(props) {
   const n = norm(props), key = JSON.stringify(n);
   const make = {
-    director: directorFloor, research: researchFloor, departments: departmentsFloor, pool: poolFloor, personnel: personnelFloor,
+    director: directorFloor, admin: (m) => (m.admin ? adminFloor(m) : ''), research: researchFloor, departments: departmentsFloor, pool: poolFloor, personnel: personnelFloor,
   };
-  const floors = ['director', 'research', 'departments', 'pool', 'personnel'].map((id) => ({ id, svg: make[id](n), viewBox: FLOOR_BOX[id] }));
+  const floors = ['director', 'admin', 'research', 'departments', 'pool', 'personnel'].map((id) => ({ id, svg: make[id](n), viewBox: FLOOR_BOX[id] }));
   return { floors, key };
 }
 

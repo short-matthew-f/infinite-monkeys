@@ -3,31 +3,44 @@
 // from core (requisitionPrice, levelsListPrice, quarterSecondsLeft); the memo
 // states the need and the price and never advises.
 import {
+  N,
   declineRequisition,
   finiteBottleneck,
   grantRequisition,
   levelsListPrice,
+  moraleMult,
+  nullSink,
+  projectDef,
   requisitionPrice,
-  type DeptId,
   type GameEvent,
+  type HeadId,
 } from '../../core/index.js';
 import type { Ctx } from '../ctx.js';
 import { enable, h, text } from '../ui/dom.js';
 import * as f from '../ui/format.js';
+import { afford } from '../ui/forms.js';
+import { DEPT_LABEL, HEAD_NAMES, OFFICE_SHORT, fadeMultOf, projectFact, projectTitle } from './projects.js';
 import './memo.css';
 
-const DEPT_NAMES: Record<DeptId, string> = { recruiting: 'Recruiting', construction: 'Construction', editing: 'Editing' };
+/** The word on the tab: a department, or a support office. */
+const TAB_NAMES: Record<HeadId, string> = { ...DEPT_LABEL, ...OFFICE_SHORT, facilities: 'Facilities', accounting: 'Accounting', training: 'Training' };
 const STAMP_HOLD_MS = 1500;
 const FILE_MS = 360;
 
 /** Everything the card shows, frozen when the memo closes so the stamp moment keeps its words. */
 interface View {
   key: string;
-  dept: DeptId;
+  from: HeadId;
+  /** 'levels' for a department's level block, else a project id. */
+  kind: string;
+  /** Who's asking, as the typed header line. */
+  who: string;
+  /** What it is. */
   asking: string;
+  /** What it does, as a fact. */
   fact: string;
-  levels: number;
-  list: string;
+  /** List price, for level blocks only. */
+  list: string | null;
   price: string;
 }
 
@@ -45,6 +58,7 @@ export class MemoView {
   private readonly fact: HTMLElement;
   private readonly priceEl: HTMLElement;
   private readonly listEl: HTMLElement;
+  private readonly shareEl: HTMLElement;
   private readonly timeEl: HTMLElement;
   private readonly bar: HTMLElement;
   private readonly walletEl: HTMLElement;
@@ -75,13 +89,14 @@ export class MemoView {
     this.ask = h('p', { class: 'memo-ask' });
     this.fact = h('p', { class: 'memo-fact' });
     this.priceEl = h('b', { class: 'memo-v' });
+    this.shareEl = h('span', { class: 'memo-share' });
     this.listEl = h('span', { class: 'memo-list' });
     this.timeEl = h('b', { class: 'memo-v' });
     this.walletEl = h('b', { class: 'memo-v' });
     this.bar = h('i');
     const barWrap = h('div', { class: 'memo-bar', role: 'progressbar', 'aria-label': 'Time left on this memo', 'aria-valuemin': '0', 'aria-valuemax': '100' }, this.bar);
     this.why = h('p', { class: 'memo-why', id: `${id}-why` });
-    this.grant = h('button', { class: 'memo-btn strong', type: 'button', 'aria-describedby': `${id}-why`, onclick: () => this.onGrant() }, 'Grant');
+    this.grant = h('button', { class: 'memo-btn strong', type: 'button', 'aria-describedby': `${id}-why`, onclick: () => this.onGrant() }, 'Accept');
     this.decline = h('button', { class: 'memo-btn', type: 'button', onclick: () => this.onDecline() }, 'Decline');
     this.stamp = h('div', { class: 'memo-stamp', 'aria-hidden': 'true' }, 'Approved');
     this.stamp.hidden = true;
@@ -95,6 +110,7 @@ export class MemoView {
       this.fact,
       h('dl', { class: 'memo-rows' },
         h('dt', {}, 'Asking'), h('dd', {}, this.priceEl, this.listEl),
+        h('dt', {}, 'Share of wallet'), h('dd', {}, this.shareEl),
         h('dt', {}, 'Time left'), h('dd', {}, this.timeEl),
         h('dt', {}, 'In the wallet'), h('dd', {}, this.walletEl),
       ),
@@ -153,7 +169,7 @@ export class MemoView {
     this.stamp.classList.add('hit');
     this.card.classList.add('done');
     this.syncExpanded();
-    this.announce('Requisition granted. Approved.');
+    this.announce('Request accepted. Approved.');
     clearTimeout(this.timer);
     this.timer = setTimeout(() => this.startFiling(null), STAMP_HOLD_MS);
   }
@@ -187,6 +203,10 @@ export class MemoView {
     setTimeout(() => (this.live.textContent = msg), 30);
   }
 
+  /** Cached effect text: morale's depends on how much headroom is left, which changes as it fades. */
+  private factKey = '';
+  private factText = '';
+
   /** The numbers on the card, straight from core. Null when there is no open requisition. */
   private build(): View | null {
     const { ctx } = this;
@@ -196,22 +216,60 @@ export class MemoView {
     const cfg = t.budget?.requisitions;
     const price = requisitionPrice(s, t);
     if (!r || !cfg || !price) return null;
-    const name = DEPT_NAMES[r.dept];
-    const fact =
-      r.dept === 'editing' && finiteBottleneck(s, t) === 'editing'
-        ? 'Editing is behind review demand.'
-        : r.dept === 'editing'
-          ? 'Editing is the shortest department.'
-          : `${name} is the shorter of Recruiting and Construction.`;
+    const key = `${r.kind}:${r.openedTick}`;
+    if (r.kind === 'levels' && r.dept) {
+      const name = DEPT_LABEL[r.dept];
+      const fact =
+        r.dept === 'editing' && finiteBottleneck(s, t) === 'editing'
+          ? 'Editing is behind review demand.'
+          : r.dept === 'editing'
+            ? 'Editing is the shortest department.'
+            : `${name} is the shorter of Recruiting and Construction.`;
+      return {
+        key, from: r.from, kind: r.kind,
+        who: `Inter-office · Head of ${name}`,
+        asking: `Requesting ${cfg.levels} more ${cfg.levels === 1 ? 'level' : 'levels'} of ${name}.`,
+        fact,
+        list: f.bananas(levelsListPrice(s, t, r.dept, cfg.levels)),
+        price: f.bananas(price),
+      };
+    }
+    const p = projectDef(t, r.kind);
     return {
-      key: `${r.dept}:${r.openedTick}`,
-      dept: r.dept,
-      asking: `Requesting ${cfg.levels} more ${cfg.levels === 1 ? 'level' : 'levels'} of ${name}.`,
-      fact,
-      levels: cfg.levels,
-      list: f.bananas(levelsListPrice(s, t, r.dept, cfg.levels)),
+      key, from: r.from, kind: r.kind,
+      who: `Inter-office · from the ${HEAD_NAMES[r.from]}`,
+      asking: projectTitle(r.kind),
+      fact: p ? this.effectText(key, r.kind) : '',
+      list: null,
       price: f.bananas(price),
     };
+  }
+
+  /** The effect as a fact. Morale's is a core preview (it caps at the ceiling), refreshed as morale fades. */
+  private effectText(key: string, kind: string): string {
+    const { ctx } = this;
+    const s = ctx.state();
+    const t = ctx.t;
+    const p = projectDef(t, kind)!;
+    const owned = s.office?.owned[kind] ?? 0;
+    if (p.effect.type !== 'morale') {
+      const k = `${key}:${owned}`;
+      if (k !== this.factKey) {
+        this.factKey = k;
+        this.factText = projectFact(t, p, { n: owned + 1 });
+      }
+      return this.factText;
+    }
+    const k = `${key}:${Math.round(moraleMult(s) * 100)}`;
+    if (k !== this.factKey) {
+      this.factKey = k;
+      const after = ctx.preview((c) => {
+        afford(c, N.toNumber(requisitionPrice(s, t) ?? N.zero));
+        grantRequisition(c, t, nullSink);
+      });
+      this.factText = projectFact(t, p, { moraleGain: moraleMult(after) - moraleMult(s), fadeMult: fadeMultOf(s, t) });
+    }
+    return this.factText;
   }
 
   /** Called once per frame-tick by main; cheap when nothing changed. */
@@ -247,12 +305,11 @@ export class MemoView {
       if (this.motion()) this.dock.classList.add('arrive');
       this.card.classList.remove('done');
       this.stamp.hidden = true;
-      text(this.tabLabel, `MEMO · ${DEPT_NAMES[v.dept]}`);
-      text(this.from, `Inter-office · Head of ${DEPT_NAMES[v.dept]}`);
+      text(this.tabLabel, `MEMO · ${TAB_NAMES[v.from]}`);
+      text(this.from, v.who);
       text(this.ask, v.asking);
-      text(this.fact, v.fact);
       this.syncExpanded();
-      this.announce(`New memo from the Head of ${DEPT_NAMES[v.dept]}. ${v.asking} Asking ${v.price}.`);
+      this.announce(`New memo from the ${v.kind === 'levels' ? `Head of ${TAB_NAMES[v.from]}` : HEAD_NAMES[v.from]}. ${v.asking}. ${v.fact} Asking ${v.price}.`);
     }
     text(this.fact, v.fact);
     this.refresh(v);
@@ -272,7 +329,10 @@ export class MemoView {
     const secLeft = Math.max(0, (r.expiresTick - s.tick) * t.tickSeconds);
     const total = Math.max(1, (r.expiresTick - r.openedTick) * t.tickSeconds);
     text(this.priceEl, v.price);
-    text(this.listEl, `list ${v.list}`);
+    text(this.listEl, v.list ? `list ${v.list}` : '');
+    const wallet = N.toNumber(s.bananas);
+    const share = wallet > 0 ? N.toNumber(priceN) / wallet : Infinity;
+    text(this.shareEl, !Number.isFinite(share) ? 'wallet is empty' : share > 10 ? 'over 1,000%' : f.pct(share));
     text(this.timeEl, f.duration(Math.ceil(secLeft)));
     text(this.walletEl, f.bananas(s.bananas));
     const frac = Math.min(1, secLeft / total);
@@ -284,9 +344,9 @@ export class MemoView {
     }
     const can = ctx.can('grantRequisition', grantRequisition);
     enable(this.grant, can);
-    const short = f.shortBy(priceN, s.bananas);
-    text(this.why, can ? '' : (short ?? ''));
+    const gap = Math.ceil(N.toNumber(priceN) - N.toNumber(s.bananas));
+    text(this.why, can ? '' : gap > 0 ? `Short by ${f.bananaText(gap)}.` : '');
     this.why.hidden = can;
-    text(this.grant, can ? `Grant · ${v.price}` : `Grant`);
+    text(this.grant, can ? `Accept · ${v.price}` : `Accept`);
   }
 }

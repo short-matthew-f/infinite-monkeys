@@ -1,7 +1,7 @@
 import { N, type Num } from './num.js';
 import { seedStreams, type RngStreams } from './rng.js';
 import type { BudgetLines, Objective, QuarterReport, Shares } from './events.js';
-import { DEPTS, type CommissionKind, type DeptId, type Tuning } from './tuning.js';
+import { DEPTS, type CommissionKind, type DeptId, type HeadId, type Tuning } from './tuning.js';
 
 export interface DeptState {
   level: number;
@@ -95,14 +95,34 @@ export interface BudgetState {
   lastReport: QuarterReport | null;
   /** A head's open requisition: pay from the wallet for levels at a bulk rate. */
   requisition: Requisition | null;
+  /** The last request's kind, so the next one differs. */
+  lastRequisitionKind?: string;
   /** When the last requisition closed (the next waits a cooldown). */
   lastRequisitionTick: number;
 }
 
 export interface Requisition {
-  dept: DeptId;
+  /** 'levels' for a department's level block, otherwise a project id. */
+  kind: string;
+  from: HeadId;
+  /** The department whose levels are requested ('levels' only). */
+  dept: DeptId | null;
+  /** Quoted when filed; this is what accepting costs. */
+  price: number;
   openedTick: number;
   expiresTick: number;
+}
+
+/** The support offices' lasting effects. Opens with the budget; finite phase only. */
+export interface OfficeState {
+  /** 1 = normal; events raise it and it fades back. */
+  morale: number;
+  /** Temporary multipliers with their end tick. */
+  timed: { target: 'output' | 'review'; mult: number; untilTick: number; project: string }[];
+  /** Times each project was accepted. */
+  owned: Record<string, number>;
+  /** Audits under way: funds found go to the pot when due. */
+  audits: { amount: number; dueTick: number }[];
 }
 
 /** Persists across runs (Publish). */
@@ -136,6 +156,8 @@ export interface GameState {
   hotel: HotelState | null;
   /** Quarterly budget, once opened (budget tuning only). Older saves lack it. */
   budget?: BudgetState | null;
+  /** Support offices' effects, once the budget opens. Older saves lack it. */
+  office?: OfficeState | null;
 }
 
 export function newSave(): SaveState {

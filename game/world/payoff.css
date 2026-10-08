@@ -1,0 +1,68 @@
+/* Payoff scenes (game/world/payoff.ts). Ported from the tower exploration.
+   Scene motion: one transform (or opacity) per moving element. Each element's own style is its END state and
+   the keyframes only say `from`, so reduced motion (animation: none) shows the finished frame.
+   No filters and no blur: the vignette shares the screen with the live building (design/STYLE.md performance). */
+.payoff { position: absolute; left: 0; right: 0; z-index: 47; display: grid; justify-items: center; padding: 6px; pointer-events: none; }
+/* an inset over the building, under the header and feed */
+.payoff.vig { top: calc(var(--hdr, 138px) + 6px); }
+/* in the room that hosts it: over the scene band, under the room bar (top is set from the bar's height) */
+.payoff.inzone { z-index: 5; top: 0; }
+.po-card {
+  width: min(100%, 520px); pointer-events: auto; background: var(--sheet); color: var(--ink); border: 2px solid var(--edge); border-radius: 4px 12px 4px 4px;
+  box-shadow: 0 3px 0 var(--lift-sh), 4px 10px 20px var(--soft-sh); overflow: hidden;
+}
+.po-card svg.pv {
+  display: block; width: 100%; height: auto; border-bottom: 2px solid var(--edge);
+  --wall: color-mix(in srgb, var(--concrete) 16%, var(--pad)); --wall-dk: color-mix(in srgb, var(--concrete) 30%, var(--paper-shade));
+}
+.pv .shl, .pv .pad-sh2 { filter: none; }
+.po-cap { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 10px; align-items: center; padding: 6px 8px 8px 10px; }
+.po-cap b { font: 700 1.05rem/1.1 var(--font-display); letter-spacing: .05em; text-transform: uppercase; color: var(--head); }
+.po-cap span { grid-column: 1; font: 400 .88rem/1.3 var(--font-body); color: var(--ink-muted); }
+.po-close {
+  grid-column: 2; grid-row: 1 / span 2; min-height: 44px; min-width: 44px; padding: 4px 14px; cursor: pointer; background: var(--btn); color: var(--ink);
+  border: 2px solid var(--ctl); border-radius: 3px 3px 10px 3px; box-shadow: 0 2px 0 var(--lift-sh); font: 700 .95rem var(--font-display); letter-spacing: .08em; text-transform: uppercase;
+}
+.po-close:active { transform: translateY(2px); box-shadow: none; }
+.payoff.out { animation: pvout .3s ease-in both; }
+@keyframes pvout { to { opacity: 0; } }
+
+.pv .mv { animation: pvmv var(--d, 1s) var(--e, cubic-bezier(.25, .8, .3, 1)) var(--dl, 0s) both; }
+@keyframes pvmv { from { transform: translate(var(--fx, 0px), var(--fy, 0px)); } }
+.pv .fi { animation: pvfi var(--d, .4s) ease-out var(--dl, 0s) both; }
+@keyframes pvfi { from { opacity: 0; } }
+.pv .po { animation: pvpo var(--d, .35s) cubic-bezier(.3, 1.6, .4, 1) var(--dl, 0s) both; }
+@keyframes pvpo { from { transform: scale(.1); opacity: 0; } }
+.pv .bye { opacity: 0; animation: pvbye var(--d, .3s) ease-in var(--dl, 0s) both; }
+@keyframes pvbye { 0% { opacity: 1; } 100% { opacity: 0; } }
+.pv .deliv { transform: translateX(300px); animation: pvdeliv 4.6s linear .1s both; }
+@keyframes pvdeliv { 0% { transform: translateX(300px); } 24%, 56% { transform: translateX(0); } 100% { transform: translateX(300px); } }
+.pv .lens { animation: pvlens 2.6s ease-in-out .2s both; }
+@keyframes pvlens { 0% { transform: translate(-160px, -40px); } 20% { transform: translate(-122px, -84px); } 40% { transform: translate(-60px, -96px); } 60% { transform: translate(-104px, -50px); } 80% { transform: translate(-24px, -42px); } 100% { transform: none; } }
+.pv .fall1 { animation: pvfall1 5.2s ease-in-out .3s both; }
+@keyframes pvfall1 { 0%, 8% { transform: rotate(0); } 28%, 52% { transform: rotate(-52deg); } 74%, 100% { transform: rotate(0); } }
+.pv .fall2 { transform: rotate(-62deg); animation: pvfall2 5.6s ease-in .3s both; }
+@keyframes pvfall2 { 0%, 14% { transform: rotate(0); } 30%, 44% { transform: rotate(-86deg); } 58%, 68% { transform: rotate(0); } 86%, 100% { transform: rotate(-62deg); } }
+.pv .catch2 { transform: translateX(62px); animation: pvcatch2 5.6s ease-in-out .3s both; }
+@keyframes pvcatch2 { 0%, 44% { transform: translateX(0); } 62%, 100% { transform: translateX(62px); } }
+.pv .door { transform: scaleX(.16); animation: pvdoor .5s cubic-bezier(.2, 1.5, .4, 1) 1.8s both; }
+@keyframes pvdoor { from { transform: scaleX(1); } }
+.pv .stampdn { transform: translateY(-34px); animation: pvstamp 1.7s ease-in-out .3s both; }
+@keyframes pvstamp { 0% { transform: translateY(-96px); } 28%, 46% { transform: translateY(0); } 100% { transform: translateY(-34px); } }
+.pv .sweep { transform-origin: 0 0; transform: rotate(330deg); animation: pvsweep 2.6s linear .3s both; }
+@keyframes pvsweep { from { transform: rotate(0); } }
+.pv .enter { opacity: 0; animation: pventer 2s ease-in-out 1.6s both; }
+@keyframes pventer { 0% { transform: translateX(0); opacity: 1; } 80% { opacity: 1; } 100% { transform: translateX(-70px); opacity: 0; } }
+.pv .shk { animation: pvshk .1s linear .5s 16 both; }
+.pv .hum { animation: pvshk .16s linear infinite; }
+@keyframes pvshk { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-1.5px); } 75% { transform: translateX(1.5px); } }
+.pv .flip { animation: pvflip .5s ease-in var(--dl, 0s) 6 both; }
+@keyframes pvflip { from { transform: translate(0, 0); opacity: 1; } to { transform: translate(-26px, -14px); opacity: 0; } }
+.pv .steam { animation: pvsteam 3s ease-in-out infinite; transform-box: fill-box; }
+@keyframes pvsteam { 0%, 100% { transform: translateY(0); opacity: .9; } 50% { transform: translateY(-4px); opacity: .4; } }
+
+/* the scenes stop with the app in the background, and a room opening over a building is not their business */
+@media (prefers-reduced-motion: reduce) {
+  .pv .mv, .pv .fi, .pv .po, .pv .bye, .pv .deliv, .pv .lens, .pv .fall1, .pv .fall2, .pv .catch2, .pv .door, .pv .stampdn, .pv .sweep, .pv .enter, .pv .shk, .pv .hum, .pv .flip, .pv .steam, .payoff.out { animation: none !important; }
+  .pv .bye { opacity: 0; }
+}

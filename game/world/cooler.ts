@@ -6,7 +6,7 @@
 // same convention as feed.ts (the presentation stream exists for UI flavour, so
 // drawing from it never touches gameplay randomness). Same save + same ticks
 // of play = same gossip. Recent lines are not repeated while others remain.
-import { finiteBottleneck, nextFloat, quarterSecondsLeft, type GameState, type Tuning } from '../../core/index.js';
+import { finiteBottleneck, moraleMult, nextFloat, quarterSecondsLeft, type GameState, type Tuning } from '../../core/index.js';
 import type { Ctx } from '../ctx.js';
 import { h } from '../ui/dom.js';
 import { headSVG } from './floor-art.js';
@@ -61,6 +61,19 @@ function awareLines(s: GameState, t: Tuning): Entry[] {
     if (left > 0 && left <= 40) out.push({ id: 'year-end', say: ['Fiscal year-end: spend it or lose it.', 'The Bursar has said so twice.'] });
     if (s.budget.requisition) out.push({ id: 'envelope', say: ["There's an inter-office envelope going round.", 'String and everything.'] });
     if (s.budget.reviewDue) out.push({ id: 'review', say: ['The quarterly review is waiting on a signature.', 'The pen is somewhere in Accounts.'] });
+  }
+  // What the heads' projects have done, as gossip: each line states something core says is true now.
+  const o = s.office;
+  if (o) {
+    const has = (id: string) => (o.owned[id] ?? 0) > 0;
+    if (has('pizzaParty') && moraleMult(s) > 1.05) out.push({ id: 'pizza', say: ["There's still a pizza box in the Typing Pool.", 'It is the one with the rumour in it.'] });
+    if (o.timed.some((e) => e.project === 'escapeRoom' && e.untilTick > s.tick)) out.push({ id: 'escape', say: ['The Editors are still talking about the escape room.', 'Somebody solved it with a red pencil.'] });
+    if (o.timed.some((e) => e.project === 'teamBuilding' && e.untilTick > s.tick)) out.push({ id: 'trust', say: ['Everyone is very close since the trust falls.', 'Mostly to the floor, in Mabel’s case.'] });
+    if (o.audits.length > 0) out.push({ id: 'auditor', say: ['The auditor is in the filing room.', 'He has asked about the drawer that sticks.'] });
+    if (has('breakRoom')) out.push({ id: 'couch', say: ['There is a couch in the break room now.', 'Nobody has been seen leaving it.'] });
+    if (has('snackMachine')) out.push({ id: 'snack', say: ['The snack machine took a coin and gave back two bananas.', 'Nobody has filed a complaint.'] });
+    if (has('bathrooms')) out.push({ id: 'wc', say: ['There is a second bathroom door by the lobby.', 'The queue has been getting shorter.'] });
+    if (has('managers')) out.push({ id: 'managers', say: ['There are managers now.', 'They have clipboards. Nobody asked what is on them.'] });
   }
   return out;
 }

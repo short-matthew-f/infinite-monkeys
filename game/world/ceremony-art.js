@@ -5,11 +5,13 @@
 /* eslint-disable */
 import { f1, stand } from './floor-art.js';
 
-/** The three department heads. Same cast as the exploration. */
+/** The department heads, then the Chief Accountant. Same cast as the exploration. */
 export const HEADS = [
   { fur: 1, H: 72, bw: 26, tw: 1.1, hr: 13, ears: 'big', view: 'f', gaze: [0, 0], eyes: 'open', mouth: 'smile', head: 'phones', tail: true, shirt: 'sk-rust' },
   { fur: 0, H: 78, bw: 34, tw: 1.1, hr: 14, ears: 'round', view: 'f', gaze: [0, 0], eyes: 'open', mouth: 'flat', head: 'pencil', tail: true, shirt: 'sk-mustard' },
   { fur: 5, H: 76, bw: 34, tw: 1.02, hr: 15, ears: 'small', view: 'f', gaze: [0, .4], eyes: 'heavy', mouth: 'flat', head: 'visor', tail: true, shirt: 'sk-ink' },
+  // the Chief Accountant: only comes to the review when there were requests to account for
+  { fur: 2, H: 70, bw: 30, tw: 1.05, hr: 14, ears: 'tuft', view: 'f', gaze: [0, .4], eyes: 'open', mouth: 'flat', head: 'visor', body: 'tie', tail: true, shirt: 'sk-olive' },
 ];
 
 const txt = (x, y, t, st = '', cls = 'sg') => `<text class="${cls}" x="${x}" y="${y}" style="${st}">${t}</text>`;
@@ -33,14 +35,14 @@ export function potSVG(x, yb, s = 1) {
 const door = (x, y) => `<g><rect x="${x}" y="${y}" width="52" height="120" fill="var(--screen)"/><rect class="door-l" x="${x}" y="${y}" width="26" height="120" fill="var(--concrete)" stroke="var(--edge)" stroke-width="1.6"/><rect class="door-r" x="${x + 26}" y="${y}" width="26" height="120" fill="var(--concrete)" stroke="var(--edge)" stroke-width="1.6"/><path d="M${x + 8} ${y - 6}a18 18 0 0 1 36 0z" fill="var(--edge)" stroke="var(--mustard)" stroke-width="2"/><path d="M${x + 26} ${y - 6}l12 -8" stroke="var(--screen)" stroke-width="1.6"/></g>`;
 
 /** Arrival: the boardroom door opens and the heads walk in. `heads: false` shows an empty room (first budget). */
-export function arrivalSVG(sign, heads) {
+export function arrivalSVG(sign, heads, accountant = false) {
   const W = 360, H = 200;
   return `<rect width="${W}" height="${H}" fill="var(--cer-wall)"/><rect y="164" width="${W}" height="36" fill="var(--cer-floor)"/>` +
     `<g><rect x="70" y="10" width="160" height="26" rx="2" class="brass"/>${txt(150, 28, sign, 'font-size:14px')}${bell(260, 16, .9)}</g>` +
     door(304, 44) +
     `<g class="ding"><rect x="286" y="60" width="40" height="18" rx="3" fill="var(--glow)" stroke="var(--screen)" stroke-width="1.2"/>${txt(306, 73, 'DING', 'font-size:11px')}</g>` +
     `<g><rect x="12" y="92" width="44" height="66" rx="10" fill="color-mix(in srgb, var(--olive) 80%, var(--edge))" stroke="var(--edge)" stroke-width="3"/>${txt(34, 86, 'YOU', 'font-size:10px')}</g>` +
-    (heads ? HEADS.map((h, k) => `<g class="walkin" style="--k:${k}"><g transform="translate(${120 + k * 70} 170)">${stand(h, k === 1 ? { xr: `<rect x="2" y="-56" width="16" height="22" fill="var(--edge)" stroke="var(--screen)" stroke-width="1"/>` } : {})}</g></g>`).join('') : potSVG(200, 172, 1.2)) +
+    (heads ? HEADS.slice(0, accountant ? 4 : 3).map((h, k) => `<g class="walkin" style="--k:${k}"><g transform="translate(${120 + k * (accountant ? 52 : 70)} 170)">${stand(h, k === 1 ? { xr: `<rect x="2" y="-56" width="16" height="22" fill="var(--edge)" stroke="var(--screen)" stroke-width="1"/>` } : {})}</g></g>`).join('') : potSVG(200, 172, 1.2)) +
     `<rect x="118" y="198" width="180" height="2" fill="none"/>`;
 }
 
@@ -77,6 +79,8 @@ export const CLIP = {
   people: `<svg viewBox="0 0 60 40" aria-hidden="true">${[10, 30, 50].map((x, k) => `<circle cx="${x}" cy="12" r="6" fill="${['var(--tangerine)', 'var(--olive)', 'var(--mustard)'][k]}" stroke="var(--screen)"/><rect x="${x - 7}" y="19" width="14" height="16" rx="6" fill="${['var(--tangerine)', 'var(--olive)', 'var(--mustard)'][k]}" stroke="var(--screen)"/>`).join('')}</svg>`,
   hat: `<svg viewBox="0 0 60 40" aria-hidden="true"><path d="M10 30q0 -22 20 -22q20 0 20 22z" fill="var(--mustard)" stroke="var(--screen)" stroke-width="2"/><path d="M4 30h52" stroke="var(--screen)" stroke-width="5" stroke-linecap="round"/><path d="M30 8v22" stroke="var(--screen)" stroke-width="1.6"/></svg>`,
   pencil: `<svg viewBox="0 0 60 40" aria-hidden="true"><g transform="rotate(-30 30 20)"><rect x="8" y="16" width="38" height="9" fill="var(--alert)" stroke="var(--screen)"/><path d="M46 16l10 4.5l-10 4.5z" fill="var(--glow)" stroke="var(--screen)"/><rect x="2" y="16" width="6" height="9" fill="color-mix(in srgb, var(--alert) 40%, var(--edge))" stroke="var(--screen)"/></g></svg>`,
+  ledger: `<svg viewBox="0 0 60 40" aria-hidden="true"><path d="M6 8l24 -4l24 4v28l-24 -4l-24 4z" fill="var(--edge)" stroke="var(--screen)" stroke-width="2"/><path d="M30 4v28" stroke="var(--screen)" stroke-width="1.6"/><path d="M12 14l14 -2M12 20l14 -2M12 26l14 -2M34 12l14 2M34 18l14 2" stroke="var(--olive)" stroke-width="1.6"/></svg>`,
+  lens: `<svg viewBox="0 0 60 40" aria-hidden="true"><circle cx="26" cy="18" r="13" fill="var(--glow)" stroke="var(--mustard)" stroke-width="5"/><path d="M36 28l16 10" stroke="var(--walnut)" stroke-width="6" stroke-linecap="round"/></svg>`,
   star: `<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 3l5 11l12 1l-9 8l3 12l-11 -6l-11 6l3 -12l-9 -8l12 -1z" fill="var(--mustard)" stroke="var(--screen)" stroke-width="1.4"/></svg>`,
 };
 

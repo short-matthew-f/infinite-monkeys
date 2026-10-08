@@ -149,6 +149,15 @@
 .sl.take .big { font: 700 14cqh/1 var(--font-mono); color: color-mix(in srgb, var(--alert) 80%, var(--screen)); }
 .sl.bullets ul { margin: 0; padding-left: 5cqw; columns: 2; column-gap: 4cqw; font: 400 5cqh/1.25 var(--font-body); }
 .sl.bullets li { break-inside: avoid; }
+/* the Chief Accountant's lists: one column, a title and a price, the effect stated under it */
+.sl.ledger ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 1.6cqh; font: 400 6.4cqh/1.2 var(--font-body); }
+.sl.ledger li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 3cqw; padding-bottom: 1cqh; border-bottom: 1px dotted var(--screen); }
+.sl.ledger li b { font-weight: 600; }
+.sl.ledger li .pr, .sl.ledger .sum .pr { font: 600 6cqh var(--font-mono); font-variant-numeric: tabular-nums; }
+.sl.ledger li .fx { grid-column: 1 / -1; font-size: 5.2cqh; opacity: .85; }
+.sl.ledger li.more { border-bottom: 0; }
+.sl.ledger .sum { display: flex; justify-content: space-between; margin: 0; font: 400 6.4cqh/1.2 var(--font-body); }
+.sl.ledger .none { margin: 0; font: 400 5.6cqh/1.3 var(--font-body); }
 .slide.standby { display: grid; place-content: center; justify-items: center; gap: 3cqh; text-align: center; background: radial-gradient(color-mix(in srgb, var(--glow) 40%, var(--edge)), var(--edge) 80%); }
 .slide.standby b { font: 700 11cqh/1.05 var(--font-display); letter-spacing: 0.08em; text-transform: uppercase; }
 .slide.standby span { font: 400 6cqh var(--font-type); opacity: 0.85; }

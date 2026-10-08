@@ -733,6 +733,55 @@ rhythm.
   together. It's a suggestion. Reports and heads state facts and never say
   which lines to sign.
 
+**Projects and the support offices** (Oct 8 2026, from Matt's brief: "enough
+weight to make people want to accept them, but enough drain on the budget that
+you can't always accept everything").
+- The heads' mid-quarter requests are one at a time. A request stays open for
+  60 s, and the next one comes 10 s after the last closes. The gameplay random
+  stream picks the next kind: a level block from the short department, or any
+  available project. The same kind is never offered twice in a row.
+- Projects come from Facilities, Construction (amenities), Accounting and
+  Training. Their price is a share of a quarter's reference wallet income,
+  which is income × quarter length × suggested discretionary, so the signed
+  lines can't game it. The price is quoted when the memo is filed and paid from
+  the wallet. Declining costs nothing.
+- Effects (`core/office.ts`, finite phase only):
+  - Morale is 1 normally. A pizza party raises it by 0.3, up to 1.6, and it
+    fades back by 0.002/s, never below 1. Morale multiplies typing and
+    department output.
+  - Timed boosts last 180 s: team building gives department output ×1.5, and
+    the escape room gives review speed ×1.4.
+  - Permanent stacks:
+    - bathrooms: Recruiting ×1.25, up to 3
+    - efficiency findings: level cost ×0.9, up to 5
+    - managers: stage cost ×0.75, up to 3
+    - communication class: review ×1.15, up to 3
+    - snack machine: morale fades at half speed
+  - Break room: time-away allowance +2 h.
+  - Audit: the fee comes back ×1.5 into the pot after 60 s.
+  - Speed-reading: one level of review research.
+- The quarter report lists every request and how it closed, plus funds that
+  audits found, for the Chief Accountant's quarter-end slides.
+- At the ceremony the heads hand funding back as an even split. Their last
+  finite split used to carry into the hotel, which skewed the Commission
+  previews by about 10%.
+- Stages cost 25% more than classic, so the casual game stays inside 25–35
+  minutes with projects.
+
+**Sim with projects (Oct 8 2026).** The bots spend greedily, so most requests
+arrive when their wallet is short. A "memo reader" bot weighs an open request
+first and saves up for it when it's worth having.
+
+| Bot | Declare | Requests accepted | Longest gap (counting decisions) |
+|---|---|---|---|
+| casual | 25.7 min | 10 of 22 | 270 s |
+| memo reader | 25.8 min | 9 of 24 | 160 s |
+| hard | 26.4 min | 6 of 22 | 280 s |
+| idler | 27.0 min | 7 of 22 | 290 s |
+
+About a third to a half of requests are accepted, so they are worth wanting,
+and the drain is real. F2 is still unmet for the greedy bots.
+
 **Not built.** A separate emergency review. Lifting the Editing cap at stage 4
 closed the Readiness drag that it was meant to fix, and requisitions are the
 mid-quarter lever. Growth-triggered quarters are not built either.

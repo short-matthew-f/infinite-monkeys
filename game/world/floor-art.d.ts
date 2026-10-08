@@ -22,9 +22,22 @@ export interface FloorProps {
   meters: Record<'recruiting' | 'construction' | 'editing', number>;
   /** What limits income right now (core's finiteBottleneck), or null outside the finite phase. */
   bottleneck: 'typing' | 'editing' | null;
+  /** The support offices, once the budget has opened (absent before). */
+  office?: {
+    /** The Administration floor shows. */
+    on: boolean;
+    /** Core's moraleMult (1 = normal). */
+    morale: number;
+    /** Where the needle sits on the dial, 0..1 (drawing only). */
+    moraleFrac: number;
+    /** Amenities the Foreman has built. */
+    built: { bathrooms: boolean; breakRoom: boolean; snackMachine: boolean };
+    /** An audit is under way. */
+    audit: boolean;
+  };
 }
 
-export type RoomId = 'personnel' | 'pool' | 'departments' | 'research' | 'director';
+export type RoomId = 'personnel' | 'pool' | 'departments' | 'research' | 'director' | 'facilities' | 'accounting' | 'training';
 
 export interface RoomScene {
   /** Markup for an <svg> with the given viewBox. */

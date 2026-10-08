@@ -10,7 +10,15 @@ import {
   declineRequisition,
   grantRequisition,
   headShares,
+  keystrokeRate,
   levelsListPrice,
+  moraleMult,
+  deptLevelCost,
+  projectDef,
+  projectAvailable,
+  projectPrice,
+  timedMult,
+  reviewSpeedMult,
   previewQuarter,
   N,
   nullSink,
@@ -22,6 +30,7 @@ import {
   suggestShares,
   type BudgetLines,
   type GameState,
+  type Tuning,
 } from '../core/index.js';
 import { collector, ofType } from './helpers.js';
 
@@ -152,6 +161,15 @@ describe('quarterly budget', () => {
     expect(N.toNumber(s.bananas)).toBeCloseTo(total, 6);
   });
 
+  it('at the ceremony the heads hand funding back as an even split', () => {
+    const s = opened();
+    signBudget(s, TB, nullSink, LINES);
+    run(s, TB, nullSink, ticks(10));
+    s.stability.permit = true;
+    declareInfinity(s, TB, nullSink);
+    expect(s.shares).toEqual({ recruiting: 1 / 3, construction: 1 / 3, editing: 1 / 3 });
+  });
+
   it("heads cap Editing's share by the budget's own caps, raised once every department is at stage 4", () => {
     const s = opened();
     const bd = TB.budget!;
@@ -179,14 +197,16 @@ describe('quarterly budget', () => {
     expect(previewQuarter(opened(), TB, { ...LINES, discretionary: 0.9 })).toBeNull(); // invalid lines
   });
 
-  describe('requisitions', () => {
-    const R = TB.budget!.requisitions!;
+  describe('level requisitions', () => {
+    // Projects off, so every request is a level block.
+    const TL: Tuning = { ...TB, budget: { ...TB.budget!, projects: [] } };
+    const R = TL.budget!.requisitions!;
     /** A signed budget with a requisition open. */
     function filed(): GameState {
       const s = opened();
-      signBudget(s, TB, nullSink, LINES);
+      signBudget(s, TL, nullSink, LINES);
       s.depts.editing.level = Math.max(1, s.depts.editing.level);
-      run(s, TB, nullSink, ticks(R.cooldownSeconds) + 1);
+      run(s, TL, nullSink, ticks(R.cooldownSeconds) + 1);
       expect(s.budget!.requisition).not.toBeNull();
       return s;
     }
@@ -194,14 +214,15 @@ describe('quarterly budget', () => {
     it('a head files one after the cooldown, priced at the bulk rate of its list price', () => {
       const { events, sink } = collector();
       const s = opened();
-      signBudget(s, TB, nullSink, LINES);
-      run(s, TB, sink, ticks(R.cooldownSeconds) - 2);
+      signBudget(s, TL, nullSink, LINES);
+      s.depts.editing.level = 1; // whichever department is short has a head to file
+      run(s, TL, sink, ticks(R.cooldownSeconds) - 2);
       expect(ofType(events, 'requisitionOpened')).toHaveLength(0);
-      run(s, TB, sink, 4);
+      run(s, TL, sink, 4);
       const opened_ = ofType(events, 'requisitionOpened');
       expect(opened_).toHaveLength(1);
       const q = s.budget!.requisition!;
-      expect(N.toNumber(requisitionPrice(s, TB)!)).toBeCloseTo(N.toNumber(levelsListPrice(s, TB, q.dept, R.levels)) * R.priceFactor, 6);
+      expect(N.toNumber(requisitionPrice(s, TL)!)).toBeCloseTo(N.toNumber(levelsListPrice(s, TL, q.dept!, R.levels)) * R.priceFactor, 6);
       expect(s.budget!.stats.requisitions.offered).toBe(1);
     });
 
@@ -209,44 +230,145 @@ describe('quarterly budget', () => {
       const s = opened();
       let sum = 0;
       const p = { ...s, depts: { ...s.depts, editing: { ...s.depts.editing } } };
-      for (let i = 0; i < 3; i++) { sum += N.toNumber(levelsListPrice(p, TB, 'editing', 1)); p.depts.editing.level++; }
-      expect(N.toNumber(levelsListPrice(s, TB, 'editing', 3))).toBeCloseTo(sum, 6);
+      for (let i = 0; i < 3; i++) { sum += N.toNumber(levelsListPrice(p, TL, 'editing', 1)); p.depts.editing.level++; }
+      expect(N.toNumber(levelsListPrice(s, TL, 'editing', 3))).toBeCloseTo(sum, 6);
     });
 
     it('granting pays from the wallet and adds the levels at once', () => {
       const s = filed();
       const q = s.budget!.requisition!;
-      const price = N.toNumber(requisitionPrice(s, TB)!);
+      const price = N.toNumber(requisitionPrice(s, TL)!);
       s.bananas = N.of(price - 1);
-      expect(grantRequisition(s, TB, nullSink)).toBe(false);
+      expect(grantRequisition(s, TL, nullSink)).toBe(false);
       s.bananas = N.of(price + 10);
-      const level = s.depts[q.dept].level;
+      const level = s.depts[q.dept!].level;
       const { events, sink } = collector();
-      expect(grantRequisition(s, TB, sink)).toBe(true);
-      expect(s.depts[q.dept].level).toBe(level + R.levels);
+      expect(grantRequisition(s, TL, sink)).toBe(true);
+      expect(s.depts[q.dept!].level).toBe(level + R.levels);
       expect(N.toNumber(s.bananas)).toBeCloseTo(10, 6);
       expect(ofType(events, 'requisitionClosed')[0]!.outcome).toBe('granted');
       expect(s.budget!.requisition).toBeNull();
-      expect(grantRequisition(s, TB, nullSink)).toBe(false);
+      expect(grantRequisition(s, TL, nullSink)).toBe(false);
     });
 
     it('declined or unanswered, it closes and the next waits a cooldown', () => {
       const s = filed();
-      expect(declineRequisition(s, TB, nullSink)).toBe(true);
+      expect(declineRequisition(s, TL, nullSink)).toBe(true);
       expect(s.budget!.stats.requisitions.declined).toBe(1);
-      run(s, TB, nullSink, ticks(R.cooldownSeconds) - 2);
+      run(s, TL, nullSink, ticks(R.cooldownSeconds) - 2);
       expect(s.budget!.requisition).toBeNull();
       const { events, sink } = collector();
-      run(s, TB, sink, 4 + ticks(R.openSeconds));
+      run(s, TL, sink, 4 + ticks(R.openSeconds));
       expect(ofType(events, 'requisitionClosed').map((e) => e.outcome)).toContain('expired');
     });
 
     it('never outlives its quarter', () => {
       const s = filed();
-      run(s, TB, nullSink, ticks(Q));
+      run(s, TL, nullSink, ticks(Q));
       const b = s.budget!;
       expect(b.requisition === null || b.requisition.openedTick >= b.quarterStartTick).toBe(true);
       if (b.requisition) expect(b.requisition.expiresTick).toBeLessThanOrEqual(b.quarterStartTick + ticks(Q));
+    });
+  });
+
+  describe('projects', () => {
+    /** Files a specific project as the open request, at its real price. */
+    function offer(s: GameState, id: string): number {
+      const p = projectDef(TB, id)!;
+      const price = N.toNumber(projectPrice(s, TB, p));
+      s.budget!.requisition = { kind: id, from: p.from, dept: null, price, openedTick: s.tick, expiresTick: s.tick + 300 };
+      s.bananas = N.add(s.bananas, N.of(price));
+      return price;
+    }
+    function signedAt(): GameState {
+      const s = opened();
+      signBudget(s, TB, nullSink, LINES);
+      run(s, TB, nullSink, ticks(5));
+      return s;
+    }
+
+    it('the heads file a mix of projects and level blocks, never the same kind twice running', () => {
+      const s = opened();
+      signBudget(s, TB, nullSink, LINES);
+      const kinds: string[] = [];
+      const sink = (e: Parameters<typeof nullSink>[0]) => { if (e.type === 'requisitionOpened') kinds.push(e.kind); };
+      for (let q = 0; q < 6; q++) {
+        run(s, TB, sink, ticks(Q));
+        if (s.budget!.reviewDue) signBudget(s, TB, nullSink, LINES);
+      }
+      expect(new Set(kinds).size).toBeGreaterThan(3);
+      for (let i = 1; i < kinds.length; i++) expect(kinds[i]).not.toBe(kinds[i - 1]);
+    });
+
+    it('a pizza party lifts morale, which speeds typing, then fades back to normal and never below', () => {
+      const s = signedAt();
+      const k0 = N.toNumber(keystrokeRate(s, TB));
+      offer(s, 'pizzaParty');
+      const { events, sink } = collector();
+      expect(grantRequisition(s, TB, sink)).toBe(true);
+      expect(ofType(events, 'projectDone')[0]!.project).toBe('pizzaParty');
+      expect(moraleMult(s)).toBeCloseTo(1.3, 9);
+      expect(N.toNumber(keystrokeRate(s, TB)) / k0).toBeCloseTo(1.3, 6);
+      run(s, TB, nullSink, ticks(200));
+      expect(moraleMult(s)).toBe(1);
+    });
+
+    it('a timed boost lasts its time and then ends', () => {
+      const s = signedAt();
+      offer(s, 'escapeRoom');
+      grantRequisition(s, TB, nullSink);
+      expect(timedMult(s, "review")).toBeCloseTo(1.4, 9);
+      run(s, TB, nullSink, ticks(181));
+      expect(timedMult(s, 'review')).toBe(1);
+    });
+
+    it('permanent upgrades stack to their cap, and each costs more than the last', () => {
+      const s = signedAt();
+      const c0 = N.toNumber(deptLevelCost(s, TB, 'editing'));
+      const p = projectDef(TB, 'efficiencyFinding')!;
+      const first = offer(s, 'efficiencyFinding');
+      grantRequisition(s, TB, nullSink);
+      expect(N.toNumber(deptLevelCost(s, TB, 'editing')) / c0).toBeCloseTo(0.9, 9);
+      expect(N.toNumber(projectPrice(s, TB, p)) / first).toBeCloseTo(p.priceGrowth, 2);
+      for (let i = 1; i < p.max!; i++) { offer(s, 'efficiencyFinding'); grantRequisition(s, TB, nullSink); }
+      expect(s.office!.owned.efficiencyFinding).toBe(p.max);
+      expect(projectAvailable(s, p)).toBe(false);
+    });
+
+    it('an audit takes the fee now and pays more into the pot when it reports', () => {
+      const s = signedAt();
+      const fee = offer(s, 'audit');
+      const pot0 = N.toNumber(s.budget!.pot);
+      grantRequisition(s, TB, nullSink);
+      const { events, sink } = collector();
+      run(s, TB, sink, ticks(61));
+      const found = ofType(events, 'auditFound');
+      expect(found).toHaveLength(1);
+      expect(found[0]!.amount).toBeCloseTo(fee * 1.5, 6);
+      expect(N.toNumber(s.budget!.pot)).toBeCloseTo(pot0 + fee * 1.5, 6);
+      expect(s.budget!.stats.auditFound).toBeCloseTo(fee * 1.5, 6);
+      expect(s.budget!.stats.requests.at(-1)).toMatchObject({ kind: 'audit', from: 'accounting', outcome: 'granted' });
+    });
+
+    it('declining costs nothing', () => {
+      const s = signedAt();
+      offer(s, 'teamBuilding');
+      const before = N.toNumber(s.bananas);
+      expect(declineRequisition(s, TB, nullSink)).toBe(true);
+      expect(N.toNumber(s.bananas)).toBe(before);
+      expect(s.budget!.stats.requests.at(-1)).toMatchObject({ kind: 'teamBuilding', outcome: 'declined' });
+      expect(timedMult(s, 'output')).toBe(1);
+    });
+
+    it('office effects apply only in the finite phase', () => {
+      const s = signedAt();
+      offer(s, 'communicationClass');
+      grantRequisition(s, TB, nullSink);
+      const r = reviewSpeedMult(s, TB);
+      expect(r).toBeCloseTo(1.15, 9);
+      s.phase = 'hotel';
+      expect(reviewSpeedMult(s, TB)).toBe(1);
+      expect(moraleMult(s)).toBe(1);
     });
   });
 });
