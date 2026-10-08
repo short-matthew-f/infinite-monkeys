@@ -21,7 +21,7 @@ If a screen would make someone say "that's the TVA" rather than "that's a retro 
 
 The mood is **cheerfully infinite bureaucracy**: orderly, warm, slightly airless, and completely sincere about absurd work.
 
-1. **Sincere, not winking.** The Bureau takes infinity seriously. Humor comes from the gap between procedure and subject, never from the interface mugging. This keeps the design doc's humor ratio: early game nearly straight-faced, absurdity rising with height.
+1. **Sincere, not winking.** The Bureau takes infinity seriously. Humor comes from the gap between procedure and subject, never from the interface mugging. Gentle whimsy is always present, from the first desk; absurdity rises with height (DESIGN.md decision 47).
 2. **Analog surface, impossible depth.** Every control looks like 1960s office equipment. What it controls is a hotel with infinitely many rooms.
 3. **Low ceilings, then none.** The finite phase feels compressed and horizontal. The infinity ceremony is the first time the frame opens vertically.
 4. **Paper is the unit of work.** Finds, Commissions, permits, and previews are all forms, folders, or stamped pages.

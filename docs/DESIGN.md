@@ -82,7 +82,7 @@ An idle game about the infinite monkey theorem. You start as the Editor-in-Chief
 2. **Infinity changes the job.** Before ℵ₀: grow production and keep departments supplied. After ℵ₀: choose publishing objectives and organize an infinite supply to fulfill them.
 3. **Show consequences, then automate the routine.** Arithmetic is fine. The player must understand what a choice accomplishes and what it delays.
 4. **Humor lives in presentation.** The feed and the bureaucracy carry the jokes. Mechanics stay readable without the math.
-5. **Humor ratio.** Early game is nearly straight-faced. Absurdity escalates with height. Human moments in the feed are rare (~1 line in 40).
+5. **Humor ratio.** Gentle whimsy is always present (decision 47); absurdity escalates with height. Human moments in the feed are rare (~1 line in 40).
 6. **Prove the payoff before tuning the climb.** The transition prototype comes before long-curve balancing.
 
 ---
@@ -648,6 +648,9 @@ Recorded so they aren't reintroduced.
 | 43 | Window views as the zone progression | Gives the growing building a visible journey | Separate locations |
 | 44 | Commission requirements and rewards freeze when offered | Upgrades should shorten completion, never move the target | Live-scaling requirements |
 | 45 | Specialist upgrades beat global upgrades in their own market | Otherwise the global upgrade dominates | Equal-strength upgrades |
+| 46 | The place is the interface: a pop-up floor plan per floor, rooms open their own sheets (Matt, Oct 7 2026) | Roomy, no menu buttons; Egg, Inc.'s map model | Tab bar; cutaway dollhouse; paper theater |
+| 47 | Whimsy is always present, from the first desk (Matt, Oct 7 2026) | Charm carries the early game | Straight-faced early game (amends #15 and §1 pillar 5: absurdity still rises with height, but the floor is never joyless) |
+| 48 | Roomy means space between spaces, not ceiling height (Matt, Oct 7 2026) | Zones breathe; ceilings can stay low until the ceremony | Tall rooms |
 
 ### Open
 
