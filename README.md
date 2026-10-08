@@ -1,14 +1,16 @@
 # Infinite Monkeys — Transition Prototype
 
-Headless game engine (M1) and simulation harness (M2.2) for the transition
-prototype in `docs/PROTOTYPE.md`, plus a PWA shell in `game/` deployed to
-https://short-matthew-f.github.io/infinite-monkeys/. The shell is a
-placeholder; M3/M4 screens start from `docs/HANDOFF-M3-M4.md`.
+Headless game engine (M1), simulation harness (M2.2), and the finite-phase
+UI (M3) for the transition prototype in `docs/PROTOTYPE.md`, deployed as a PWA
+to https://short-matthew-f.github.io/infinite-monkeys/. The UI is a pop-up
+floor plan of the Bureau: tap a room to open its sheet (`design/STYLE.md`).
+M4 starts from `docs/HANDOFF-M3-M4.md`.
 
 ```
 core/      the game engine: pure logic (no DOM, no clock, no unseeded randomness)
 content/   prototype tuning (data only)
-game/      PWA shell (Vite): loop, IndexedDB saves, service worker
+game/      PWA (Vite): the Bureau floor (world/), room screens, saves, service worker
+design/    art direction: STYLE.md (binding), explorations, review tooling
 sim/       bots, first-hotel-decision evaluation, metrics, report
 tests/     unit tests and sim assertions (Vitest)
 scripts/   purity check for core/

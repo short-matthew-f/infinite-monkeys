@@ -4,6 +4,16 @@
 import type { Ctx, Screen } from '../ctx.js';
 import { h } from '../ui/dom.js';
 
+const svgIcon = (inner: string) => {
+  const el = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  el.setAttribute('width', '14');
+  el.setAttribute('height', '14');
+  el.setAttribute('viewBox', '0 0 14 14');
+  el.setAttribute('aria-hidden', 'true');
+  el.innerHTML = inner;
+  return el;
+};
+
 export interface Room {
   id: string;
   /** Name on the sheet and the directory. */
@@ -29,16 +39,18 @@ export class SheetHost {
 
   constructor(parent: HTMLElement, private ctx: Ctx) {
     this.title = h('h2', { id: 'sheet-title', tabindex: '-1' });
-    this.code = h('p', { class: 'sheet-code' });
-    this.tab = h('span', { class: 'sheet-tab' });
-    const close = h('button', { class: 'sheet-close', onclick: () => this.close() }, 'Fold down');
-    this.body = h('div', { class: 'sheet-body' });
-    this.el = h('section', { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'sheet-title', hidden: true },
-      this.tab,
-      h('header', { class: 'sheet-head' }, h('div', {}, this.title, this.code), close),
+    this.code = h('p', { class: 'form' });
+    this.tab = h('div', { class: 'fold-tab' });
+    const close = h('button', { class: 'close', onclick: () => this.close() },
+      svgIcon('<path d="M2 5l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>'), 'Fold down');
+    this.body = h('div', { class: 'sbody' });
+    this.el = h('section', { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'sheet-title' },
+      h('div', { class: 'sheetgrain' }),
+      h('div', { class: 'tabw' }, this.tab),
+      h('header', { class: 'shead' }, h('div', {}, this.title, this.code), close),
       this.body,
     );
-    parent.append(this.el);
+    parent.append(h('div', { class: 'sheetwrap' }, this.el));
     this.el.addEventListener('keydown', (e) => this.onKey(e));
   }
 
@@ -58,8 +70,7 @@ export class SheetHost {
     for (const [id, pane] of this.panes) pane.hidden = id !== room.id;
     this.title.textContent = room.name;
     this.code.textContent = `${room.form} · Room ${room.disc}`;
-    this.tab.textContent = String(room.disc);
-    this.el.hidden = false;
+    this.tab.replaceChildren(h('span', { class: 'disc sm' }, String(room.disc)), h('span', {}, room.name));
     this.body.scrollTop = 0;
     document.body.classList.add('sheet-open');
     this.render();
@@ -75,7 +86,6 @@ export class SheetHost {
     this.current = null;
     this.el.classList.remove('open');
     document.body.classList.remove('sheet-open');
-    window.setTimeout(() => { if (!this.current) this.el.hidden = true; }, 260);
     this.returnTo?.focus({ preventScroll: true });
     this.onClose(room);
   }
@@ -96,7 +106,7 @@ export class SheetHost {
       return;
     }
     if (e.key !== 'Tab') return;
-    const focusable = [...this.el.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), [tabindex="0"]')]
+    const focusable = [...document.querySelectorAll<HTMLElement>('.sheet button:not([disabled]), .sheet input:not([disabled]), .sheet [tabindex="0"], .ewrap.docked .ok')]
       .filter((x) => !x.closest('[hidden]'));
     if (!focusable.length) return;
     const first = focusable[0]!, last = focusable[focusable.length - 1]!;

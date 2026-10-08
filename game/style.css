@@ -1,156 +1,64 @@
-/* Typing Pool Modern tokens (docs/Typing Pool Modern Visual Design Guide.md).
-   Shared base only: each screen imports its own <screen>.css. */
+/* Typing Pool Modern tokens and base (docs/Typing Pool Modern Visual Design Guide.md, design/STYLE.md).
+   Shell and world styles: game/world/bureau.css. Form styles: game/ui/forms.css. */
 :root {
-  --paper: #f2e8d5;
-  --paper-shade: #e4d6bc;
-  --ink: #2b2622;
-  --ink-muted: #6b6157;
-  --walnut: #6b4423;
-  --concrete: #8a8780;
-  --mustard: #c9a227;
-  --tangerine: #d9732b;
-  --olive: #6e7046;
-  --alert: #b23a2e;
-  --phosphor-amber: #b87400;
-  --phosphor-green: #3f7d4e;
-  --glow: #ffe9b0;
-  --screen: #14110d;
-  --screen-ink: #ffb000;
-  --screen-muted: #a89c8a;
+  --paper: #f2e8d5; --paper-shade: #e4d6bc; --ink: #2b2622; --ink-muted: #5e554c;
+  --walnut: #6b4423; --concrete: #8a8780; --mustard: #c9a227; --tangerine: #d9732b;
+  --olive: #6e7046; --alert: #b23a2e; --phosphor-amber: #b87400; --phosphor-green: #3f7d4e;
+  --glow: #ffe9b0; --screen: #14110d; --screen-ink: #ffb000; --screen-muted: #a89c8a;
   --font-display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
   --font-body: 'IBM Plex Sans', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
   --font-type: 'Courier Prime', 'Courier New', monospace;
-  --tabs-height: 60px;
+  /* derived for this exploration: three clearly separated value layers */
+  --edge: #fffaf0;          /* the white of cut paper (rims, tabs) */
+  --on-walnut: #f2e8d5;
+  --table: color-mix(in srgb, var(--walnut) 72%, var(--screen));
+  --floor: color-mix(in srgb, var(--paper-shade) 60%, var(--walnut));   /* darkest sheet */
+  --pad: color-mix(in srgb, var(--paper) 88%, var(--glow));             /* zone rugs: lightest sheet */
+  --sheet: var(--paper);
+  --head: var(--walnut);
+  --focus: var(--ink);
+  --ctl: var(--walnut);         /* edge of every control: >= 3:1 on sheet, floor and header */
+  --ctl-hdr: var(--mustard);    /* edge of the header control on walnut */
+  --stamp: color-mix(in srgb, var(--alert) 68%, var(--ink));
   color-scheme: light dark;
 }
 @media (prefers-color-scheme: dark) {
-  :root {
-    --paper: #1f1b17;
-    --paper-shade: #2a241e;
-    --ink: #ede3cf;
-    --ink-muted: #a89c8a;
-    --walnut: #8a5a33;
-    --concrete: #5e5b55;
-    --mustard: #d9b23a;
-    --tangerine: #e8843a;
-    --olive: #8c8f5a;
-    --alert: #d2554a;
-    --phosphor-amber: #ffb000;
-    --phosphor-green: #7cd992;
-    --glow: #ffd27a;
+  :root:not([data-theme='light']) {
+    --paper: #1f1b17; --paper-shade: #2a241e; --ink: #ede3cf; --ink-muted: #a89c8a;
+    --walnut: #8a5a33; --concrete: #5e5b55; --mustard: #d9b23a; --tangerine: #e8843a;
+    --olive: #8c8f5a; --alert: #d2554a; --phosphor-amber: #ffb000; --phosphor-green: #7cd992;
+    --glow: #ffd27a; --edge: #d8ccb4; --on-walnut: #f2e8d5; --sheet: #302920; --head: #d9b23a;
+    --table: color-mix(in srgb, var(--paper) 70%, var(--screen));
+    --floor: color-mix(in srgb, var(--paper) 78%, var(--screen));
+    --pad: color-mix(in srgb, var(--paper-shade) 55%, var(--concrete));
+    --stamp: color-mix(in srgb, var(--alert) 66%, var(--ink));
+    --ctl: color-mix(in srgb, var(--mustard) 80%, var(--sheet)); --ctl-hdr: var(--edge);
   }
 }
-
-* { box-sizing: border-box; }
-body {
-  margin: 0;
-  background: var(--paper);
-  color: var(--ink);
-  font: 16px/1.5 var(--font-body);
-  padding-bottom: calc(var(--tabs-height) + env(safe-area-inset-bottom));
-}
-body > * { max-width: 44rem; margin-left: auto; margin-right: auto; }
-
-h1, h2, h3 { font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.04em; margin: 0; }
-h2 { font-size: 1.2rem; color: var(--walnut); }
-.eyebrow, .label {
-  font: 500 0.8rem var(--font-display);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--ink-muted);
-}
-.label { margin: 0; }
-.value { font: 600 1.2rem var(--font-mono); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.cost { font-family: var(--font-mono); font-size: 0.95em; text-transform: none; letter-spacing: 0; }
-
-/* ---------- shell ---------- */
-.shell-header { padding: max(12px, env(safe-area-inset-top)) 16px 8px; display: grid; gap: 8px; }
-.shell-title h1 { font-size: 1.6rem; line-height: 1; color: var(--walnut); }
-.shell-title .eyebrow { margin: 0 0 2px; }
-.shell-slot:empty { display: none; }
-#screens { padding: 8px 16px 16px; display: grid; gap: 16px; }
-#screens > [hidden] { display: none; }
-.screen { display: grid; gap: 16px; }
-
-.readout {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1px;
-  background: var(--concrete);
-  border: 1px solid var(--concrete);
-}
-.readout > div { background: var(--screen); padding: 8px 10px; display: grid; min-width: 0; }
-.readout .label { color: var(--screen-muted); }
-.readout .value { color: var(--screen-ink); font-size: 1.15rem; }
-
-.panel {
-  background: var(--paper-shade);
-  border: 1px solid var(--concrete);
-  padding: 12px;
-  display: grid;
-  gap: 10px;
+:root[data-theme='dark'] {
+  --paper: #1f1b17; --paper-shade: #2a241e; --ink: #ede3cf; --ink-muted: #a89c8a;
+  --walnut: #8a5a33; --concrete: #5e5b55; --mustard: #d9b23a; --tangerine: #e8843a;
+  --olive: #8c8f5a; --alert: #d2554a; --phosphor-amber: #ffb000; --phosphor-green: #7cd992;
+  --glow: #ffd27a; --edge: #d8ccb4; --on-walnut: #f2e8d5; --sheet: #302920; --head: #d9b23a;
+  --table: color-mix(in srgb, var(--paper) 70%, var(--screen));
+  --floor: color-mix(in srgb, var(--paper) 78%, var(--screen));
+  --pad: color-mix(in srgb, var(--paper-shade) 55%, var(--concrete));
+  --stamp: color-mix(in srgb, var(--alert) 66%, var(--ink));
+  --ctl: color-mix(in srgb, var(--mustard) 80%, var(--sheet)); --ctl-hdr: var(--edge);
 }
 
-.shell-tabs {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  max-width: none;
-  display: flex;
-  justify-content: center;
-  background: var(--walnut);
-  padding-bottom: env(safe-area-inset-bottom);
-  z-index: 10;
-}
-.shell-tabs button {
-  flex: 1 1 0;
-  max-width: 9rem;
-  min-height: var(--tabs-height);
-  border: 0;
-  background: transparent;
-  color: #f2e8d5;
-  font-size: 0.95rem;
-  padding: 8px 4px;
-  opacity: 0.7;
-}
-.shell-tabs button[aria-current='page'] { opacity: 1; box-shadow: inset 0 -4px 0 var(--mustard); }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; margin: 0; overflow: hidden; }
+body { background: var(--table); color: var(--ink); font: 16px/1.45 var(--font-body); overscroll-behavior: none; position: relative; }
+button { font: inherit; color: inherit; }
+/* focus: ink on every paper/floor value in light, cream in dark (>= 3:1 against all backgrounds it sits on) */
+button:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; box-shadow: 0 0 0 6px var(--paper); }
+h1, h2, h3 { font-family: var(--font-display); text-transform: uppercase; letter-spacing: .04em; margin: 0; font-weight: 700; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
-.shell-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 12px 16px 24px; border-top: 1px solid var(--concrete); }
 
-/* ---------- controls ---------- */
-button {
-  font: 700 1.05rem var(--font-display);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  padding: 10px 16px;
-  min-height: 44px;
-  border: 2px solid var(--walnut);
-  background: var(--paper);
-  color: var(--ink);
-  cursor: pointer;
-}
-button.primary { background: var(--tangerine); border-color: var(--tangerine); color: #1f1b17; }
-button:disabled { opacity: 0.45; cursor: not-allowed; }
-button:focus-visible, input:focus-visible { outline: 3px solid var(--mustard); outline-offset: 2px; }
-button.quiet { font-size: 0.8rem; padding: 6px 10px; min-height: 0; border-color: var(--concrete); background: transparent; }
-
-.toast {
-  position: fixed;
-  left: 16px;
-  right: 16px;
-  bottom: calc(var(--tabs-height) + 12px + env(safe-area-inset-bottom));
-  max-width: 40rem;
-  margin: 0 auto;
-  padding: 12px 16px;
-  background: var(--mustard);
-  color: #1f1b17;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  z-index: 20;
-  font-weight: 600;
-}
+/* update prompt */
+.toast { position: absolute; z-index: 60; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); max-width: 26rem; margin: 0 auto; padding: 10px 12px; background: var(--mustard); color: var(--screen); border: 2px solid var(--edge); border-radius: 4px; display: flex; justify-content: space-between; align-items: center; gap: 12px; font-weight: 600; box-shadow: 0 3px 0 var(--lift-sh), 0 8px 16px var(--soft-sh); }
 .toast[hidden] { display: none; }
+.toast button { min-height: 44px; padding: 0 14px; background: var(--walnut); color: var(--on-walnut); border: 2px solid var(--edge); border-radius: 3px 3px 10px 3px; font: 700 .95rem var(--font-display); letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }

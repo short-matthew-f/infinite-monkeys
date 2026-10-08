@@ -157,23 +157,33 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
   };
 
   // ---- DOM (built once) ----
-  const clip = h('span', { class: 'feed-clip' });
+  const clip = h('span', { class: 'fl feed-clip' });
   const lineEl = h('span', { class: 'feed-text' });
   clip.append(lineEl);
   const count = h('span', { class: 'feed-count' });
-  const live = h('span', { class: 'feed-sr', role: 'status', 'aria-live': 'polite' });
-  const list = h('ol', { class: 'feed-history', id: 'feed-history', hidden: true, 'aria-label': 'Recent feed lines, newest first' });
-  const tick = h('button', { class: 'feed-tick', type: 'button', 'aria-expanded': 'false', 'aria-controls': 'feed-history', 'aria-label': 'Feed. Tap to show recent lines.', onclick: () => setOpen(!open) },
-    h('span', { class: 'feed-strip' }, clip),
-    count,
+  const live = h('span', { class: 'sr', role: 'status', 'aria-live': 'polite' });
+  const list = h('ol', { id: 'feed-history', 'aria-label': 'Recent feed lines, newest first' });
+  const hist = h('div', { class: 'feedhist', hidden: true, role: 'region', 'aria-label': 'Feed history' },
+    h('p', { class: 'typed' }, 'Feed · latest entries ', count), list);
+  const chevron = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  chevron.setAttribute('class', 'fc');
+  chevron.setAttribute('width', '14');
+  chevron.setAttribute('height', '14');
+  chevron.setAttribute('viewBox', '0 0 14 14');
+  chevron.setAttribute('aria-hidden', 'true');
+  chevron.innerHTML = '<path d="M2 5l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>';
+  const tick = h('button', { class: 'feedbtn', type: 'button', 'aria-expanded': 'false', 'aria-controls': 'feed-history', 'aria-label': 'Feed. Tap to show recent lines.', onclick: () => setOpen(!open) },
+    h('span', { class: 'ft', 'aria-hidden': 'true' }, 'Feed'),
+    clip,
+    chevron,
   );
-  const wrap = h('div', { class: 'feed' }, tick, live, list);
+  const wrap = h('div', { class: 'feed-inner' }, tick, live, hist);
   root.append(wrap);
 
   const setOpen = (v: boolean) => {
     open = v;
     tick.setAttribute('aria-expanded', String(v));
-    list.hidden = !v;
+    hist.hidden = !v;
     if (v) {
       shownKey = '';
       dirty = true;

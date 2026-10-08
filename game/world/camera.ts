@@ -82,10 +82,10 @@ export class Camera {
   }
 
   /** Pose that centres a world box in the visible area, at play zoom, optionally above a sheet of `cover` px. */
-  frame(box: Box, cover = 0, s = this.o.playScale): Pose {
+  frame(box: Box, cover = 0, s = this.o.playScale, minScale = 0): Pose {
     const { top } = this.o.insets();
     const bottom = Math.max(this.o.insets().bottom, cover);
-    const fit = Math.min(s, (this.vw - 24) / box[2], (this.vh - top - bottom - 24) / box[3]);
+    const fit = Math.max(minScale, Math.min(s, (this.vw - 24) / box[2], (this.vh - top - bottom - 24) / box[3]));
     const cx = box[0] + box[2] / 2, cy = box[1] + box[3] / 2;
     const sy = (top + this.vh - bottom) / 2;
     const [x, y] = cover ? [this.vw / 2 - cx * fit, sy - cy * fit] : this.clampPose(this.vw / 2 - cx * fit, sy - cy * fit, fit);

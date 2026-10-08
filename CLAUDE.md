@@ -41,10 +41,17 @@ content/   tuning data only
 sim/       bots + simulation report
 tests/     Vitest unit tests and sim assertions
 scripts/   check-purity.mjs (enforces core/ rules)
-game/      UI (Vite root): main.ts, loop.ts (fixed-step rAF), persist.ts (IndexedDB)
+game/      UI (Vite root): main.ts (wiring), loop.ts (fixed-step rAF), persist.ts (IndexedDB)
+  world/   the Bureau floor: camera.ts (two zoom levels), floor.ts (state → art),
+           floor-art.js (pure SVG builder, art code), sheet.ts (room sheets), ernest.ts
+  screens/ room contents (Personnel, Typing Pool, Departments, Records Library,
+           Director's Office) plus the feed; each mounts into a paper sheet
 ```
 
 Hard rules:
+- **The place is the interface.** No tab bar: rooms on the floor open their
+  screens in sheets; the Directory is the non-spatial route. Art and camera
+  follow `design/STYLE.md` (including its performance rules).
 - **The UI never reimplements game math.** Every number on screen comes from
   `core/`. If a number is missing, add a pure function to `core/` with a test.
 - **`core/` purity** (enforced by `npm run check:purity`): no `Date`,

@@ -1,5 +1,6 @@
 // Measures frame rate on a page with the CPU throttled to roughly phone speed.
-// Usage: node scripts/perf.mjs <page.html> [--click=<selector>]... [--throttle=4]
+// Usage: node scripts/perf.mjs <page.html | http(s) URL> [--click=<selector>]... [--setup=<js>] [--throttle=4]
+// --setup runs in the page after load (e.g. to load a mid-game state through a dev hook).
 // Reports idle, a drag-pan, and each --click (e.g. a zoom toggle), as fps / worst
 // frame / frames over 34 ms. Target: >= 55 fps and no frame over 50 ms at 4×.
 import { chromium } from 'playwright-core';
@@ -9,6 +10,7 @@ import { pathToFileURL } from 'node:url';
 const args = process.argv.slice(2);
 const page = args.find((a) => !a.startsWith('--'));
 const clicks = args.filter((a) => a.startsWith('--click=')).map((a) => a.slice(8));
+const setup = args.find((a) => a.startsWith('--setup='))?.slice(8);
 const rate = Number(args.find((a) => a.startsWith('--throttle='))?.slice(11) ?? 4);
 if (!page) { console.error('usage: node scripts/perf.mjs <page.html> [--click=<selector>]... [--throttle=4]'); process.exit(1); }
 
@@ -17,8 +19,9 @@ const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, de
 const p = await ctx.newPage();
 const errors = [];
 p.on('pageerror', (e) => errors.push(e.message));
-await p.goto(pathToFileURL(resolve(page)).href, { waitUntil: 'networkidle' });
+await p.goto(/^https?:/.test(page) ? page : pathToFileURL(resolve(page)).href, { waitUntil: 'networkidle' });
 await p.waitForTimeout(1500);
+if (setup) { await p.evaluate(setup); await p.waitForTimeout(2500); }
 const cdp = await ctx.newCDPSession(p);
 await cdp.send('Emulation.setCPUThrottlingRate', { rate });
 
