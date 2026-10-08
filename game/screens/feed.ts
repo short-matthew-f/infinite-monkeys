@@ -1,7 +1,7 @@
 // Feed: a teletype ticker (one current line) that unrolls into recent history.
 // Lines come from core events and from ambient flavor on a game-time schedule.
 // Choosing flavor draws from state.rng.presentation only (HANDOFF rule 5).
-import { nextFloat, type GameEvent } from '../../core/index.js';
+import { DEPTS, nextFloat, type DeptId, type GameEvent } from '../../core/index.js';
 import type { Ctx, Screen } from '../ctx.js';
 import { h, text } from '../ui/dom.js';
 import * as f from '../ui/format.js';
@@ -21,6 +21,7 @@ import {
 } from '../content/feed-lines.js';
 import './feed.css';
 
+const DEPT_NAMES: Record<DeptId, string> = { recruiting: 'Recruiting', construction: 'Construction', editing: 'Editing' };
 const HISTORY_MAX = 50;
 const AMBIENT_MIN_S = 20;
 const AMBIENT_SPAN_S = 20; // next ambient line is 20..40 s of game time away
@@ -83,12 +84,16 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
     push(tick, line);
   };
 
+  /** One of a few equivalent phrasings, chosen from the presentation stream only. */
+  const variant = (lines: string[]): string => lines[Math.min(lines.length - 1, Math.floor(nextFloat(ctx.state().rng.presentation) * lines.length))] as string;
+
   const onEvent = (e: GameEvent) => {
     switch (e.type) {
       case 'hire':
         if (e.manual) pending.hires++; // automated hires are far too frequent to log
         break;
       case 'purchase':
+        if (e.by === 'department') break; // a department spending its own account; the quarter summary covers it
         if (e.item === 'desk') pending.desks++;
         else if (e.item.startsWith('research:') || e.item.startsWith('epic:')) pending.research++;
         else pending.upgrades++;
@@ -119,6 +124,33 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
       case 'objectivePinned':
         throttled('pin', e.tick, pinLine(e.objective.kind, e.objective.kind === 'commission' ? e.objective.id : undefined));
         break;
+      // Quarterly budget (trial): facts only. Heads and reports never say what to buy.
+      case 'budgetOpened':
+        push(e.tick, variant([
+          'Form 8-B filed: the quarterly budget is open. Until it is signed, income goes to the wallet.',
+          'Accounts has opened the quarterly budget. Until it is signed, all income goes to the wallet.',
+        ]), false, true);
+        break;
+      case 'quarterEnded': {
+        const r = e.report;
+        const levels = DEPTS.reduce((a, d) => a + r.autoLevels[d], 0);
+        const tail = e.missedReview ? ' The review closed unsigned; the previous lines continue.' : '';
+        push(e.tick, `Q${r.quarter} closed. Income ${f.amount(r.income)}; ${plural(levels, 'department level', 'department levels')} bought by the departments; ${f.amount(r.swept)} swept to the pot.${tail}`, false, true);
+        break;
+      }
+      case 'budgetSigned': {
+        const l = e.next;
+        push(e.tick, `Q${e.quarter} budget signed: ${DEPTS.map((d) => `${DEPT_NAMES[d]} ${f.pct(l[d])}`).join(', ')}, wallet ${f.pct(l.discretionary)}.`, false, true);
+        break;
+      }
+      case 'requisitionOpened':
+        push(e.tick, `${DEPT_NAMES[e.dept]} has filed a requisition: ${plural(e.levels, 'level', 'levels')} for ${f.bananaText(e.price)}.`);
+        break;
+      case 'requisitionClosed': {
+        const word = e.outcome === 'granted' ? 'granted' : e.outcome === 'declined' ? 'declined' : 'expired unanswered';
+        push(e.tick, `${DEPT_NAMES[e.dept]} requisition ${word}.`);
+        break;
+      }
       default:
         break;
     }

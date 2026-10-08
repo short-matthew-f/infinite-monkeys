@@ -53,3 +53,16 @@
 
 /* primitive gap: .n inside .buy-fx computes to 13.7 px; keep decision text at 14 px or more */
 .sheet-pane .dview .buy-fx .n, .sheet-pane .dview .next-fx .n { font-size: 1em; }
+
+/* budget trial: facts in place of the funding controls */
+.sheet-pane .bfacts { display: grid; gap: 8px; }
+.sheet-pane .bf-head { font: 700 1.15rem/1.2 var(--font-display); letter-spacing: .06em; color: var(--head); }
+.sheet-pane .bfact { margin: 0; padding: 8px 10px; display: grid; gap: 2px; background: var(--box); border: 1.5px solid var(--rule); border-radius: 2px 10px 2px 2px; }
+.sheet-pane .bf-name { font: 700 1.05rem/1.2 var(--font-display); letter-spacing: .06em; text-transform: uppercase; }
+.sheet-pane .bf-row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.sheet-pane .bf-k { font: 400 .95rem/1.35 var(--font-body); color: var(--ink-muted); }
+.sheet-pane .bf-v { margin: 0; font: 600 .95rem/1.35 var(--font-body); font-variant-numeric: tabular-nums; text-align: right; }
+.sheet-pane .bf-bar { display: block; position: relative; height: 8px; margin-top: 4px; background: color-mix(in srgb, var(--mustard) 22%, var(--paper)); border: 1.5px solid var(--walnut); border-radius: 1px; overflow: hidden; }
+.sheet-pane .bf-bar::after { content: ''; position: absolute; inset: 0 auto 0 0; width: var(--fill, 0%); background: var(--mustard); }
+:root[data-theme='dark'] .sheet-pane .bf-bar { border-color: var(--mustard); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .sheet-pane .bf-bar { border-color: var(--mustard); } }

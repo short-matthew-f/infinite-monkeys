@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Cards harness (dev only)</title>
+    <link rel="stylesheet" href="../style.css" />
+    <link rel="stylesheet" href="../world/bureau.css" />
+  </head>
+  <body>
+    <div class="stage" id="stage" style="position:absolute;inset:0;overflow:hidden">
+      <main class="tower" id="map" style="background:var(--floor)"></main>
+      <header class="hdr" id="hdr"><div class="brand"><div><p class="eb">Bureau of Infinite Typing</p><h1>The Bureau</h1></div></div></header>
+      <div class="feed" id="feed"></div>
+    </div>
+    <script type="module" src="./cards.ts"></script>
+  </body>
+</html>

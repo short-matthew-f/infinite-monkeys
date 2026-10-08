@@ -1,0 +1,20 @@
+/* Water-cooler card: top-left, below the roof so the quarter-clock and its tag stay visible. Never over a room sheet (main suppresses it). */
+.cooler {
+  position: absolute; z-index: 39; left: 8px; top: calc(var(--hdr, 138px) + 104px);
+  width: min(300px, calc(100% - 112px)); display: grid; grid-template-columns: auto 1fr 44px; gap: 8px; align-items: start;
+  padding: 8px 2px 8px 8px; background: var(--sheet); color: var(--ink); border: 2px solid var(--edge); border-radius: 14px 4px 14px 14px;
+  box-shadow: 0 3px 0 var(--lift-sh), 4px 10px 18px var(--soft-sh); transform-origin: 100% 0;
+}
+.cooler[hidden] { display: none; }
+.cooler.pop { animation: coolin .35s cubic-bezier(.3, .8, .3, 1.2) both; }
+@keyframes coolin { from { transform: translateY(-10px) scale(.92); opacity: 0; } to { transform: none; opacity: 1; } }
+.cooler .faces { display: grid; gap: 2px; }
+.cooler .faces svg { width: 30px; height: 30px; }
+.cooler .cl { margin: 0; font: 400 .9rem/1.35 var(--font-body); }
+.cooler .cl.a { font-weight: 600; }
+.cooler .cl + .cl { margin-top: 3px; }
+.cooler .x {
+  min-width: 44px; min-height: 44px; border: 0; background: transparent; color: var(--ink-muted); font-size: 1rem; cursor: pointer; border-radius: 50%;
+}
+.cooler .x:active { background: color-mix(in srgb, var(--concrete) 30%, transparent); }
+@media (prefers-reduced-motion: reduce) { .cooler.pop { animation: none !important; } }

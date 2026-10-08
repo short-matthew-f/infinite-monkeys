@@ -40,6 +40,8 @@ export interface QuarterReport {
   autoLevels: Record<DeptId, number>;
   /** Bananas spent from the wallet. */
   walletSpent: number;
+  /** The quarter's review was never signed, so it ran on the previous quarter's lines. */
+  ranOnOldLines: boolean;
   /** Requisitions the heads filed this quarter, and how each closed. */
   requisitions: { offered: number; granted: number; declined: number; expired: number };
   /** Unspent wallet swept back into the pot at quarter end. */

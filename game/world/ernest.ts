@@ -8,7 +8,7 @@
 //    existing save never gets a flood of cards. Reel 1 is the exception: it fires
 //    on load while the Bureau has one monkey or none.
 //  - One card at a time. Simultaneous triggers queue (at most 2; older non-essential
-//    ones drop), and the next card waits a short pause after the last is dismissed.
+//    ones drop), and the next card waits a few seconds after the last is dismissed.
 //  - Reels teach rules and locations, never which option is best.
 // Which reels have been seen is presentation state (progress.ts), never GameState.
 import { N, certifyTiers, deskCost, discoveredTiers, editingPool, findRates, buyDeptStage, researchTier, DEPTS, type GameState, type Tuning } from '../../core/index.js';
@@ -59,7 +59,10 @@ const REELS: Reel[] = [
 const BY_ID = new Map(REELS.map((r) => [r.id, r]));
 
 const MAX_QUEUE = 2;
-const PAUSE_SECONDS = 1.5;
+/** A quiet beat after a card is dismissed, so the next one doesn't chase the last. */
+const PAUSE_SECONDS = 6;
+/** Rooms on the lower floors: for these his card sits at the top of the building, clear of what he points to. */
+const LOWER_FLOORS = new Set(['personnel', 'pool']);
 
 export class Ernest {
   /** Set by main: open a room. */
@@ -191,6 +194,8 @@ export class Ernest {
       this.lastSay = text;
     }
     this.wrap.classList.toggle('docked', docked);
+    // He never covers what he teaches: reels about the bottom floors perch at the top and point down.
+    this.wrap.classList.toggle('top', !docked && LOWER_FLOORS.has(r.room));
     this.go.hidden = docked;
     this.fig?.setAttribute('viewBox', docked ? '50 8 86 76' : '0 0 138 128');
     if (!this.shown) {

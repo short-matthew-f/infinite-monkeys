@@ -113,6 +113,7 @@ describe('quarterly budget', () => {
     const ended = ofType(events, 'quarterEnded');
     expect(ended).toHaveLength(1);
     expect(ended[0]!.missedReview).toBe(true);
+    expect(s.budget!.lastReport!.ranOnOldLines).toBe(true);
     expect(s.budget!.missedReviews).toBe(1);
     expect(s.budget!.lines).toEqual(LINES);
   });

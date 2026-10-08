@@ -45,6 +45,21 @@ export function floorProps(s: GameState, t: Tuning): FloorProps {
   };
 }
 
+/** What the building shows of the quarterly budget (all values from core; ratios only for drawing). */
+export interface BudgetView {
+  quarter: number;
+  /** Seconds left in the quarter, from core's quarterSecondsLeft. */
+  secondsLeft: number;
+  /** Share of the quarter still to run, 0..1. */
+  frac: number;
+  reviewDue: boolean;
+  /** Each department's account against its next level price. */
+  accounts: Record<(typeof DEPTS)[number], { frac: number; balance: string; price: string }>;
+}
+
+const CLOCK_R = 15;
+const CLOCK_C = 2 * Math.PI * CLOCK_R;
+
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, html = ''): HTMLElementTagNameMap[K] => {
   const e = document.createElement(tag);
   e.className = cls;
@@ -65,12 +80,30 @@ export class Tower {
   private limitTag: HTMLElement;
   private pileNote!: HTMLElement;
   private cued: Cue | null = null;
+  private clock: HTMLButtonElement;
+  private clockArc: SVGCircleElement;
+  private clockQ: SVGTextElement;
+  private clockTag: HTMLElement;
+  private clockKey = '';
+  private acctNote: Partial<Record<(typeof DEPTS)[number], string>> = {};
+  private flashes = new Map<string, { n: number; timer: number }>();
+  /** Called when the roof clock is tapped (budget trial). */
+  onReview: () => void = () => {};
   /** Called when a floor (or a Departments wing) is activated. */
   onOpen: (id: FloorId, from: HTMLElement, dept?: string) => void = () => {};
 
   constructor(private host: HTMLElement) {
     const roof = el('div', 'roof');
     roof.innerHTML = `<svg viewBox="0 -8 400 34" preserveAspectRatio="xMidYMax meet" aria-hidden="true">${roofSVG()}</svg>`;
+    this.clock = el('button', 'qclock',
+      `<span class="qtag" hidden></span><svg viewBox="0 0 40 40" width="40" height="40" aria-hidden="true"><circle class="qface" cx="20" cy="20" r="19"/><circle class="qtrack" cx="20" cy="20" r="${CLOCK_R}"/><circle class="qarc" cx="20" cy="20" r="${CLOCK_R}" transform="rotate(-90 20 20)" stroke-dasharray="${CLOCK_C.toFixed(2)}"/><circle class="qring" cx="20" cy="20" r="19"/><text class="qnum" x="20" y="24.5" text-anchor="middle">Q1</text></svg>`);
+    this.clock.type = 'button';
+    this.clock.hidden = true;
+    this.clock.addEventListener('click', () => this.onReview());
+    this.clockArc = this.clock.querySelector('.qarc') as unknown as SVGCircleElement;
+    this.clockQ = this.clock.querySelector('.qnum') as unknown as SVGTextElement;
+    this.clockTag = this.clock.querySelector('.qtag') as HTMLElement;
+    roof.append(this.clock);
     const bldg = el('div', 'bldg');
     this.limitTag = el('span', 'limit-tag', '<span aria-hidden="true">◆</span> Typing is the limit');
     for (const id of ORDER) bldg.append(this.floor(id));
@@ -99,7 +132,7 @@ export class Tower {
     this.cueEl.set(id, cue);
     if (id === 'departments') {
       for (const d of DEPTS) {
-        const w = el('button', `wing wing-${d}`, `<span class="wlab"><span data-live="${d}"></span>${d === 'editing' ? '<span class="wnote" hidden><span aria-hidden="true">▲</span> Pages piling up</span>' : ''}</span>`);
+        const w = el('button', `wing wing-${d}`, `<span class="wflash" hidden></span><span class="wlab"><span data-live="${d}"></span>${d === 'editing' ? '<span class="wnote" hidden><span aria-hidden="true">▲</span> Pages piling up</span>' : ''}<span class="acct" aria-hidden="true" hidden><span class="acct-l" aria-hidden="true">Acct</span><span class="acct-bar" aria-hidden="true"></span></span></span>`);
         w.type = 'button';
         w.dataset.room = 'departments';
         w.dataset.dept = d;
@@ -157,6 +190,52 @@ export class Tower {
     return rebuilt;
   }
 
+  /** The quarterly budget on the building. Null (classic, or before the budget opens) shows nothing new. */
+  setBudget(b: BudgetView | null): void {
+    const on = !!b;
+    this.host.classList.toggle('budget', on);
+    this.clock.hidden = !on;
+    for (const d of DEPTS) {
+      const acct = this.hits.get(`departments:${d}`)?.querySelector<HTMLElement>('.acct');
+      if (!acct) continue;
+      acct.hidden = !on;
+      if (!b) continue;
+      const a = b.accounts[d];
+      acct.style.setProperty('--fill', `${Math.min(100, a.frac * 100).toFixed(1)}%`);
+      this.acctNote[d] = `. Account ${a.balance} of ${a.price} for the next level`;
+    }
+    if (!on) this.acctNote = {};
+    if (this.props) this.labels(this.props);
+    if (!b) return;
+    this.clock.classList.toggle('due', b.reviewDue);
+    this.clockTag.hidden = !b.reviewDue;
+    if (b.reviewDue && !this.clockTag.textContent) this.clockTag.textContent = 'Review ready';
+    // Redraw the arc and label only when they would change.
+    const key = `${b.quarter}|${b.reviewDue}|${Math.round(b.frac * 200)}|${Math.ceil(b.secondsLeft / 5)}`;
+    if (key === this.clockKey) return;
+    this.clockKey = key;
+    this.clockArc.setAttribute('stroke-dashoffset', (CLOCK_C * (1 - (b.reviewDue ? 1 : b.frac))).toFixed(2));
+    this.clockQ.textContent = `Q${b.quarter}`;
+    const left = `${Math.max(0, Math.ceil(b.secondsLeft / 5) * 5)} seconds left`;
+    this.clock.setAttribute('aria-label', b.reviewDue ? `Quarterly review ready, Q${b.quarter}` : `Quarterly review, Q${b.quarter}, ${left}`);
+  }
+
+  /** A department bought a level from its own account. Flashes on its wing; bursts add up. */
+  flashAuto(d: (typeof DEPTS)[number]): void {
+    const w = this.hits.get(`departments:${d}`);
+    const fl = w?.querySelector<HTMLElement>('.wflash');
+    if (!w || !fl) return;
+    const prev = this.flashes.get(d);
+    if (prev) window.clearTimeout(prev.timer);
+    const n = (prev?.n ?? 0) + 1;
+    fl.textContent = n === 1 ? '+1 level · auto' : `+${n} levels · auto`;
+    fl.hidden = false;
+    fl.classList.remove('go');
+    void fl.offsetWidth; // restart the animation
+    fl.classList.add('go');
+    this.flashes.set(d, { n, timer: window.setTimeout(() => { fl.hidden = true; this.flashes.delete(d); }, 1900) });
+  }
+
   /** Button labels carry the same status words as the plates. */
   private labels(p: FloorProps): void {
     const set = (b: HTMLElement | undefined, v: string) => {
@@ -165,7 +244,7 @@ export class Tower {
     for (const id of ['personnel', 'pool', 'research', 'director'] as const) set(this.hits.get(id), `${FLOOR_NAMES[id]}: ${floorHint(id, p)}`);
     for (const d of DEPTS) {
       const pile = p.bottleneck === 'editing' && d === 'editing' ? '. Pages are piling up' : '';
-      set(this.hits.get(`departments:${d}`), `${DEPT_NAMES[d]}: ${deptHint(d, p)}${pile}`);
+      set(this.hits.get(`departments:${d}`), `${DEPT_NAMES[d]}: ${deptHint(d, p)}${pile}${this.acctNote[d] ?? ''}`);
     }
   }
 

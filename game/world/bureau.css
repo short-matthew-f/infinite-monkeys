@@ -401,8 +401,13 @@ body.hidden-pause, body.hidden-pause * { animation-play-state: paused !important
 
 /* ---------- Ernest: peeks over his card from the bottom-right aisle, never over what he teaches ---------- */
 .ewrap { position: absolute; z-index: 35; right: 8px; bottom: 10px; width: min(214px, calc(100vw - 16px)); pointer-events: none; display: flex; flex-direction: column; align-items: flex-end;
-  transform: translate(190px, 0) rotate(3deg); opacity: 0; visibility: hidden; transform-origin: 100% 100%;
-  transition: transform 620ms cubic-bezier(.3, .8, .25, 1), opacity 260ms, visibility 0s 620ms; }
+  transform: translate(56px, 0) rotate(2deg); opacity: 0; visibility: hidden; transform-origin: 100% 100%;
+  transition: transform 560ms cubic-bezier(.3, .8, .25, 1), opacity 420ms ease-out, visibility 0s 560ms; }
+/* Reels about the lower floors perch at the top of the building and point down, so the floor they teach stays tappable. */
+.ewrap.top { bottom: auto; top: calc(var(--hdr, 138px) + 6px); width: min(196px, calc(100vw - 16px)); transform: translate(0, -22px); transform-origin: 100% 0; }
+.ewrap.top .efig { width: 84px; height: 78px; margin: 0 6px -14px 0; --aim: -34deg; }
+.ewrap.top .reel { display: none; }
+.ewrap.top .ernest p.say { font-size: .875rem; margin: 2px 0 4px; }
 .ewrap.in { transform: none; opacity: 1; visibility: visible; transition-delay: 0s; }
 .ewrap.docked { bottom: auto; top: calc(var(--hdr, 138px) - var(--feed) + 62px); width: 148px; padding-top: 50px; }
 .efig { width: 104px; height: 97px; margin: 0 4px -16px 0; pointer-events: none; position: relative; z-index: 0; }
@@ -460,3 +465,21 @@ html { background: var(--walnut); }
 .readout .v { white-space: nowrap; }
 /* The stage never scrolls, even programmatically (focus or scrollIntoView would otherwise shift the world under the header). */
 .stage { overflow: clip; }
+
+/* ---------- quarterly budget (trial): header marker, wallet and pot, Directory switch ---------- */
+.h1row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.trial {
+  flex: none; padding: 2px 6px 1px; background: var(--mustard); color: var(--screen); border: 1.5px solid var(--edge); border-radius: 2px;
+  font: 700 .68rem/1.1 var(--font-display); letter-spacing: .1em; text-transform: uppercase; white-space: nowrap;
+}
+.trial[hidden] { display: none; }
+.readout .ban { gap: 4px; justify-content: flex-start; }
+.readout .ban #r-ban { margin-right: auto; }
+.readout.budget > div { align-items: center; }
+.readout.budget .ban { flex-wrap: wrap; row-gap: 0; }
+/* the pot sits under the wallet; its line is reserved so the header never changes height */
+.readout .pot { display: none; flex: 1 0 100%; align-items: baseline; gap: 4px; }
+.readout.budget .pot { display: flex; }
+.readout.budget .pot[hidden] { visibility: hidden; }
+.readout .pot .v { font-size: .78rem; }
+.mode-box { display: grid; gap: 6px; padding: 8px 0; border-top: 1.5px dotted var(--concrete); }

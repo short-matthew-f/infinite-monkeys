@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Ceremony harness (dev only)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=Courier+Prime&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600&display=swap" />
+    <link rel="stylesheet" href="../style.css" />
+    <link rel="stylesheet" href="../world/bureau.css" />
+  </head>
+  <body>
+    <div class="stage" id="stage">
+      <svg class="defs" width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute"><defs><filter id="soft" x="-20%" y="-20%" width="140%" height="160%"><feGaussianBlur stdDeviation="2.6"/></filter></defs></svg>
+      <main style="padding:16px"><button id="opener" type="button">Open the quarterly review</button> <p id="out" style="font:14px monospace"></p></main>
+      <div class="sr" id="live" aria-live="polite"></div>
+    </div>
+    <script type="module" src="./ceremony.ts"></script>
+  </body>
+</html>

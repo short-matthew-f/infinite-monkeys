@@ -678,9 +678,13 @@ Recorded so they aren't reintroduced.
 
 ## 13. Quarterly Budget (proposed, behind a tuning switch)
 
-Status: in `core/` behind `Tuning.budget` (`prototypeBudgetTuning`). The shipped
-game still runs `prototypeTuning`, where `budget` is absent, so nothing changes
-until this is adopted. Mockup: `design/explorations/tower/`.
+Status: in `core/` behind `Tuning.budget` (`prototypeBudgetTuning`), and
+playable in the game as a trial. The Directory's "Quarterly budget (trial)"
+switches to a separate save slot that runs the budget tuning. Classic play
+still runs `prototypeTuning` and is unchanged. Game pieces: the roof
+quarter-clock and department account plates (`game/world/tower.ts`), the
+quarter-end ceremony (`ceremony.ts`), requisition memos (`memo.ts`) and the
+water cooler (`cooler.ts`, both modes). Mockup: `design/explorations/tower/`.
 
 **Why.** Free funding shares were a solved knob: "Suggested" was nearly always
 right, so the player pressed it whenever something drifted (Matt: "everything

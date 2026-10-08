@@ -1,8 +1,11 @@
 import { registerSW } from 'virtual:pwa-register';
-import { N, catchUp, certifyTiers, createState, editingPool, type EventSink, type GameEvent, type GameState } from '../core/index.js';
-import { prototypeTuning as t } from '../content/prototype.js';
+import { DEPTS, N, activeBudget, catchUp, certifyTiers, createState, deptLevelCost, editingPool, quarterSecondsLeft, type DeptId, type EventSink, type GameEvent, type GameState } from '../core/index.js';
+import { prototypeBudgetTuning, prototypeTuning } from '../content/prototype.js';
 import { createCtx } from './ctx.js';
 import { startLoop } from './loop.js';
+import { Ceremony } from './world/ceremony.js';
+import { Cooler } from './world/cooler.js';
+import { MemoView } from './world/memo.js';
 import * as persist from './persist.js';
 import { departments } from './screens/departments.js';
 import { feed } from './screens/feed.js';
@@ -17,7 +20,7 @@ import { CueView } from './world/cue.js';
 import { Ernest } from './world/ernest.js';
 import { progress } from './world/progress.js';
 import { RoomView, type Room } from './world/room.js';
-import { Tower, floorProps } from './world/tower.js';
+import { Tower, floorProps, type BudgetView } from './world/tower.js';
 import { floorHint } from './world/tower-art.js';
 
 // The place is the interface: each floor of the building opens its room, full screen.
@@ -28,6 +31,12 @@ const ROOMS: Room[] = [
   { id: 'research', name: 'Records Library', form: 'Form 4-R', disc: 4, screen: research },
   { id: 'director', name: "Director's Office", form: 'Form 9-R', disc: 5, screen: readiness },
 ];
+
+// The tuning is a per-save choice made before anything else reads it. Classic and the
+// quarterly-budget trial keep separate save slots, so switching never destroys either.
+const mode = persist.getMode();
+const t = mode === 'budget' ? prototypeBudgetTuning : prototypeTuning;
+const budgetOn = !!t.budget;
 
 const SAVE_EVERY_MS = 5000;
 const FEED_H = 40;
@@ -54,7 +63,7 @@ function newSeed(): number {
   return crypto.getRandomValues(new Uint32Array(1))[0] ?? 1;
 }
 
-const rec = await persist.load();
+const rec = await persist.load(mode);
 let state: GameState = rec ? rec.state : createState(t, newSeed());
 const returning = !!rec;
 
@@ -68,9 +77,11 @@ if (rec) catchUp(state, t, sink, (Date.now() - rec.savedAt) / 1000);
 // ---------- saving ----------
 
 let saveFailed = false;
+let resetting = false;
 async function save(): Promise<void> {
+  if (resetting) return;
   try {
-    await persist.save(state);
+    await persist.save(state, mode);
     if (saveFailed) $('save-fail').hidden = true;
     saveFailed = false;
     text($('save-status'), `Saved ${new Date().toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`);
@@ -89,6 +100,14 @@ $('save-retry').addEventListener('click', () => void save());
 
 // ---------- the building ----------
 
+// Budget trial header (before it is measured): marker, Wallet label, and a reserved line for the pot.
+if (budgetOn) {
+  $('trial').hidden = false;
+  document.querySelector('.readout')!.classList.add('budget');
+  $('r-ban-lb').textContent = 'Wallet';
+  $('r-ban').parentElement!.setAttribute('aria-label', 'Wallet: bananas to spend on manual purchases');
+}
+
 const stage = $('stage');
 const hdr = $('hdr');
 const insetTop = () => hdr.offsetHeight + FEED_H;
@@ -100,10 +119,46 @@ let props = floorProps(state, t);
 const tower = new Tower($('map'));
 tower.apply(props);
 
+/** Opens the quarter-end ceremony (budget trial): the roof quarter-clock calls this. */
+function openReview(): void {
+  const b = state.budget;
+  if (!b?.reviewDue) {
+    say(`Q${b?.quarter ?? 1} is still running.`);
+    return;
+  }
+  closeDir();
+  if (rooms.current) rooms.close();
+  ceremony.open();
+  dirty = true;
+}
+tower.onReview = openReview;
+
+/** What the building shows of the budget; null in classic play and before the budget opens. */
+function budgetView(): BudgetView | null {
+  const b = activeBudget(state, t);
+  if (!t.budget || !b) return null;
+  const accounts = {} as BudgetView['accounts'];
+  for (const d of DEPTS) {
+    const price = deptLevelCost(state, t, d);
+    accounts[d] = { frac: N.ratio(b.accounts[d], price), balance: f.count(b.accounts[d]), price: f.count(price) };
+  }
+  const secondsLeft = quarterSecondsLeft(state, t);
+  return { quarter: b.quarter, secondsLeft, frac: secondsLeft / t.budget.quarterSeconds, reviewDue: b.reviewDue, accounts };
+}
+tower.setBudget(budgetView());
+
 // ---------- rooms ----------
 
 const rooms = new RoomView(stage, ctx, () => props);
 rooms.register(ROOMS);
+
+// Budget trial: the quarter-end ceremony and the heads' memos. The water cooler runs in both modes.
+const ceremony = new Ceremony(stage, ctx);
+ceremony.onClose = () => (dirty = true);
+const memo = new MemoView(stage, ctx);
+const cooler = new Cooler(stage, ctx);
+addEventListener('pointerdown', () => cooler.poke(), { capture: true });
+addEventListener('keydown', () => cooler.poke(), { capture: true });
 /** The Departments wing that opened the room, so focus can return to it. */
 let lastDept: string | undefined;
 
@@ -137,6 +192,11 @@ addEventListener('im:goto', (e) => {
   const room = (e as CustomEvent<string>).detail;
   if (room === 'departments') dispatchEvent(new CustomEvent('im:dept-view', { detail: 'summary' }));
   openRoom(room);
+});
+
+// A department bought a level from its own account: flash it on its wing.
+onEvent((e) => {
+  if (e.type === 'purchase' && e.by === 'department') tower.flashAuto(e.item.split(':')[0] as DeptId);
 });
 
 // A manual hire: the candidate walks from the street into the lobby.
@@ -173,6 +233,7 @@ document.addEventListener('pointerdown', (e) => {
 });
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
+  if (ceremony.isOpen) return; // the ceremony handles its own Escape
   // Escape leaves an open room even when focus has left it (e.g. a button that just disabled itself).
   if (rooms.current) {
     if (!rooms.el.contains(document.activeElement)) rooms.close();
@@ -181,7 +242,21 @@ document.addEventListener('keydown', (e) => {
   if (!dir.hidden) { closeDir(); dirbtn.focus(); }
 });
 
-// Reset is destructive: it asks first (MOBILE-UX rule 1).
+// Mode switch: not destructive. The other mode's save stays in its own slot.
+const switchTo = mode === 'budget' ? 'classic' : 'budget';
+$('mode-why').textContent = mode === 'budget'
+  ? 'You are in the budget trial: department money comes from a budget you sign each quarter. Going back switches to your classic Bureau. This trial save is kept.'
+  : 'Try the quarterly budget: department money comes from a budget you sign each quarter. It starts its own save. Your classic Bureau is kept exactly as it is.';
+$('mode-switch').textContent = mode === 'budget' ? 'Back to the classic Bureau' : 'Quarterly budget (trial)';
+$('mode-switch').addEventListener('click', async () => {
+  await save();
+  persist.setMode(switchTo);
+  resetting = true; // the page is going away; don't let pagehide re-save over the switch
+  location.reload();
+});
+$('reset-why').textContent = `This erases every monkey, desk, banana and discovery in the ${mode === 'budget' ? 'budget trial' : 'classic'} save on this device. ${mode === 'budget' ? 'Your classic Bureau is kept.' : 'Your budget-trial save is kept.'} It can't be undone.`;
+
+// Reset is destructive: it asks first (MOBILE-UX rule 1). It erases only the active mode's slot.
 $('reset').addEventListener('click', () => {
   $('reset-confirm').hidden = false;
   $('reset-no').focus();
@@ -191,9 +266,10 @@ $('reset-no').addEventListener('click', () => {
   $('reset').focus();
 });
 $('reset-yes').addEventListener('click', async () => {
-  await persist.clear();
+  resetting = true;
+  await persist.clear(mode);
   try {
-    for (const k of Object.keys(localStorage)) if (k.startsWith('im:')) localStorage.removeItem(k);
+    for (const k of Object.keys(localStorage)) if (k.startsWith('im:') && k !== 'im:mode') localStorage.removeItem(k);
   } catch {}
   location.reload();
 });
@@ -241,6 +317,12 @@ function say(msg: string): void {
 
 function renderHeader(): void {
   text($('r-ban'), f.count(state.bananas));
+  if (budgetOn) {
+    const pot = state.budget?.pot;
+    const show = !!pot && N.gt(pot, N.zero);
+    $('r-pot').hidden = !show;
+    if (show) text($('r-pot-v'), f.count(pot!));
+  }
   text($('r-inc'), f.rate(certifyTiers(state, t, editingPool(state, t), state.tierAllocation).income));
   // After 'tall', the finish line needs a headcount: show it as progress toward the Permit's minimum.
   const goal = state.milestonesReached.includes('tall') && state.phase === 'finite';
@@ -264,7 +346,12 @@ startLoop(() => state, t, sink, () => {
   renderFeed();
   props = floorProps(state, t);
   tower.apply(props);
+  if (budgetOn) tower.setBudget(budgetView());
   rooms.render();
+  if (ceremony.isOpen) ceremony.render();
+  memo.render();
+  cooler.suppressed = !!rooms.current || ceremony.isOpen;
+  cooler.render();
   ernest.update(rooms.current?.id ?? null);
   updateCue();
 });
@@ -280,6 +367,8 @@ if (import.meta.env.DEV) {
       },
       run: (seconds: number) => catchUp(state, t, sink, seconds),
       open: openRoom,
+      openReview,
+      mode,
       t,
     },
   });

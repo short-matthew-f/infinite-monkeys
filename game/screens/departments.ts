@@ -43,6 +43,8 @@ const gap = (a: Shares, b: Shares): number => Math.max(...DEPTS.map((d) => Math.
 
 function mount(root: HTMLElement, ctx: Ctx): () => void {
   const { t } = ctx;
+  /** Quarterly-budget trial: the heads set the effort shares, so the funding controls give way to facts. */
+  const budgetMode = !!t.budget;
   let view: View = 'summary';
   let pick: PresetId | null = null;
   let hand: Shares | null = null;
@@ -60,6 +62,10 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
   const outNum = (s: GameState, d: DeptId): number => N.toNumber(deptOutput(s, t, d));
   const outText = (s: GameState, d: DeptId): string => f.amount(outNum(s, d));
   const funded = (s: GameState): boolean => DEPTS.filter((d) => s.depts[d].level > 0).length >= 2;
+  const budgetLines = (s: GameState): string => {
+    const l = s.budget?.lines;
+    return l ? `${DEPTS.map((d) => `${NAMES[d]} ${f.pct(l[d])}`).join(' · ')} · Wallet ${f.pct(l.discretionary)}` : '';
+  };
   const pctWords = (sh: Shares): string => DEPTS.map((d) => `${NAMES[d]} ${f.pct(sh[d])}`).join(' · ');
 
   // ----- presets: computed from core's suggestion -----
@@ -93,7 +99,7 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
   };
   const summaryView = h('div', { class: 'dview dview-summary' },
     next.el,
-    h('div', { class: 'jumps' }, ...DEPTS.map((d) => jumpRow(d, NAMES[d])), jumpRow('funding', 'Funding')),
+    h('div', { class: 'jumps' }, ...DEPTS.map((d) => jumpRow(d, NAMES[d])), jumpRow('funding', budgetMode ? 'Budget and effort' : 'Funding')),
   );
 
   // ----- department view -----
@@ -113,17 +119,18 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
   const pairRow = buyRow({ verb: '', onBuy: () => act(balancedBuy) });
   const meterTxt = h('span', { class: 'ready-txt' });
   const meterLed = ledger('Readiness');
-  const fundLink = h('button', { type: 'button', class: 'quiet', onclick: () => setView('funding', true) }, 'Change funding');
+  const fundLink = h('button', { type: 'button', class: 'quiet', onclick: () => setView('funding', true) }, budgetMode ? 'See the budget' : 'Change funding');
+  const acctLine = h('p', { class: 'stage-line acct-line', hidden: true });
   const readyBlock = h('div', { class: 'ready' },
     h('div', { class: 'ready-head' }, h('span', { class: 'm-nm' }, 'Readiness'), meterTxt),
     meterLed.el, fundLink);
   const blurb = h('p', { class: 'blurb' });
   const legend = h('p', { class: 'legend' }, h('span', { class: 'plus', 'aria-hidden': 'true' }, '+'), 'Levels add a little. Stages multiply.');
-  const deptView = h('div', { class: 'dview dview-dept' }, deptBack.btn, levelRow.el, unfunded, stageRow.el, stageLine, finalRow, pairRow.el, readyBlock, blurb, legend);
+  const deptView = h('div', { class: 'dview dview-dept' }, deptBack.btn, levelRow.el, acctLine, unfunded, stageRow.el, stageLine, finalRow, pairRow.el, readyBlock, blurb, legend);
 
   // ----- funding view -----
   const fundBack = backBtn('All departments');
-  fundBack.id.textContent = 'Funding';
+  fundBack.id.textContent = budgetMode ? 'Budget' : 'Funding';
   const sliders = {} as Record<DeptId, { input: HTMLInputElement; share: HTMLElement }>;
   const setHandFor = (d: DeptId, pctValue: number) => {
     const s = ctx.state();
@@ -179,8 +186,30 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
   // The disclosure (and the sliders behind it) go below Apply, so the peek holds chips, meters and Apply.
   const [presetGroup, adjustToggle, adjustBody] = Array.from(pre.el.children) as HTMLElement[];
   pre.el.replaceChildren(presetGroup as HTMLElement);
-  const fundView = h('div', { class: 'dview dview-fund' }, fundBack.btn, pre.el, meterBlock, applyBtn, explain,
-    h('div', { class: 'presetrow adjust-wrap' }, adjustToggle as HTMLElement, adjustBody as HTMLElement));
+  // Budget trial: facts instead of controls (core refuses setShares in this mode).
+  const bf = {} as Record<DeptId, { eff: HTMLElement; line: HTMLElement; acct: HTMLElement; bar: HTMLElement }>;
+  const walletFact = h('p', { class: 'explain' });
+  const budgetFacts = h('div', { class: 'bfacts' },
+    h('h3', { class: 'bf-head' }, 'The heads coordinate effort'),
+    h('p', { class: 'explain' }, 'In the budget trial the department heads split their effort among themselves, so there is no funding slider. Money reaches each department through the budget lines signed at the quarterly review.'),
+    ...DEPTS.map((d) => {
+      const eff = h('dd', { class: 'bf-v' });
+      const line = h('dd', { class: 'bf-v' });
+      const acct = h('dd', { class: 'bf-v' });
+      const bar = h('span', { class: 'bf-bar', role: 'progressbar', 'aria-label': `${NAMES[d]} account toward its next level`, 'aria-valuemin': '0', 'aria-valuemax': '100' });
+      bf[d] = { eff, line, acct, bar };
+      return h('dl', { class: 'bfact' },
+        h('dt', { class: 'bf-name' }, NAMES[d]),
+        h('div', { class: 'bf-row' }, h('dt', { class: 'bf-k' }, 'Effort'), eff),
+        h('div', { class: 'bf-row' }, h('dt', { class: 'bf-k' }, 'Budget line'), line),
+        h('div', { class: 'bf-row' }, h('dt', { class: 'bf-k' }, 'Account'), acct),
+        bar);
+    }),
+    walletFact);
+  const fundView = budgetMode
+    ? h('div', { class: 'dview dview-fund dview-budget' }, fundBack.btn, budgetFacts, meterBlock)
+    : h('div', { class: 'dview dview-fund' }, fundBack.btn, pre.el, meterBlock, applyBtn, explain,
+      h('div', { class: 'presetrow adjust-wrap' }, adjustToggle as HTMLElement, adjustBody as HTMLElement));
 
   root.append(h('div', { class: 'dept-screen' }, summaryView, deptView, fundView));
 
@@ -193,7 +222,7 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
   function setView(v: View, focus = false): void {
     const from = view;
     if (from === 'funding' && v !== 'funding') { pick = null; hand = null; }
-    if (v === 'funding' && from !== 'funding') {
+    if (v === 'funding' && from !== 'funding' && !budgetMode) {
       const s = ctx.state();
       const sug = suggestShares(s, t);
       if (!hand && gap(sug, s.shares) > SAME) {
@@ -255,10 +284,12 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
     if (open) {
       const dd = DEPTS.reduce((a, d) => (Math.abs(sug[d] - s.shares[d]) > Math.abs(sug[a] - s.shares[a]) ? d : a), DEPTS[0] as DeptId);
       const g = gap(sug, s.shares);
-      text(fj.out, `Split: ${pctWords(s.shares)}`);
-      const status = g > SAME ? `${NAMES[dd]} is at ${f.pct(s.shares[dd])}; suggested ${f.pct(sug[dd])}.` : 'On the suggested split.';
+      text(fj.out, budgetMode ? `Effort: ${pctWords(s.shares)}` : `Split: ${pctWords(s.shares)}`);
+      const status = budgetMode
+        ? (s.budget ? `Budget lines: ${budgetLines(s)}.` : 'The budget has not opened yet.')
+        : g > SAME ? `${NAMES[dd]} is at ${f.pct(s.shares[dd])}; suggested ${f.pct(sug[dd])}.` : 'On the suggested split.';
       text(fj.status, status);
-      fj.el.setAttribute('aria-label', `Funding. ${fj.out.textContent}. ${status}`);
+      fj.el.setAttribute('aria-label', `${budgetMode ? 'Budget and effort' : 'Funding'}. ${fj.out.textContent}. ${status}`);
     }
 
     // ----- Next card: chosen by situation, never by payoff -----
@@ -284,7 +315,7 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
         why: 'Recruiters hire for you; each new monkey needs a desk, so buy a Recruiter and a Builder together.',
         effect: `Monkeys ${outText(s, 'recruiting')} → ${outText(after, 'recruiting')}/s · desks ${outText(s, 'construction')} → ${outText(after, 'construction')}/s`,
         reason: f.shortBy(total, s.bananas) ?? CLOSED,
-        secondary: outNum(after, 'recruiting') === 0 ? 'Recruiting has no funding yet, so funding is the step after this.' : null,
+        secondary: !budgetMode && outNum(after, 'recruiting') === 0 ? 'Recruiting has no funding yet, so funding is the step after this.' : null,
       });
       return;
     }
@@ -311,10 +342,10 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
     const discarding = N.gt(cert.discarded, N.zero) && N.ratio(cert.discarded, findsTotal) > 0.0005;
     if (discarding) {
       levelNext('editing', `Finds are being thrown away: ${f.rate(cert.discarded)} of submissions go unreviewed.`,
-        open && gap(sug, s.shares) > FUNDING_GAP ? 'Funding is also off the suggested split.' : undefined);
+        !budgetMode && open && gap(sug, s.shares) > FUNDING_GAP ? 'Funding is also off the suggested split.' : undefined);
       return;
     }
-    if (open && gap(sug, s.shares) > FUNDING_GAP) {
+    if (!budgetMode && open && gap(sug, s.shares) > FUNDING_GAP) {
       const dd = DEPTS.reduce((a, d) => (Math.abs(sug[d] - s.shares[d]) > Math.abs(sug[a] - s.shares[a]) ? d : a), DEPTS[0] as DeptId);
       const after = ctx.preview((c) => { setShares(c, t, nullSink, sug); });
       const mAfter = meters(after, t);
@@ -350,8 +381,11 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
       reason: f.shortBy(lCost, s.bananas) ?? CLOSED,
     });
 
-    const dry = s.shares[d] <= SAME;
+    const dry = !budgetMode && s.shares[d] <= SAME;
     show(unfunded, dry);
+    const bud = budgetMode ? s.budget : null;
+    show(acctLine, !!bud);
+    if (bud) text(acctLine, `${NAMES[d]} account: ${f.bananaText(bud.accounts[d])} of ${f.bananaText(lCost)} for its next level. The department buys it on its own; you can also buy it from your wallet.`);
     if (dry) text(unfunded, `${NAMES[d]} has no funding, so its output stays at 0 until you fund it.`);
 
     // Stage: only at level 1+, a row once within reach, otherwise one line
@@ -396,8 +430,9 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
     show(readyBlock, showReady);
     if (showReady) {
       const m = meters(s, t);
-      text(meterTxt, `${f.meterPct(m[d])} ${f.meterWord(m[d])} · funded ${f.pct(s.shares[d])}`);
-      meterLed.set(m[d], `${NAMES[d]} readiness ${f.meterPct(m[d])}, ${f.meterWord(m[d])}, funded ${f.pct(s.shares[d])}`);
+      const w = budgetMode ? 'effort' : 'funded';
+      text(meterTxt, `${f.meterPct(m[d])} ${f.meterWord(m[d])} · ${w} ${f.pct(s.shares[d])}`);
+      meterLed.set(m[d], `${NAMES[d]} readiness ${f.meterPct(m[d])}, ${f.meterWord(m[d])}, ${w} ${f.pct(s.shares[d])}`);
     }
     text(blurb, BLURB[d]);
     show(legend, hasStages);
@@ -411,7 +446,33 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
 
   const PRESET_NAME: Record<PresetId, string> = { sug: 'Suggested', gro: 'Favour growth', edi: 'Favour editing' };
 
+  /** Budget trial: every figure is read from state; nothing here can be changed. */
+  function renderBudget(s: GameState): void {
+    const b = s.budget;
+    const mNow = meters(s, t);
+    for (const d of DEPTS) {
+      const r = bf[d];
+      const price = deptLevelCost(s, t, d);
+      text(r.eff, `${f.pct(s.shares[d])} of the team's effort`);
+      text(r.line, b ? f.pct(b.lines[d]) + ' of income' : 'Not set yet');
+      text(r.acct, b ? `${f.count(b.accounts[d])} of ${f.count(price)} for level ${s.depts[d].level + 1}` : 'Not open yet');
+      const frac = b ? Math.min(1, N.ratio(b.accounts[d], price)) : 0;
+      r.bar.style.setProperty('--fill', `${(frac * 100).toFixed(1)}%`);
+      r.bar.setAttribute('aria-valuenow', String(Math.round(frac * 100)));
+      r.bar.setAttribute('aria-valuetext', b ? `${f.count(b.accounts[d])} of ${f.count(price)}` : 'Not open yet');
+      const m = mRows[d];
+      text(m.share, f.pct(s.shares[d]));
+      text(m.txt, `${f.meterPct(mNow[d])} ${f.meterWord(mNow[d])}`);
+      m.led.set(mNow[d], `${NAMES[d]} readiness ${f.meterPct(mNow[d])} ${f.meterWord(mNow[d])}`);
+    }
+    const pot = b && N.gt(b.pot, N.zero) ? ` The pot holds ${f.bananaText(b.pot)}, split when the next budget is signed.` : '';
+    text(walletFact, b
+      ? `Your wallet holds ${f.bananaText(s.bananas)}, the ${f.pct(b.lines.discretionary)} wallet line. Manual purchases are paid from it.${pot}`
+      : `The budget opens when a department first starts. Until then, all income goes to your wallet: ${f.bananaText(s.bananas)}.`);
+  }
+
   function renderFunding(s: GameState): void {
+    if (budgetMode) return renderBudget(s);
     const presets = presetShares(s);
     const draft = draftOf(s);
     const shown = draft ?? s.shares;

@@ -30,7 +30,7 @@ export function emptyReport(quarter: number): QuarterReport {
   return {
     quarter, seconds: 0, income: 0, hires: 0, manualHires: 0, desksBuilt: 0, desksBought: 0,
     certifiedFinds: 0, discardedFinds: 0, autoLevels: { recruiting: 0, construction: 0, editing: 0 },
-    requisitions: { offered: 0, granted: 0, declined: 0, expired: 0 }, walletSpent: 0, swept: 0,
+    ranOnOldLines: false, requisitions: { offered: 0, granted: 0, declined: 0, expired: 0 }, walletSpent: 0, swept: 0,
   };
 }
 
@@ -171,6 +171,7 @@ export function maybeEndQuarter(s: GameState, t: Tuning, b: BudgetState, sink: E
   }
   if (b.requisition) closeRequisition(s, t, b, sink, 'expired');
   b.stats.seconds = (s.tick - b.quarterStartTick) * t.tickSeconds;
+  b.stats.ranOnOldLines = missedReview;
   const swept = N.mul(s.bananas, t.budget.sweepShare);
   b.stats.swept = N.toNumber(swept);
   b.pot = N.add(b.pot, swept);

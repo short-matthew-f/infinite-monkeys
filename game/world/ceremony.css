@@ -1,0 +1,263 @@
+/* The quarter-end ceremony (game/world/ceremony.ts): a full-screen dialog over the building.
+   Moving things get one transform each (CSS transitions, Web Animations); no large SVG filters.
+   Colours come from the game's tokens (game/style.css); the few derived ones are defined here
+   with light and dark values. Reduced motion: no walking, no wipes; slides cross-fade. */
+
+.cer {
+  --cer-wall: color-mix(in srgb, var(--paper) 86%, var(--glow));
+  --cer-floor: color-mix(in srgb, var(--paper-shade) 60%, var(--walnut));
+  --edge: #fffaf0;
+  --rule: color-mix(in srgb, var(--walnut) 55%, var(--paper));
+  --btn: var(--paper);
+  --on-ctl: var(--paper);
+  --lift-sh: color-mix(in srgb, var(--ink) 30%, transparent);
+  --soft-sh: color-mix(in srgb, var(--ink) 18%, transparent);
+  --stamp-ok: color-mix(in srgb, var(--olive) 72%, var(--ink));
+  --box: color-mix(in srgb, var(--paper-shade) 38%, var(--sheet));
+  --next-bg: color-mix(in srgb, var(--edge) 55%, var(--sheet));
+  position: absolute; inset: 0; z-index: 55; display: flex; flex-direction: column;
+  background: var(--sheet); color: var(--ink);
+  opacity: 0; transition: opacity 0.25s ease;
+  font: 400 1rem/1.45 var(--font-body);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .cer {
+    --cer-wall: color-mix(in srgb, var(--paper-shade) 80%, var(--concrete));
+    --cer-floor: color-mix(in srgb, var(--paper) 78%, var(--screen));
+    --edge: #d8ccb4;
+    --btn: var(--paper-shade);
+    --on-ctl: var(--screen);
+    --lift-sh: color-mix(in srgb, #000 55%, transparent);
+    --soft-sh: color-mix(in srgb, #000 40%, transparent);
+    --stamp-ok: color-mix(in srgb, var(--olive) 65%, var(--ink));
+    --next-bg: color-mix(in srgb, var(--edge) 4%, var(--sheet));
+  }
+}
+:root[data-theme='dark'] .cer {
+  --cer-wall: color-mix(in srgb, var(--paper-shade) 80%, var(--concrete));
+  --cer-floor: color-mix(in srgb, var(--paper) 78%, var(--screen));
+  --edge: #d8ccb4;
+  --btn: var(--paper-shade);
+  --on-ctl: var(--screen);
+  --lift-sh: color-mix(in srgb, #000 55%, transparent);
+  --soft-sh: color-mix(in srgb, #000 40%, transparent);
+  --stamp-ok: color-mix(in srgb, var(--olive) 65%, var(--ink));
+  --next-bg: color-mix(in srgb, var(--edge) 4%, var(--sheet));
+}
+.cer[hidden] { display: none; }
+.cer.on { opacity: 1; }
+.cer:focus { outline: none; }
+.cer p { margin: 0; }
+.cer [hidden] { display: none !important; }
+/* the monkeys' long shadow is a flat tint here (the blur filter is for the building) */
+.cer .shl { filter: none; opacity: 0.14; }
+
+/* ---------- bar, body, foot ---------- */
+.cer-top {
+  flex: none; display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  padding: 6px 10px; background: var(--walnut); border-bottom: 2px solid var(--mustard);
+}
+.cer-typed { font: 400 0.8rem var(--font-type); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-muted); }
+.cer-top .cer-typed { color: var(--on-walnut); min-width: 0; }
+.cer-top .cer-btn { background: var(--paper); border-color: var(--edge); flex: none; }
+.cer-body { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.cer-sec { display: none; width: min(100%, 640px); margin: 0 auto; }
+.cer[data-step='arrive'] [data-pane='arrive'],
+.cer[data-step='pres'] [data-pane='pres'],
+.cer[data-step='budget'] [data-pane='budget'],
+.cer[data-step='signed'] [data-pane='budget'] { display: block; }
+.cer-foot {
+  display: none; flex: none; gap: 8px; padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+  background: var(--sheet); border-top: 3px double var(--rule);
+}
+.cer[data-step='pres'] [data-foot='pres'] { display: grid; grid-template-columns: minmax(0, 1.3fr) auto minmax(0, 1.2fr); width: min(100%, 640px); margin: 0 auto; align-self: stretch; }
+.cer[data-step='budget'] [data-foot='budget'],
+.cer[data-step='signed'] [data-foot='budget'] { display: grid; justify-items: stretch; }
+.cer-pane { padding: 12px 14px 16px; display: grid; gap: 10px; align-content: start; }
+.cer-say { font: 400 1rem/1.45 var(--font-body); }
+.cer-why { font: 400 0.9rem/1.4 var(--font-body); color: var(--ink-muted); }
+.cer-h { font: 700 1rem var(--font-display); letter-spacing: 0.06em; text-transform: uppercase; color: var(--head); margin-top: 4px; }
+
+/* ---------- controls ---------- */
+.cer-btn {
+  position: relative; min-height: 48px; min-width: 44px; padding: 6px 14px; cursor: pointer;
+  border: 2px solid var(--ctl); background: var(--btn); color: var(--ink); border-radius: 3px 3px 12px 3px;
+  box-shadow: 0 3px 0 var(--ctl), 0 5px 6px var(--soft-sh);
+  font: 700 1.02rem/1.1 var(--font-display); letter-spacing: 0.07em; text-transform: uppercase;
+}
+.cer-btn:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 var(--ctl); }
+.cer-btn.strong:not(:disabled) { background: var(--ctl); color: var(--on-ctl); }
+.cer-btn.wide { width: 100%; }
+.cer-btn:disabled { border: 2px dashed var(--ink-muted); background: var(--sheet); color: var(--ink); box-shadow: none; cursor: not-allowed; }
+.cer-btn[aria-pressed='true'] { background: color-mix(in srgb, var(--mustard) 38%, var(--sheet)); outline: 2px solid var(--ink); outline-offset: -5px; }
+.cer-btn:focus-visible, .cer-screen:focus-visible, .cer input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; box-shadow: 0 0 0 6px var(--paper); }
+
+/* ---------- stages ---------- */
+.cer-stage { position: relative; aspect-ratio: 360 / 200; overflow: hidden; border-bottom: 3px double var(--rule); background: var(--cer-wall); }
+.cer-stage.strip { aspect-ratio: 360 / 116; }
+.cer-stage.band { aspect-ratio: 360 / 104; }
+.cer-stage svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+/* arrival */
+.walkin { transform: translateX(150px); opacity: 0; transition: transform 0.7s cubic-bezier(0.3, 0.8, 0.3, 1), opacity 0.3s; transition-delay: calc(var(--k) * 0.22s + 0.3s); }
+.cer.go .walkin { transform: none; opacity: 1; }
+.cer .door-l, .cer .door-r { transition: transform 0.45s ease-in-out 0.1s; }
+.cer.go .door-l { transform: translateX(-26px); }
+.cer.go .door-r { transform: translateX(26px); }
+.cer .ding { opacity: 0; transform-origin: 306px 69px; transform: scale(0.4); transition: transform 0.25s cubic-bezier(0.3, 0.8, 0.3, 1.4), opacity 0.2s; }
+.cer.go .ding { opacity: 1; transform: none; }
+.cer.go .bellring { animation: cer-ring 0.45s ease-in-out 4; }
+@keyframes cer-ring { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-16deg); } 75% { transform: rotate(16deg); } }
+
+/* pull-down screen */
+.cer-screenwrap { position: relative; padding: 10px 8px 14px; background: var(--cer-wall); }
+.cer-roller { height: 9px; margin: 0 auto 0; width: min(100%, calc((100dvh - 420px) * 1.55 + 16px)); max-width: 100%; border-radius: 5px; background: var(--concrete); border: 1.5px solid var(--edge); }
+.cer-pull { transform-origin: 50% 0; position: relative; }
+.cer[data-step='pres'] .cer-pull { animation: cer-pull 0.5s cubic-bezier(0.3, 0.8, 0.3, 1.1) both; }
+@keyframes cer-pull { from { transform: scaleY(0); } to { transform: none; } }
+.cer-cord { position: absolute; left: 50%; bottom: -12px; width: 6px; height: 12px; margin-left: -3px; background: var(--walnut); border-radius: 0 0 3px 3px; }
+.cer-screen {
+  width: min(100%, calc((100dvh - 420px) * 1.55), 640px); aspect-ratio: 31 / 20; margin: 0 auto;
+  position: relative; overflow: hidden; cursor: pointer; container-type: size;
+  background: var(--edge); border: 2px solid var(--concrete); box-shadow: 0 3px 0 var(--lift-sh);
+}
+.beam { animation: cer-beam 2.2s steps(3, jump-none) infinite; }
+@keyframes cer-beam { 50% { opacity: 0.1; } }
+
+/* slides (sizes in container units, so the same slide reads at any screen width) */
+.slide { position: absolute; inset: 0; padding: 5cqh 5cqw; background: var(--edge); color: var(--screen); }
+.slide.in.t-wipe { animation: cer-wipe 0.55s ease-out both; }
+.slide.in.t-spin { animation: cer-spin 0.6s cubic-bezier(0.3, 0.8, 0.3, 1.1) both; }
+.slide.in.t-zoom { animation: cer-zoom 0.5s cubic-bezier(0.3, 0.8, 0.3, 1.3) both; }
+.slide.in.t-blinds { animation: cer-blinds 0.6s steps(6) both; }
+@keyframes cer-wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes cer-spin { from { transform: rotate(-200deg) scale(0.1); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes cer-zoom { from { transform: scale(0.2); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes cer-blinds { from { clip-path: inset(0 0 100% 0); } to { clip-path: inset(0 0 0 0); } }
+.sl { display: grid; gap: 2cqh; height: 100%; align-content: start; }
+.sl > b { font: 700 9cqh/1.05 var(--font-display); letter-spacing: 0.04em; text-transform: uppercase; border-bottom: 1.5px solid var(--screen); padding-bottom: 1.5cqh; }
+.sl.title { align-content: center; justify-items: center; text-align: center; gap: 3cqh; background: linear-gradient(color-mix(in srgb, var(--glow) 55%, var(--edge)), var(--edge)); margin: -5cqh -5cqw; padding: 5cqh 5cqw; height: calc(100% + 10cqh); }
+.sl.title .clip { display: flex; gap: 3cqw; justify-content: center; }
+.sl.title .clip svg { width: 24cqw; height: 22cqh; }
+.sl.title > b { font-size: 12cqh; border: 0; text-shadow: 1px 1px 0 var(--tangerine), 2px 2px 0 var(--mustard); }
+.sl.title > span { font: 400 6.5cqh var(--font-type); }
+.chart-svg { width: 100%; height: 72cqh; }
+.sl.take { align-content: center; justify-items: center; text-align: center; }
+.sl.take p { font: 600 7cqh/1.3 var(--font-body); }
+.sl.take > svg { width: 18cqw; height: 22cqh; }
+.wordart { font: 700 22cqh/1 var(--font-display); letter-spacing: 0.08em; color: var(--tangerine); transform: skewX(-12deg) rotate(-4deg); text-shadow: 2px 2px 0 var(--mustard), 4px 4px 0 var(--olive), 6px 6px 0 var(--walnut); }
+.sl.take .big { font: 700 14cqh/1 var(--font-mono); color: color-mix(in srgb, var(--alert) 80%, var(--screen)); }
+.sl.bullets ul { margin: 0; padding-left: 5cqw; columns: 2; column-gap: 4cqw; font: 400 5cqh/1.25 var(--font-body); }
+.sl.bullets li { break-inside: avoid; }
+.slide.standby { display: grid; place-content: center; justify-items: center; gap: 3cqh; text-align: center; background: radial-gradient(color-mix(in srgb, var(--glow) 40%, var(--edge)), var(--edge) 80%); }
+.slide.standby b { font: 700 11cqh/1.05 var(--font-display); letter-spacing: 0.08em; text-transform: uppercase; }
+.slide.standby span { font: 400 6cqh var(--font-type); opacity: 0.85; }
+.slide.standby i { display: block; width: 60cqw; height: 6cqh; background: repeating-linear-gradient(90deg, var(--tangerine) 0 12.5%, var(--mustard) 0 25%, var(--olive) 0 37.5%, var(--concrete) 0 50%); opacity: 0.8; }
+
+/* rubber stamps */
+.cer-rstamp {
+  position: absolute; right: 4cqw; bottom: 4cqh; border: 3px double currentColor; padding: 1px 6px;
+  font: 700 7cqh/1.2 var(--font-display); letter-spacing: 0.12em; text-transform: uppercase; background: var(--edge);
+  opacity: 0; transform: scale(2.2) rotate(-12deg); transition: transform 0.22s cubic-bezier(0.5, 0, 0.6, 1.6), opacity 0.12s;
+}
+.cer-rstamp.down { opacity: 1; transform: rotate(-8deg); }
+.cer-rstamp.ok { color: color-mix(in srgb, var(--olive) 72%, var(--screen)); }
+.cer-rstamp.bad { color: color-mix(in srgb, var(--alert) 80%, var(--screen)); }
+.cer-rstamp.neutral { color: var(--screen); }
+.cer-rstamp.ok::before { content: '✓ '; }
+.cer-rstamp.bad::before { content: '▲ '; }
+
+/* presenters */
+.presenter { display: none; }
+.presenter.on { display: inline; }
+.presenter .armR { animation: cer-point 1.8s ease-in-out infinite; }
+.presenter .head, .presenter .ptr { transform-box: fill-box; transform-origin: 50% 90%; }
+.presenter.exit .armR, .presenter.enter .armR { animation: cer-tuck 0.4s ease-out both; }
+.presenter.enter .armR { animation: none; transform: rotate(160deg); }
+.presenter.exit .ptr, .presenter.enter .ptr { animation: cer-ptrgone 0.01s steps(1) 0.15s both; }
+.presenter.enter .ptr { animation: none; opacity: 0; }
+.presenter.exit .head { animation: cer-glance 1.3s ease-in-out 0.55s 1 both; }
+.presenter.exit .armL { animation: cer-nwave 0.5s ease-in-out 1.05s 3 both; }
+.presenter.ready .armR { animation: cer-untuck 0.45s ease-out both, cer-point 1.8s ease-in-out 0.45s infinite; }
+@keyframes cer-point { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(-10deg); } }
+@keyframes cer-tuck { 0% { transform: rotate(0); } 30% { transform: rotate(-22deg); } 100% { transform: rotate(160deg); } }
+@keyframes cer-ptrgone { to { opacity: 0; } }
+@keyframes cer-untuck { from { transform: rotate(160deg); } to { transform: rotate(0); } }
+@keyframes cer-glance { 0%, 100% { transform: rotate(0); } 25%, 55% { transform: rotate(-12deg); } 40% { transform: rotate(5deg); } }
+@keyframes cer-nwave { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(-38deg); } }
+.pbub .bg, .pbub .bt { fill: var(--sheet); stroke: var(--ink); stroke-width: 1; }
+.pbub .bt { stroke: none; }
+.pbub .bx { font: 700 8px var(--font-type); fill: var(--ink); text-anchor: middle; }
+
+/* caption under the screen */
+.cer-ph { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.cer-ph b { font: 700 1.15rem var(--font-display); letter-spacing: 0.05em; text-transform: uppercase; color: var(--head); }
+.cer-sayline { font: 400 1rem/1.4 var(--font-body); min-height: 4.2em; }
+.cer-dots { display: flex; gap: 5px; flex-wrap: wrap; }
+.cer-dots i { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--ink); }
+.cer-dots i.d { background: var(--ink); }
+.cer-dots i.on { background: var(--tangerine); }
+
+/* notes */
+.cer-fact { padding: 8px 10px; border: 1.5px solid var(--rule); background: var(--box); font: 400 0.95rem/1.4 var(--font-body); }
+.cer-fact.away { border: 3px double var(--stamp); }
+.cer-fact.note { border-style: dashed; border-color: var(--ink); }
+
+/* ---------- budget ---------- */
+.cer-form { gap: 12px; }
+.cer-pot { font: 400 1rem/1.4 var(--font-body); }
+.cer.swept .sweep { transform: translate(90px, 18px) scale(0.5); opacity: 0; }
+.sweep { transition: transform 0.9s cubic-bezier(0.5, 0, 0.7, 1), opacity 0.9s; }
+.cer-last { margin: 0; display: grid; gap: 2px; font: 400 0.9rem/1.35 var(--font-body); }
+.cer-last > div { display: flex; justify-content: space-between; gap: 10px; border-bottom: 1.5px dotted var(--concrete); padding: 2px 0; }
+.cer-last dt { color: var(--ink-muted); }
+.cer-last dd { margin: 0; font-family: var(--font-mono); font-size: 0.85rem; text-align: right; }
+.cer-presets { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.cer-presets .cer-btn:last-child:nth-child(odd) { grid-column: 1 / -1; }
+.cer-line { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'ln pc' 'lr pc' 'rng rng'; align-items: center; column-gap: 8px; border-top: 1.5px dotted var(--concrete); padding-top: 4px; }
+.cer-line .ln { grid-area: ln; font: 600 1rem/1.15 var(--font-body); }
+.cer-line .ln small { display: block; font: 400 0.82rem var(--font-body); color: var(--ink-muted); }
+.cer-line .pc { grid-area: pc; font: 600 1.15rem var(--font-mono); font-variant-numeric: tabular-nums; }
+.cer-line input { grid-area: rng; width: 100%; min-height: 44px; margin: 0; accent-color: var(--ctl); }
+.cer-line .lr { grid-area: lr; font: 400 0.8rem/1.3 var(--font-mono); color: var(--ink-muted); overflow-wrap: anywhere; }
+.cer-split { display: flex; height: 26px; border: 2px solid var(--walnut); background: var(--sheet); overflow: hidden; }
+.cer-split i { display: block; min-width: 0; overflow: hidden; border-right: 1.5px solid var(--walnut); font: 700 0.78rem/22px var(--font-display); letter-spacing: 0.05em; text-align: center; white-space: nowrap; color: var(--screen); }
+.cer-split i:last-child { border-right: 0; }
+.cer-split .recruiting { background: color-mix(in srgb, var(--tangerine) 60%, var(--edge)); }
+.cer-split .construction { background: color-mix(in srgb, var(--mustard) 60%, var(--edge)); }
+.cer-split .editing { background: color-mix(in srgb, var(--olive) 55%, var(--edge)); }
+.cer-split .discretionary { background: color-mix(in srgb, var(--concrete) 40%, var(--edge)); background-image: radial-gradient(color-mix(in srgb, var(--screen) 28%, transparent) 1.2px, transparent 1.6px); background-size: 6px 6px; }
+.cer-proj { margin: 0; padding: 8px 10px 8px 26px; border: 1.5px solid var(--rule); background: var(--box); font: 400 0.92rem/1.45 var(--font-body); transition: opacity 0.15s; }
+.cer-proj[aria-busy='true'] { opacity: 0.55; }
+.cer-sigline { display: grid; gap: 2px; border-bottom: 1.5px solid var(--ink); padding-bottom: 2px; }
+.cer-sigline svg { width: 220px; height: 40px; }
+.sig { fill: none; stroke: var(--walnut); stroke-width: 2.2; stroke-linecap: round; stroke-dasharray: 420; stroke-dashoffset: 420; transition: stroke-dashoffset 0.6s ease-out; }
+.cer.signed .sig { stroke-dashoffset: 0; }
+
+/* the stamp over everything once signed */
+.cer-stamp { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+.cer-stamp span {
+  font: 700 2.6rem/1 var(--font-display); letter-spacing: 0.14em; text-transform: uppercase; color: var(--stamp);
+  border: 6px double var(--stamp); padding: 6px 16px; background: color-mix(in srgb, var(--sheet) 90%, transparent);
+  opacity: 0; transform: scale(2.6) rotate(-14deg); transition: transform 0.26s cubic-bezier(0.5, 0, 0.6, 1.5), opacity 0.12s;
+}
+.cer.qon .cer-stamp span { opacity: 1; transform: rotate(-8deg); }
+
+/* the review closed underneath */
+.cer-ended { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; background: color-mix(in srgb, var(--screen) 55%, transparent); }
+.cer-card { width: min(100%, 26rem); display: grid; gap: 12px; padding: 14px; background: var(--sheet); border: 2px solid var(--ctl); border-radius: 3px 14px 3px 3px; box-shadow: 0 3px 0 var(--ctl), 0 8px 16px var(--soft-sh); }
+
+/* ---------- motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .cer { transition: opacity 0.12s; }
+  .beam, .presenter .armR, .presenter .armL, .presenter .head, .presenter .ptr, .cer.go .bellring, .cer[data-step='pres'] .cer-pull { animation: none !important; }
+  .walkin, .cer .door-l, .cer .door-r, .cer .ding, .cer-rstamp, .cer-stamp span, .sig, .sweep { transition: opacity 0.2s ease !important; }
+  .walkin { transform: none; }
+  .cer.go .door-l { transform: translateX(-26px); }
+  .cer.go .door-r { transform: translateX(26px); }
+  .cer-rstamp { transform: rotate(-8deg); }
+  .cer-stamp span { transform: rotate(-8deg); }
+  .cer.swept .sweep { transform: none; }
+  .slide.in { animation: cer-fade 0.3s ease both !important; }
+  @keyframes cer-fade { from { opacity: 0; } to { opacity: 1; } }
+}
