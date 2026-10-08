@@ -74,9 +74,9 @@
 
 <div class="wrap">
   <header>
-    <p class="eyebrow">Form 9-A · Art direction review · Round 1</p>
+    <p class="eyebrow">Form 9-A · Art direction review · Round 2</p>
     <h1>Bureau Art Directions</h1>
-    <p>Three ways to make the Bureau itself the interface: rooms you tap instead of menus, in a 2.5D paper-cutout style. All three show the same scene with mock data. Tap around inside the phone: open Personnel, press Hire, dismiss Ernest, try the directory.</p>
+    <p>You picked the Pop-up Floor Plan. Round 2 rebuilds it with the panel’s fixes: space between spaces, bigger monkeys with personality, Ernest peeking in, stronger paper. Drag the floor around, tap areas, press Hire, try the directory. The round 1 versions stay here for comparison.</p>
   </header>
 
   <div class="tabs" role="tablist" aria-label="Approaches" id="tabs"></div>
@@ -90,18 +90,16 @@
   </section>
 
   <section class="verdict">
-    <span class="stamp">Opus summary</span>
-    <h2>What the panel agreed on</h2>
+    <span class="stamp">Opus summary · Round 2</span>
+    <h2>Where round 2 landed</h2>
     <ol>
-      <li><strong>None of them is roomy yet, and that's the brief's fault.</strong> It asked for eight monkeys, four rooms, a header and Ernest in one phone screen. The fix is the same for all three: show less at a time (one room or about 1.5 floors), make monkeys 50–60 px tall instead of about 30, and let scrolling, panning or dollying reveal the rest.</li>
-      <li><strong>Ernest is too big.</strong> In every version his card covers a third of the floor. He should peek in from a corner, point at what he's explaining, and never block the thing he's teaching.</li>
-      <li><strong>Variety reads as accessories, not personalities.</strong> At phone size the behaviours are too small to see. Bigger monkeys, distinct silhouettes (size, ears, posture, profile), and more exaggerated poses.</li>
-      <li><strong>The paper depth is subtle in stills.</strong> They read as clean vector with drop shadows. Visible paper rims, a second shadow tier and more value separation between layers would sell the cutout look.</li>
-      <li><strong>The room sheets are the strongest part of all three.</strong> Numbered forms, the curved tangerine Hire button, and the camera moving to the room before the sheet arrives all landed well.</li>
+      <li><strong>Much better, and most of the round 1 problems are fixed.</strong> Roominess went from 3 to 4 and paper depth from 3 to 4, and every checklist item now passes. The monkeys finally read as individuals.</li>
+      <li><strong>The weak spot is the first screen.</strong> Only the Typing Pool is fully in view, so a new player sees one tappable place, not four. This is the top fix for round 3.</li>
+      <li><strong>The paper look stops at the forms.</strong> The floor is paper, but the directory and room forms are flat app panels. They need the same die-cut, tab and shadow treatment.</li>
+      <li><strong>Small finishes:</strong> real vacant desks instead of grey blobs, fewer repeated ferns, a friendlier Editor, open forms capped at about 40% of the screen.</li>
     </ol>
-    <h2>My recommendation</h2>
-    <p><strong>Pop-up Floor Plan as the base</strong>: it scored best on whimsy and readability, and it's the closest to the Egg Inc map you described. <strong>Take the Dollhouse's vertical stack for growth</strong>: as the Bureau gains floors, you scroll up the building, and each floor is its own roomy pop-up plan. That also gives the infinity ceremony its climb. The Theater's sideways dolly fits the Hotel's endless corridor better than the finite climb, so I'd keep it in mind for the Hotel phase.</p>
-    <p>Round 2 would rebuild the winner with the fixes above, and the panel reviews it again.</p>
+    <h2>Next</h2>
+    <p>Round 3 fixes the first screen, the tap cues, and the paper forms. After that, the panel’s view is that it’s ready to become the style reference for building the real game: the floor plan replaces the tab bar, and each existing screen becomes a room’s form.</p>
   </section>
 
   <footer>Evidence: scripted Chrome screenshots at 390 × 844 (light, dark, reduced motion, animation frames, taps), computed contrast, and static inspection. Not yet tested on a physical phone or by players. Reviewers: a Sonnet agent for taste and a Haiku agent for the checklist on each approach.</footer>
@@ -110,7 +108,18 @@
 <script>
   const APPROACHES = [
     {
-      id: 'popup', file: 'popup.html', name: 'Pop-up Floor Plan', tag: 'one floor, 3/4 top-down',
+      id: 'popup-r2', file: 'popup-r2.html', name: 'Pop-up · Round 2', tag: 'your pick, refined',
+      idea: 'The floor is now about twice the screen in each direction, and you drag to explore. Aisles hold a water cooler, coat rack, mailroom, copier and shredder, with a mail-cart monkey doing its rounds, a paper airplane, and a monkey watering the ficus. Ernest leans in from the corner and points at Personnel.',
+      scores: { Whimsy: 4, Coherence: 4, Readability: 3, Roominess: 4, 'Paper depth': 4 },
+      best: 'The Typing Pool: eight monkeys with different silhouettes, postures and habits (the yawner with his badge, the dozer, the page-holder) on a cream pad with cut rims and fold tabs, set inside a bigger floor with life in the aisles. It feels like a place with people in it.',
+      blocking: ['The opening view shows only the Typing Pool whole. Personnel, the first tutorial target, is mostly off-screen, and Departments and the Director are slivers.', 'Tap cues are too faint in a still frame (a small dog-ear and a soft lamp glow).', 'The two vacant desks are grey placeholder blobs next to finished monkeys.', 'The directory and the open forms are flat app UI, so the paper look drops out where players spend the most time.', 'An open form takes about 55% of the screen, shrinking the room behind it.'],
+      fixes: ['Pull the opening camera back about 20% or move Personnel closer, so all four areas show', 'A persistent cue on every area, plus a paper pointing flag on the one that needs action', 'Vacant desks as tidy empty desks with a VACANT tent card', 'Directory and forms in cut-paper style: die-cut card, notched tab, brass number discs', 'Fewer repeated ferns; a few distinct props instead', 'Soften the Editor’s scowl; cap open forms at about 40% of the screen'],
+      checks: { 'IP line': true, Accessibility: true, 'Reduced motion': true, Performance: true, Variety: true },
+      checkNote: 'All pass. Contrast fixed (every text pair ≥ 4.8:1). Watch item: 81 looping animations at once, so the real game should pause the ones off-screen.',
+      scale: 'The parts kit, rim-and-shadow language and aisle life are ready to anchor the real game once the opening view and tap cues are fixed. Floors stack upward via the elevator.',
+    },
+    {
+      id: 'popup', file: 'popup.html', name: 'Pop-up · Round 1', tag: 'one floor, 3/4 top-down',
       idea: 'One office floor laid out like a pop-up book on a table. Walls, desks and monkeys are cutouts standing on the floor sheet with fold tabs and cast shadows. Tap a zone: the camera eases over, its cutouts fold up taller, and the room’s form unfolds.',
       scores: { Whimsy: 4, Coherence: 4, Readability: 4, Roominess: 3, 'Paper depth': 3 },
       best: 'The Personnel transition: the camera moves to the zone, a dashed gold ring marks it, Ernest docks to a slim bar at the top, and a tabbed paper form with the Hire button unfolds. It feels like going somewhere.',
@@ -121,7 +130,7 @@
       scale: 'Rooms become zones and the forms are reusable, but one packed screen doesn’t stretch to many floors by itself. Pair it with vertical floors.',
     },
     {
-      id: 'dollhouse', file: 'dollhouse.html', name: 'Cutaway Dollhouse', tag: 'building cross-section, scroll up',
+      id: 'dollhouse', file: 'dollhouse.html', name: 'Cutaway Dollhouse', tag: 'round 1 · building cross-section',
       idea: 'The Bureau in cross-section like a dollhouse with the front wall off. Floors stack as the building grows and vertical scroll is the map. Tap a room: the building zooms toward it and the room’s form slides up.',
       scores: { Whimsy: 3, Coherence: 4, Readability: 3, Roominess: 2, 'Paper depth': 3 },
       best: 'The stack itself: it reads instantly as a place you tap into, the crane on Floor 4 promises growth, and the dark-mode version with lit lamps is the warmest of the three.',
@@ -132,7 +141,7 @@
       scale: 'Best fit for growth: new floors appear above, and the ceremony becomes a climb past repeating floors. Needs reused symbols past about 20 floors.',
     },
     {
-      id: 'theater', file: 'theater.html', name: 'Paper Theater', tag: 'stage sets, sideways dolly',
+      id: 'theater', file: 'theater.html', name: 'Paper Theater', tag: 'round 1 · stage sets, sideways dolly',
       idea: 'Each room is a toy-theater set of layered flats. Swipe or tap a doorway and the camera dollies sideways to the next room, with the flats moving at different speeds. Forms are lowered from the flies on strings.',
       scores: { Whimsy: 3, Coherence: 4, Readability: 3, Roominess: 2, 'Paper depth': 3 },
       best: 'The Personnel form lowered on strings, “Form 3-H, Room 1”, with bureaucratic microcopy. Sincere, tactile and right on tone.',

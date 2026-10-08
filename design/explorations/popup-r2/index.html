@@ -1,0 +1,1118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#6B4423" />
+<title>Pop-up Floor Plan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=Courier+Prime&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600&display=swap" rel="stylesheet" />
+<style>
+/* ---------- tokens (copied from game/style.css, plus derived paper tokens) ---------- */
+:root {
+  --paper: #f2e8d5; --paper-shade: #e4d6bc; --ink: #2b2622; --ink-muted: #5e554c;
+  --walnut: #6b4423; --concrete: #8a8780; --mustard: #c9a227; --tangerine: #d9732b;
+  --olive: #6e7046; --alert: #b23a2e; --phosphor-amber: #b87400; --phosphor-green: #3f7d4e;
+  --glow: #ffe9b0; --screen: #14110d; --screen-ink: #ffb000; --screen-muted: #a89c8a;
+  --font-display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+  --font-body: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --font-type: 'Courier Prime', 'Courier New', monospace;
+  /* derived for this exploration: three clearly separated value layers */
+  --edge: #fffaf0;          /* the white of cut paper (rims, tabs) */
+  --on-walnut: #f2e8d5;
+  --table: color-mix(in srgb, var(--walnut) 72%, var(--screen));
+  --floor: color-mix(in srgb, var(--paper-shade) 60%, var(--walnut));   /* darkest sheet */
+  --pad: color-mix(in srgb, var(--paper) 88%, var(--glow));             /* zone rugs: lightest sheet */
+  --sheet: var(--paper);
+  --head: var(--walnut);
+  --focus: var(--ink);
+  --stamp: color-mix(in srgb, var(--alert) 68%, var(--ink));
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --paper: #1f1b17; --paper-shade: #2a241e; --ink: #ede3cf; --ink-muted: #a89c8a;
+    --walnut: #8a5a33; --concrete: #5e5b55; --mustard: #d9b23a; --tangerine: #e8843a;
+    --olive: #8c8f5a; --alert: #d2554a; --phosphor-amber: #ffb000; --phosphor-green: #7cd992;
+    --glow: #ffd27a; --edge: #d8ccb4; --on-walnut: #f2e8d5; --sheet: #302920; --head: #d9b23a;
+    --table: color-mix(in srgb, var(--paper) 70%, var(--screen));
+    --floor: color-mix(in srgb, var(--paper) 78%, var(--screen));
+    --pad: color-mix(in srgb, var(--paper-shade) 55%, var(--concrete));
+    --stamp: color-mix(in srgb, var(--alert) 66%, var(--ink));
+  }
+}
+:root[data-theme='dark'] {
+  --paper: #1f1b17; --paper-shade: #2a241e; --ink: #ede3cf; --ink-muted: #a89c8a;
+  --walnut: #8a5a33; --concrete: #5e5b55; --mustard: #d9b23a; --tangerine: #e8843a;
+  --olive: #8c8f5a; --alert: #d2554a; --phosphor-amber: #ffb000; --phosphor-green: #7cd992;
+  --glow: #ffd27a; --edge: #d8ccb4; --on-walnut: #f2e8d5; --sheet: #302920; --head: #d9b23a;
+  --table: color-mix(in srgb, var(--paper) 70%, var(--screen));
+  --floor: color-mix(in srgb, var(--paper) 78%, var(--screen));
+  --pad: color-mix(in srgb, var(--paper-shade) 55%, var(--concrete));
+  --stamp: color-mix(in srgb, var(--alert) 66%, var(--ink));
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; margin: 0; overflow: hidden; }
+body { background: var(--table); color: var(--ink); font: 16px/1.45 var(--font-body); overscroll-behavior: none; position: relative; }
+button { font: inherit; color: inherit; }
+/* focus: ink on every paper/floor value in light, cream in dark (>= 3:1 against all backgrounds it sits on) */
+button:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; box-shadow: 0 0 0 6px var(--paper); }
+h1, h2, h3 { font-family: var(--font-display); text-transform: uppercase; letter-spacing: .04em; margin: 0; font-weight: 700; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* ---------- stage, camera, world ---------- */
+.stage { position: absolute; inset: 0; overflow: hidden; width: 390px; max-width: 100%; margin: 0 auto; }
+@media (min-width: 391px) { .stage { box-shadow: 0 0 0 1px var(--concrete); } }
+.cam {
+  position: absolute; left: 0; top: 0; width: 780px; height: 1340px;
+  --tx: -195px; --ty: -202px; --s: 1;
+  transform: translate3d(var(--tx), var(--ty), 0) scale(var(--s)); transform-origin: 0 0;
+  transition: transform 760ms cubic-bezier(.5, .02, .2, 1);
+  touch-action: none;
+}
+.cam.dragging { transition: none; will-change: transform; }
+#map { position: absolute; left: 0; top: 0; width: 780px; height: 1340px; display: block; overflow: visible; }
+.hot { position: absolute; background: transparent; border: 0; padding: 0; margin: 0; cursor: pointer; border-radius: 10px; }
+.hot:focus-visible { outline: 3px dashed var(--focus); outline-offset: -4px; box-shadow: none; }
+
+/* ---------- map art: paper cutouts ---------- */
+.floor { fill: var(--floor); }
+.floor-edge { fill: color-mix(in srgb, var(--floor) 55%, var(--screen)); }
+.floor-rim { fill: none; stroke: var(--edge); stroke-width: 1.6; opacity: .75; }
+.table-shadow { fill: var(--screen); opacity: .35; }
+.grain { mix-blend-mode: overlay; opacity: .45; pointer-events: none; }
+.dots { fill: var(--edge); opacity: .28; }
+.crease { stroke: var(--screen); stroke-width: 1; stroke-dasharray: 3 6; opacity: .22; fill: none; }
+.crease-hi { stroke: var(--edge); stroke-width: 1; opacity: .35; fill: none; }
+.route { stroke: var(--mustard); stroke-width: 2.4; stroke-dasharray: 1 8; stroke-linecap: round; fill: none; opacity: .95; }
+.pad { fill: color-mix(in srgb, var(--tint, var(--concrete)) 16%, var(--pad)); stroke: var(--edge); stroke-width: 1.8; }
+.pad-sh { fill: var(--screen); opacity: .3; }
+.pad-sh2 { fill: var(--screen); opacity: .14; }
+.t-pl { --tint: var(--olive); } .t-pe { --tint: var(--mustard); } .t-dp { --tint: var(--concrete); } .t-dr { --tint: var(--walnut); }
+.rug { stroke: var(--edge); stroke-width: 1.2; }
+.ring { fill: none; stroke: var(--ink); stroke-width: 2; stroke-dasharray: 7 5; opacity: 0; transition: opacity .3s; }
+.zone.active .ring { opacity: .9; }
+.tape { fill: var(--mustard); opacity: .9; stroke: var(--edge); stroke-width: .8; }
+
+.up { transition: transform 620ms cubic-bezier(.3, .8, .25, 1); transform: scaleY(1); }
+.zone.pop .up { transform: scaleY(1.18); }
+.stage:has(.hot[data-zone='personnel']:is(:hover, :active)) #z-personnel .up,
+.stage:has(.hot[data-zone='pool']:is(:hover, :active)) #z-pool .up,
+.stage:has(.hot[data-zone='departments']:is(:hover, :active)) #z-departments .up,
+.stage:has(.hot[data-zone='director']:is(:hover, :active)) #z-director .up { transform: scaleY(1.07); transition-duration: 160ms; }
+
+/* standing pieces: front face, lighter cut rim, lighter top face, two shadow tiers */
+.fr { fill: var(--c, var(--walnut)); stroke: var(--edge); stroke-width: 1.7; stroke-linejoin: round; }
+.tp { fill: color-mix(in srgb, var(--c, var(--walnut)) 62%, var(--edge)); stroke: var(--edge); stroke-width: 1.7; stroke-linejoin: round; }
+.rim { fill: none; stroke: var(--edge); stroke-width: 2.4; stroke-linecap: square; stroke-linejoin: round; opacity: .95; }
+.shl { fill: var(--screen); opacity: .2; filter: url(#soft); }
+.shc { fill: var(--screen); opacity: .42; }
+.sh { fill: var(--screen); opacity: .3; }
+.tb { fill: var(--edge); stroke: var(--concrete); stroke-width: .8; stroke-linejoin: round; opacity: .95; }
+.c-walnut { --c: var(--walnut); } .c-concrete { --c: var(--concrete); } .c-mustard { --c: var(--mustard); }
+.c-olive { --c: var(--olive); } .c-alert { --c: var(--alert); } .c-paper { --c: color-mix(in srgb, var(--edge) 88%, var(--paper-shade)); }
+.c-shade { --c: var(--paper-shade); } .c-steel { --c: color-mix(in srgb, var(--concrete) 62%, var(--glow)); }
+.c-glass { --c: var(--glow); } .c-wall { --c: color-mix(in srgb, var(--paper-shade) 70%, var(--concrete)); }
+.c-paper .fr, .c-shade .fr, .c-wall .fr { stroke: var(--edge); }
+.ink { fill: var(--screen); } .inkl { stroke: var(--screen); fill: none; stroke-linecap: round; }
+.glowf { fill: var(--glow); } .brass { fill: var(--mustard); stroke: var(--screen); stroke-width: .8; }
+.sg { font: 700 12px var(--font-display); letter-spacing: .1em; fill: var(--screen); text-anchor: middle; text-transform: uppercase; }
+.sg.sm { font-size: 11px; letter-spacing: .06em; }
+.halo { fill: url(#halo); }
+.pulse { animation: pulse 3.4s ease-in-out infinite; }
+@keyframes pulse { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
+.sway { animation: sway 5s ease-in-out infinite; }
+@keyframes sway { 0%, 100% { transform: rotate(-1.4deg); } 50% { transform: rotate(1.4deg); } }
+/* tap cue: a small mechanical nudge every few seconds (sign hops 3px, dog-ear lifts) */
+.nd { animation: nd 8s steps(1) infinite; animation-delay: var(--nd, 0s); }
+@keyframes nd { 0%, 100% { transform: translateY(0); } 4% { transform: translateY(-3px); } 8% { transform: translateY(0); } 12% { transform: translateY(-2px); } 16% { transform: translateY(0); } }
+.ear { animation: ear 8s ease-in-out infinite; animation-delay: var(--nd, 0s); transform-box: fill-box; transform-origin: 100% 100%; }
+@keyframes ear { 0%, 70%, 100% { transform: scale(1); } 76%, 86% { transform: scale(1.5) translate(1px, 1px); } 92% { transform: scale(1); } }
+.glass-f { fill: color-mix(in srgb, var(--glow) 26%, transparent); stroke: var(--mustard); stroke-width: 2; stroke-linejoin: round; }
+.glass-t { fill: color-mix(in srgb, var(--glow) 44%, transparent); stroke: var(--mustard); stroke-width: 1.6; stroke-linejoin: round; }
+.leaf { fill: var(--olive); stroke: var(--edge); stroke-width: .9; }
+.leaf2 { fill: color-mix(in srgb, var(--olive) 70%, var(--phosphor-green)); stroke: var(--edge); stroke-width: .9; }
+.page { fill: var(--edge); stroke: var(--concrete); stroke-width: .7; }
+.sil { fill: var(--screen); stroke: var(--edge); stroke-width: .8; stroke-opacity: .55; }
+.skyg { fill: color-mix(in srgb, var(--glow) 82%, var(--paper)); }
+.cloud { fill: var(--edge); opacity: .9; animation: cloud 80s linear infinite; }
+@keyframes cloud { from { transform: translateX(-120px); } to { transform: translateX(900px); } }
+
+/* monkeys */
+.f0 { --fur: var(--walnut); }
+.f1 { --fur: color-mix(in srgb, var(--walnut) 55%, var(--tangerine)); }
+.f2 { --fur: color-mix(in srgb, var(--walnut) 40%, var(--concrete)); }
+.f3 { --fur: color-mix(in srgb, var(--walnut) 62%, var(--screen)); }
+.f4 { --fur: color-mix(in srgb, var(--mustard) 50%, var(--walnut)); }
+.f5 { --fur: color-mix(in srgb, var(--tangerine) 70%, var(--walnut)); }
+.fur { fill: var(--fur); stroke: var(--edge); stroke-width: 1.2; stroke-linejoin: round; }
+.furl { fill: none; stroke: var(--fur); stroke-width: 2.4; stroke-linecap: round; }
+.face { fill: color-mix(in srgb, var(--fur) 40%, var(--glow)); }
+.tongue { fill: color-mix(in srgb, var(--alert) 60%, var(--glow)); stroke: var(--screen); stroke-width: .5; }
+.shirt { fill: var(--shirt); stroke: var(--edge); stroke-width: 1.3; stroke-linejoin: round; }
+.sleeve { stroke: var(--shirt); stroke-width: 7; stroke-linecap: round; fill: none; }
+.hand { fill: var(--fur); stroke: var(--edge); stroke-width: .9; }
+.chair { fill: color-mix(in srgb, var(--concrete) 50%, var(--paper)); stroke: var(--edge); stroke-width: 1.4; stroke-linejoin: round; }
+.sk-paper { --shirt: var(--edge); } .sk-mustard { --shirt: var(--mustard); } .sk-olive { --shirt: var(--olive); }
+.sk-shade { --shirt: var(--concrete); } .sk-rust { --shirt: color-mix(in srgb, var(--tangerine) 60%, var(--paper)); }
+.vacant .mk, .vacant .hands, .vacant .tail { display: none; }
+.tent { display: none; }
+.vacant .tent { display: inline; }
+.arrive { animation: arrive 700ms cubic-bezier(.3, .8, .25, 1) both; }
+@keyframes arrive { from { transform: translateY(-26px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.zz { font: 700 10px var(--font-display); fill: var(--ink); opacity: 0; }
+.g-glance .eyes { animation: glance 7s ease-in-out infinite; animation-delay: var(--d); }
+@keyframes glance { 0%, 38%, 100% { transform: translateX(0); } 44%, 62% { transform: translateX(1.6px); } 70% { transform: translateX(-1px); } }
+
+/* behaviours */
+@keyframes tap { 0%, 100% { transform: rotate(-5deg); } 50% { transform: rotate(7deg); } }
+@keyframes hb { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(.8px); } }
+.b-type .armL { animation: tap calc(.2s * var(--t)) ease-in-out infinite; }
+.b-type .armR { animation: tap calc(.23s * var(--t)) ease-in-out infinite reverse; }
+.b-type .head { animation: hb calc(.4s * var(--t)) ease-in-out infinite; }
+@keyframes peck { 0%, 8% { transform: rotate(-16deg); } 15% { transform: rotate(3deg); } 22%, 46% { transform: rotate(-16deg); } 53% { transform: rotate(-1deg); } 60%, 100% { transform: rotate(-14deg); } }
+@keyframes look { 0%, 100% { transform: rotate(0); } 15% { transform: rotate(4deg); } 53% { transform: rotate(-4deg); } 80% { transform: rotate(1deg); } }
+.b-peck .armR { animation: peck calc(3.6s * var(--t)) linear infinite; animation-delay: var(--d); }
+.b-peck .head { animation: look calc(3.6s * var(--t)) ease-in-out infinite; animation-delay: var(--d); }
+@keyframes slam { 0%, 58%, 100% { transform: rotate(0); } 64% { transform: rotate(-34deg); } 74% { transform: rotate(-34deg); } 82% { transform: rotate(0); } }
+@keyframes feed { 0%, 70% { transform: translateY(0); } 71%, 98% { transform: translateY(-3px); } 100% { transform: translateY(0); } }
+.b-slam .armR { animation: slam calc(3.4s * var(--t)) ease-in-out infinite; animation-delay: var(--d); }
+.b-slam .armL { animation: tap calc(.3s * var(--t)) ease-in-out infinite; }
+.b-slam .sheet { animation: feed calc(3.4s * var(--t)) steps(1) infinite; animation-delay: var(--d); }
+@keyframes sip { 0%, 16% { transform: rotate(0); } 30%, 52% { transform: rotate(var(--sa)); } 66%, 100% { transform: rotate(0); } }
+@keyframes mugt { 0%, 16% { transform: rotate(0); } 30%, 52% { transform: rotate(-64deg); } 66%, 100% { transform: rotate(0); } }
+.b-sip .armR { animation: sip calc(6s * var(--t)) ease-in-out infinite; animation-delay: var(--d); }
+.b-sip .mug { animation: mugt calc(6s * var(--t)) ease-in-out infinite; animation-delay: var(--d); }
+@keyframes stL { 0%, 30%, 100% { transform: rotate(0); } 42%, 68% { transform: rotate(150deg); } 80% { transform: rotate(0); } }
+@keyframes stR { 0%, 30%, 100% { transform: rotate(0); } 42%, 68% { transform: rotate(-150deg); } 80% { transform: rotate(0); } }
+@keyframes stH { 0%, 30%, 100% { transform: translateY(0); } 42%, 68% { transform: translateY(-3px); } 80% { transform: translateY(0); } }
+.b-stretch .armL { animation: stL calc(7s * var(--t)) ease-in-out infinite; animation-delay: var(--d); }
+.b-stretch .armR { animation: stR calc(7s * var(--t)) ease-in-out infinite; animation-delay: var(--d); }
+.b-stretch .head { animation: stH calc(7s * var(--t)) ease-in-out infinite; animation-delay: var(--d); }
+@keyframes flip { 0%, 66%, 100% { transform: scaleX(1); } 72% { transform: scaleX(.12); } 78% { transform: scaleX(1); } }
+@keyframes scan { 0%, 100% { transform: translateX(-1.2px); } 50% { transform: translateX(1.2px); } }
+.b-read .rpage { animation: flip calc(5s * var(--t)) ease-in-out infinite; animation-delay: var(--d); }
+.b-read .eyes { animation: scan calc(1.6s * var(--t)) ease-in-out infinite; }
+@keyframes doze { 0% { transform: rotate(0); } 12%, 46% { transform: rotate(17deg) translateY(3px); } 52% { transform: rotate(-6deg); } 58% { transform: rotate(0); } 66%, 92% { transform: rotate(17deg) translateY(3px); } 100% { transform: rotate(0); } }
+@keyframes lids { 0%, 6% { transform: scaleY(1); } 12%, 46% { transform: scaleY(.12); } 52%, 60% { transform: scaleY(1); } 66%, 92% { transform: scaleY(.12); } 98%, 100% { transform: scaleY(1); } }
+@keyframes zzf { 0%, 10% { opacity: 0; transform: translate(0, 0); } 24%, 40% { opacity: 1; transform: translate(3px, -5px); } 48%, 62% { opacity: 0; } 76%, 88% { opacity: 1; transform: translate(3px, -5px); } 96%, 100% { opacity: 0; } }
+.b-doze .head { animation: doze calc(9s * var(--t)) ease-in-out infinite; animation-delay: var(--d); }
+.b-doze .eyes { animation: lids calc(9s * var(--t)) ease-in-out infinite; animation-delay: var(--d); }
+.b-doze .zz { animation: zzf calc(9s * var(--t)) ease-in-out infinite; animation-delay: var(--d); }
+@keyframes crank { 0%, 44%, 100% { transform: rotate(0); } 48% { transform: rotate(-7deg); } 52% { transform: rotate(3deg); } 56% { transform: rotate(-7deg); } 60% { transform: rotate(3deg); } 64% { transform: rotate(-7deg); } 68% { transform: rotate(3deg); } 72% { transform: rotate(0); } }
+@keyframes spin { 0%, 44% { transform: rotate(0); } 72%, 100% { transform: rotate(720deg); } }
+.b-sharpen .armL { animation: crank calc(4s * var(--t)) linear infinite; animation-delay: var(--d); }
+.b-sharpen .cr { animation: spin calc(4s * var(--t)) linear infinite; animation-delay: var(--d); }
+/* editor stamps and sends a capsule up the tube */
+@keyframes stampT { 0%, 30% { transform: translateY(-13px); } 38%, 50% { transform: translateY(0); } 62%, 100% { transform: translateY(-13px); } }
+@keyframes stampA { 0%, 30% { transform: rotate(0); } 38%, 50% { transform: rotate(18deg); } 62%, 100% { transform: rotate(0); } }
+@keyframes mark { 0%, 37% { opacity: 0; } 39%, 96% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes tube { 0%, 52% { transform: translateY(0); opacity: 0; } 54% { opacity: 1; } 80% { transform: translateY(-96px); opacity: 1; } 84%, 100% { transform: translateY(-100px); opacity: 0; } }
+.b-stamp .stampT { animation: stampT 3.4s cubic-bezier(.6, 0, .4, 1) infinite; }
+.b-stamp .armR { animation: stampA 3.4s cubic-bezier(.6, 0, .4, 1) infinite; }
+.b-stamp .mark { animation: mark 3.4s steps(1) infinite; }
+.cap { animation: tube 3.4s ease-in infinite; }
+.b-stamp .armL { animation: tap 1.1s ease-in-out infinite; }
+@keyframes foot { 0%, 70%, 100% { transform: rotate(0); } 78% { transform: rotate(-12deg); } 86% { transform: rotate(0); } 92% { transform: rotate(-12deg); } }
+.foot { animation: foot 2.6s ease-in-out infinite; }
+.cand { transition: opacity .6s; }
+.cand.gone { opacity: 0; }
+
+/* ---------- life in the aisles ---------- */
+.cartpos { animation: cartxy var(--cd) linear infinite; animation-delay: var(--cdl); }
+.cartflip { animation: cartflip var(--cd) steps(1) infinite; animation-delay: var(--cdl); }
+.wheel { animation: roll .5s linear infinite; }
+@keyframes roll { to { transform: rotate(360deg); } }
+.cartbob { animation: cbob .7s steps(2, jump-none) infinite; }
+@keyframes cbob { 0% { transform: translateY(0); } 50% { transform: translateY(-.8px); } }
+.plane { animation: plane 17s ease-in-out infinite; animation-delay: -5s; }
+.planesh { animation: planesh 17s ease-in-out infinite; animation-delay: -5s; }
+@keyframes plane { 0% { transform: translate(0, 0) rotate(8deg); opacity: 0; } 3% { opacity: 1; } 14% { transform: translate(60px, -22px) rotate(-5deg); } 28% { transform: translate(140px, -8px) rotate(6deg); } 42% { transform: translate(230px, -26px) rotate(-6deg); } 56% { transform: translate(310px, -12px) rotate(7deg); opacity: 1; } 60% { transform: translate(330px, -6px) rotate(14deg); opacity: 0; } 100% { transform: translate(330px, -6px); opacity: 0; } }
+@keyframes planesh { 0% { transform: translate(0, 0); opacity: 0; } 3% { opacity: .28; } 56% { transform: translate(310px, 0); opacity: .28; } 60%, 100% { transform: translate(330px, 0); opacity: 0; } }
+@keyframes water { 0%, 8%, 62%, 100% { transform: rotate(0); } 18%, 50% { transform: rotate(32deg); } }
+@keyframes drop { 0%, 18% { transform: translateY(0); opacity: 0; } 22% { opacity: 1; } 50% { transform: translateY(24px); opacity: 1; } 54%, 100% { transform: translateY(26px); opacity: 0; } }
+.shred { animation: shred 6s steps(8) infinite; }
+@keyframes shred { 0%, 20% { transform: translateY(-14px); opacity: 0; } 24% { opacity: 1; } 60% { transform: translateY(8px); opacity: 1; } 62%, 100% { transform: translateY(10px); opacity: 0; } }
+.can { animation: water 7s ease-in-out infinite; }
+.drp { animation: drop 7s linear infinite; }
+@keyframes bub { 0% { transform: translateY(0); opacity: 0; } 15% { opacity: 1; } 100% { transform: translateY(-20px); opacity: 0; } }
+.bub { animation: bub 2.4s ease-in infinite; animation-delay: var(--d); }
+@keyframes cup { 0%, 20% { transform: rotate(0); } 34%, 56% { transform: rotate(var(--sa)); } 70%, 100% { transform: rotate(0); } }
+.cupa { animation: cup 8s ease-in-out infinite; }
+@keyframes scanbar { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(26px); } }
+@keyframes eject { 0%, 45% { transform: translateY(0); } 70%, 100% { transform: translateY(7px); } }
+.scan { animation: scanbar 2.6s ease-in-out infinite; }
+.eject { animation: eject 5.2s steps(6) infinite; }
+@keyframes coat { 0%, 100% { transform: rotate(-1.6deg); } 50% { transform: rotate(1.6deg); } }
+.coat { animation: coat 6s ease-in-out infinite; animation-delay: var(--d); }
+@keyframes drawer { 0%, 50%, 100% { transform: translateY(0); } 58%, 82% { transform: translateY(5px); } }
+.drw { animation: drawer 9s ease-in-out infinite; animation-delay: var(--d); }
+@keyframes dstamp { 0%, 52% { transform: translateY(-9px); } 58%, 66% { transform: translateY(0); } 74%, 100% { transform: translateY(-9px); } }
+@keyframes dmark { 0%, 57% { opacity: 0; } 59%, 96% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes dlean { 0%, 100% { transform: rotate(0); } 40%, 60% { transform: rotate(4deg); } }
+.dst { animation: dstamp 7s steps(1) infinite; } .dmk { animation: dmark 7s steps(1) infinite; }
+.dsil { animation: dlean 7s ease-in-out infinite; }
+@keyframes elev { 0%, 80%, 100% { opacity: .25; } 84%, 94% { opacity: 1; } }
+.elv { animation: elev 7s steps(1) infinite; }
+
+/* reduced motion: no loops, no travel; each scene holds the pose that carries its meaning */
+@media (prefers-reduced-motion: reduce) {
+  .cam, .up { transition: none !important; }
+  .pulse, .sway, .nd, .ear, .bub, .foot, .arrive, .cloud, .wheel, .cartbob, .g-glance .eyes, [class*='b-'] *, .scan, .eject, .cap, .shred, .coat, .drw, .dst, .dmk, .dsil, .elv { animation: none !important; }
+  .sway { transform: rotate(-1.4deg); }
+  .halo.pulse { opacity: 1; }
+  .ear { transform: scale(1.5) translate(1px, 1px); }
+  .cartpos, .cartflip, .plane, .planesh, .can, .drp, .cupa { animation: none !important; }
+  .cartpos { transform: translate(300px, 440px); }
+  .plane { transform: translate(250px, 6px) rotate(14deg); opacity: 1; } .planesh { transform: translate(250px, 18px); opacity: .3; }
+  .can { transform: rotate(32deg); } .drp { opacity: 1; } .cupa { transform: rotate(var(--sa)); }
+  .b-peck .armR { transform: rotate(-14deg); } .b-slam .armR { transform: rotate(-30deg); }
+  .b-sip .armR { transform: rotate(var(--sa)); } .b-sip .mug { transform: rotate(-64deg); }
+  .b-stretch .armL { transform: rotate(150deg); } .b-stretch .armR { transform: rotate(-150deg); }
+  .b-doze .head { transform: rotate(17deg) translateY(3px); } .b-doze .eyes { transform: scaleY(.12); }
+  .b-doze .zz { opacity: 1; transform: translate(3px, -5px); }
+  .b-sharpen .armL { transform: rotate(-5deg); } .b-stamp .mark, .dmk { opacity: 1; } .b-stamp .stampT { transform: translateY(0); } .dst { transform: translateY(0); }
+  .cap { opacity: 1; transform: translateY(-50px); } .elv { opacity: 1; }
+}
+
+/* ---------- header ---------- */
+.hdr {
+  position: absolute; left: 0; right: 0; top: 0; z-index: 30;
+  padding: max(8px, env(safe-area-inset-top)) 12px 8px; background: var(--walnut);
+  border-bottom: 2px solid var(--mustard); color: var(--on-walnut);
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--screen) 40%, transparent);
+  display: grid; grid-template-columns: 1fr auto; gap: 6px 10px; align-items: center;
+}
+.hdr .seal { width: 36px; height: 36px; flex: none; }
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.brand .eb { font: 500 .75rem var(--font-display); letter-spacing: .12em; text-transform: uppercase; opacity: .92; margin: 0; line-height: 1.1; }
+.brand h1 { font-size: 1.45rem; line-height: 1; color: var(--on-walnut); }
+.dirbtn {
+  min-width: 44px; min-height: 44px; border: 2px solid var(--mustard); background: var(--paper); color: var(--ink);
+  font: 700 .95rem var(--font-display); letter-spacing: .08em; text-transform: uppercase; padding: 4px 10px;
+  display: flex; align-items: center; gap: 6px; border-radius: 6px 6px 14px 6px;
+}
+.dirbtn:active { transform: translateY(2px); }
+.readout { grid-column: 1 / -1; display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 1px; background: var(--concrete); border: 1px solid var(--concrete); }
+.readout > div { background: var(--screen); padding: 3px 8px; display: flex; align-items: baseline; justify-content: space-between; gap: 6px; min-width: 0; }
+.readout .lb { font: 500 .7rem var(--font-display); letter-spacing: .1em; text-transform: uppercase; color: var(--screen-muted); }
+.readout .v { font: 600 .98rem var(--font-mono); color: var(--screen-ink); font-variant-numeric: tabular-nums; text-shadow: 0 0 6px color-mix(in srgb, var(--screen-ink) 45%, transparent); }
+
+/* directory (elevator panel) */
+.dir {
+  position: absolute; z-index: 40; right: 10px; top: calc(max(8px, env(safe-area-inset-top)) + 50px); width: 244px;
+  background: var(--mustard); border: 2px solid var(--edge); border-radius: 8px; padding: 8px 8px 10px; color: var(--screen);
+  box-shadow: 4px 6px 0 color-mix(in srgb, var(--screen) 35%, transparent);
+  transform-origin: 90% 0; transition: transform .28s cubic-bezier(.3, .8, .25, 1), opacity .2s, visibility 0s;
+}
+.dir[hidden] { display: block; visibility: hidden; opacity: 0; transform: perspective(500px) rotateX(-60deg); pointer-events: none; transition: transform .22s, opacity .2s, visibility 0s .22s; }
+.dir h3 { font-size: .85rem; letter-spacing: .14em; margin: 0 4px 6px; }
+.dir ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; }
+.dir button, .dir .dis { width: 100%; min-height: 46px; display: grid; grid-template-columns: 30px 1fr; align-items: center; gap: 8px; text-align: left; background: var(--paper); border: 2px solid var(--screen); border-radius: 5px; padding: 3px 8px 3px 4px; color: var(--ink); }
+.dir button:active { background: var(--glow); transform: translateY(1px); }
+.dir .dis .hn { color: var(--ink); }
+.dir .dis { border-style: dashed; background: color-mix(in srgb, var(--paper) 70%, var(--mustard)); }
+.dir .fl { width: 28px; height: 28px; border-radius: 50%; background: var(--screen); color: var(--screen-ink); font: 600 .95rem var(--font-mono); display: grid; place-items: center; }
+.dir .nm { font: 700 1.02rem var(--font-display); letter-spacing: .06em; text-transform: uppercase; line-height: 1; }
+.dir .hn { display: block; font: 400 .78rem var(--font-body); letter-spacing: 0; text-transform: none; color: var(--ink-muted); margin-top: 2px; }
+.dir button[aria-current='true'] { box-shadow: inset 0 -4px 0 var(--tangerine); }
+
+/* ---------- sheet (paper card that unfolds) ---------- */
+.sheetwrap { position: absolute; left: 0; right: 0; bottom: 0; z-index: 20; perspective: 900px; pointer-events: none; }
+.sheet {
+  position: relative; pointer-events: auto; background: var(--sheet); color: var(--ink);
+  border: 1.5px solid var(--edge); border-bottom: 0; border-radius: 6px 6px 0 0; margin: 0 6px;
+  padding: 18px 14px calc(12px + env(safe-area-inset-bottom));
+  box-shadow: 0 -10px 26px color-mix(in srgb, var(--screen) 42%, transparent);
+  transform-origin: 50% 100%; transform: rotateX(78deg) translateY(30px); opacity: 0; visibility: hidden;
+  transition: transform 560ms cubic-bezier(.3, .8, .25, 1), opacity 300ms, visibility 0s 560ms;
+}
+.sheet.open { transform: none; opacity: 1; visibility: visible; transition-delay: 220ms, 220ms, 0s; }
+.sheetgrain { position: absolute; inset: 0; pointer-events: none; opacity: .5; mix-blend-mode: multiply; border-radius: inherit;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' seed='5'/><feColorMatrix type='saturate' values='0'/></filter><rect width='160' height='160' filter='url(%23n)' opacity='.16'/></svg>"); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .sheetgrain { mix-blend-mode: screen; opacity: .35; } }
+.sheet > * { position: relative; }
+.sbody { max-height: 470px; overflow: auto; overscroll-behavior: contain; padding: 8px 10px 4px; margin: -8px -10px -4px; }
+.sheet > .sheetgrain { position: absolute; }
+.fold-tab {
+  position: absolute; top: -29px; left: 14px; height: 30px; padding: 0 14px 0 10px; display: flex; align-items: center; gap: 8px;
+  background: var(--mustard); color: var(--screen); border: 1.5px solid var(--edge); border-bottom: 0;
+  clip-path: polygon(0 100%, 0 22%, 8px 0, calc(100% - 8px) 0, 100% 22%, 100% 100%);
+  font: 700 .88rem var(--font-display); letter-spacing: .12em; text-transform: uppercase;
+}
+.fold-tab b { font: 600 .85rem var(--font-mono); background: var(--screen); color: var(--screen-ink); border-radius: 50%; width: 20px; height: 20px; display: grid; place-items: center; }
+.sheet-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.sheet h2 { font-size: 1.7rem; line-height: 1; color: var(--head); }
+.form { font: 400 .88rem var(--font-type); color: var(--ink-muted); margin: 3px 0 0; }
+.close {
+  min-height: 44px; min-width: 44px; background: var(--paper-shade); border: 2px solid var(--walnut); border-radius: 4px 4px 14px 4px;
+  font: 700 .95rem var(--font-display); letter-spacing: .08em; text-transform: uppercase; padding: 4px 10px; display: flex; align-items: center; gap: 6px; white-space: nowrap; flex: none;
+}
+.close:active { transform: translateY(2px); }
+.panel { background: var(--paper-shade); border: 1px solid var(--concrete); padding: 10px 12px; margin-top: 12px; display: grid; gap: 6px; }
+.panel.sheetinner { background: color-mix(in srgb, var(--paper-shade) 55%, var(--sheet)); }
+.lab { font: 500 .85rem var(--font-display); letter-spacing: .1em; text-transform: uppercase; color: var(--ink); margin: 0; }
+.big { font: 600 1.5rem var(--font-mono); font-variant-numeric: tabular-nums; line-height: 1.1; }
+.big small { font: 400 .9rem var(--font-body); }
+.desks { display: flex; gap: 4px; margin-top: 2px; }
+.desks i { flex: 1; height: 16px; border: 1.5px solid var(--walnut); background: transparent; position: relative; border-radius: 2px; }
+.desks i.on { background: var(--walnut); }
+.desks i.on::after { content: ''; position: absolute; left: 50%; top: 2px; width: 6px; height: 6px; margin-left: -3px; border-radius: 50%; background: var(--edge); }
+.note { font: 400 .9rem var(--font-body); margin: 0; }
+.delta { font: 400 .88rem var(--font-mono); font-variant-numeric: tabular-nums; margin: 0; color: var(--ink); }
+.why { font: 400 .88rem var(--font-body); color: var(--ink-muted); margin: 0; }
+.hirebox { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; justify-items: center; margin-top: 14px; position: relative; }
+.hirebox.tut { padding-left: 50px; }
+.hirebox.tut .hire { width: 100%; }
+.hire {
+  --d: 6px; width: min(100%, 300px); min-height: 62px; border: 4px solid var(--mustard); background: var(--tangerine); color: var(--screen);
+  font: 700 1.45rem var(--font-display); letter-spacing: .1em; text-transform: uppercase; cursor: pointer;
+  border-radius: 44px 44px 30px 30px / 40px 40px 26px 26px; box-shadow: 0 var(--d) 0 var(--walnut), 0 calc(var(--d) + 4px) 8px color-mix(in srgb, var(--screen) 40%, transparent);
+  position: relative; transition: transform 90ms, box-shadow 90ms; padding: 4px 18px;
+}
+.hire:focus-visible { box-shadow: 0 var(--d) 0 var(--walnut), 0 0 0 6px var(--paper); }
+.hire::before { content: ''; position: absolute; left: 22%; right: 22%; top: 6px; height: 10px; border-radius: 50%; background: var(--glow); opacity: .5; }
+.hire:active:not(:disabled) { transform: translateY(5px); --d: 1px; }
+.hire:disabled { background: var(--concrete); color: var(--screen); border-color: var(--paper-shade); cursor: not-allowed; }
+.hire.nudge { animation: nudge 2s ease-in-out infinite; }
+@keyframes nudge { 0%, 100% { outline: 0 solid transparent; } 50% { outline: 6px solid color-mix(in srgb, var(--mustard) 50%, transparent); outline-offset: 2px; } }
+.pt { position: absolute; left: -2px; top: 14px; width: 46px; height: 34px; pointer-events: none; animation: ptn 1.6s steps(2, jump-none) infinite; filter: drop-shadow(2px 3px 0 color-mix(in srgb, var(--screen) 35%, transparent)); }
+@keyframes ptn { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(5px); } }
+.row2 { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; }
+.btn2 { min-height: 44px; padding: 6px 14px; background: var(--paper); border: 2px solid var(--walnut); font: 700 .98rem var(--font-display); letter-spacing: .08em; text-transform: uppercase; border-radius: 3px; cursor: pointer; color: var(--ink); }
+.btn2:active:not(:disabled) { transform: translateY(2px); background: var(--paper-shade); }
+.btn2:disabled { border-color: var(--concrete); color: var(--ink-muted); cursor: not-allowed; }
+.gauges { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.gauge { text-align: center; }
+.gauge svg { width: 100%; height: auto; max-width: 112px; }
+.gauge .gv { font: 600 1rem var(--font-mono); font-variant-numeric: tabular-nums; }
+.bar { height: 12px; border: 1.5px solid var(--walnut); background: var(--paper); position: relative; }
+.bar > i { position: absolute; inset: 0 auto 0 0; background: var(--olive); }
+.drow { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; padding: 8px 0; border-top: 1px dashed var(--concrete); }
+.drow:first-child { border-top: 0; }
+.drow .nm { font: 700 1.05rem var(--font-display); letter-spacing: .06em; text-transform: uppercase; }
+.stamp { display: inline-block; border: 2px solid var(--stamp); color: var(--stamp); font: 700 .85rem var(--font-display); letter-spacing: .14em; padding: 1px 6px; transform: rotate(-3deg); }
+
+/* ---------- Ernest: peeks in from the top-right corner, never over what he teaches ---------- */
+.ernest {
+  position: absolute; z-index: 35; top: 102px; left: 10px; width: 262px; padding: 8px 10px 8px 12px;
+  background: var(--paper); color: var(--ink); border: 1.5px solid var(--edge); border-radius: 4px;
+  box-shadow: 3px 4px 0 color-mix(in srgb, var(--screen) 40%, transparent);
+  transform-origin: 100% 0; transform: translate(40px, -10px) rotate(4deg); opacity: 0; visibility: hidden;
+  transition: transform 620ms cubic-bezier(.3, .8, .25, 1), opacity 260ms, visibility 0s 620ms;
+}
+.ernest::before { content: ''; position: absolute; inset: 3px; border: 1.5px dashed var(--concrete); pointer-events: none; opacity: .6; }
+.ernest.in { transform: none; opacity: 1; visibility: visible; transition-delay: 0s; }
+.ernest .reel { font: 700 .76rem var(--font-display); letter-spacing: .14em; text-transform: uppercase; color: var(--ink); margin: 0; }
+.ernest h2 { font-size: 1.12rem; color: var(--head); line-height: 1.05; }
+.ernest p.say { margin: 3px 0 7px; font-size: .86rem; line-height: 1.28; }
+.ernest .ok { min-height: 44px; min-width: 132px; display: block; margin-left: auto; padding: 0 16px; background: var(--walnut); color: var(--on-walnut); border: 2px solid var(--screen); border-radius: 3px; font: 700 .98rem var(--font-display); letter-spacing: .1em; text-transform: uppercase; cursor: pointer; }
+.ernest .ok:active { transform: translateY(2px); }
+.ernest.docked { width: 262px; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 0 8px; padding-top: 7px; padding-bottom: 7px; }
+.ernest.docked > * { grid-column: 1; }
+.ernest.docked .reel { display: none; }
+.ernest.docked p.say { margin: 1px 0 0; font-size: .84rem; font-weight: 600; }
+.ernest.docked .ok { grid-column: 2; grid-row: 1 / span 2; min-width: 0; margin: 0; padding: 0 10px; }
+.efig { position: absolute; z-index: 36; right: -22px; top: 92px; width: 138px; height: 128px; pointer-events: none; transform-origin: 100% 0; transform: translate(60px, -20px) rotate(10deg); opacity: 0; visibility: hidden; transition: transform 700ms cubic-bezier(.3, .8, .25, 1) 120ms, opacity 260ms 120ms, visibility 0s 820ms; }
+.efig.in { transform: rotate(-3deg); opacity: 1; visibility: visible; transition-delay: 120ms, 120ms, 0s; }
+.efig .arm { transform-origin: 74px 78px; transform: rotate(var(--aim, 0deg)); }
+.aim { position: absolute; inset: 0; z-index: 34; pointer-events: none; opacity: 0; transition: opacity .3s .5s; }
+.aim.in { opacity: 1; }
+.aimline { fill: none; stroke: var(--focus); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 1 8; }
+.aimhead { fill: var(--mustard); stroke: var(--focus); stroke-width: 2; stroke-linejoin: round; }
+@keyframes boil { 0% { transform: rotate(-.8deg); } 33% { transform: rotate(.7deg) translateY(-.6px); } 66% { transform: rotate(0); } }
+.boil { animation: boil .9s steps(1) infinite; transform-origin: 90% 90%; }
+@media (prefers-reduced-motion: reduce) {
+  .ernest, .efig, .sheet, .dir { transform: none !important; transition: opacity .2s, visibility 0s .2s !important; }
+  .ernest.in, .efig.in, .sheet.open, .dir:not([hidden]) { transition: opacity .2s !important; }
+  .boil, .hire.nudge, .pt { animation: none !important; }
+  .efig { transform: rotate(-3deg) !important; }
+  .aim { transition: opacity .2s; }
+}
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+  <div class="cam" id="cam">
+    <svg id="map" viewBox="0 0 780 1340" role="img" aria-label="Floor plan of the Bureau's first floor, larger than the screen: Departments and the Director's Office along the back wall beside the Floor 2 elevator, the Typing Pool in the middle, Personnel by the entrance at the bottom. A water cooler, mail room, copier and plants fill the aisles. Drag to look around."></svg>
+    <button class="hot" data-zone="personnel" style="left:110px;top:965px;width:250px;height:200px" aria-label="Personnel: hire monkeys and manage desks"></button>
+    <button class="hot" data-zone="pool" style="left:220px;top:450px;width:340px;height:440px" aria-label="Typing Pool: typing versus editing"></button>
+    <button class="hot" data-zone="departments" style="left:30px;top:150px;width:270px;height:185px" aria-label="Departments: Recruiting, Construction, Editing"></button>
+    <button class="hot" data-zone="director" style="left:480px;top:150px;width:270px;height:185px" aria-label="Director's Office: readiness, permit, declare"></button>
+  </div>
+
+  <header class="hdr">
+    <div class="brand">
+      <svg class="seal" viewBox="0 0 40 40" aria-hidden="true">
+        <circle cx="20" cy="20" r="18" fill="var(--mustard)" stroke="var(--edge)" stroke-width="1.5"/>
+        <circle cx="20" cy="20" r="13.5" fill="none" stroke="var(--screen)" stroke-width="1.2" stroke-dasharray="2 2"/>
+        <path d="M9 20c0-5 5-5 11 0s11 5 11 0-5-5-11 0-11 5-11 0z" fill="none" stroke="var(--screen)" stroke-width="2.6" stroke-linejoin="round"/>
+      </svg>
+      <div><p class="eb">Bureau of Infinite Typing</p><h1>First Floor</h1></div>
+    </div>
+    <button class="dirbtn" id="dirbtn" aria-expanded="false" aria-controls="dir" aria-label="Building directory">
+      <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="3" y="1" width="12" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="9" cy="6" r="1.8" fill="currentColor"/><circle cx="9" cy="12" r="1.8" fill="currentColor"/></svg>
+      <span>Directory</span>
+    </button>
+    <div class="readout" role="group" aria-label="Bureau totals">
+      <div><span class="lb">Bananas</span><span class="v" id="r-ban">1,284</span></div>
+      <div><span class="lb">Income</span><span class="v" id="r-inc">12.4/s</span></div>
+      <div><span class="lb">Monkeys</span><span class="v" id="r-mon">8</span></div>
+    </div>
+  </header>
+
+  <nav class="dir" id="dir" hidden aria-label="Building directory">
+    <h3>Building directory</h3>
+    <ul id="dirlist"></ul>
+  </nav>
+
+  <div class="sheetwrap"><section class="sheet" id="sheet" role="dialog" aria-modal="false" tabindex="-1" aria-label="Room"><div class="sheetgrain"></div><div class="fold-tab" id="foldtab"></div><div class="sbody" id="sheetbody"></div></section></div>
+
+  <svg class="aim" id="aim" width="390" height="844" viewBox="0 0 390 844" aria-hidden="true"><path class="aimline" id="aimline" d="M0 0"/><path class="aimhead" id="aimhead" d="M0 0"/></svg>
+  <svg class="efig" id="efig" viewBox="0 0 138 128" aria-hidden="true">
+    <g class="boil">
+      <!-- Ernest: chimpanzee leaning in from the corner; shirt, narrow tie, pencil behind the ear, pointing arm -->
+      <path d="M52 128V94q0-14 14-17h46q18 3 18 18v33z" fill="var(--edge)" stroke="var(--concrete)" stroke-width="1.4"/>
+      <path d="M84 80l7 8 7-8v8l-3 30h-8l-3-30z" fill="var(--screen)"/>
+      <circle cx="66" cy="52" r="10" fill="var(--walnut)" stroke="var(--edge)" stroke-width="1.4"/><circle cx="66" cy="52" r="5.6" fill="color-mix(in srgb, var(--walnut) 40%, var(--glow))"/>
+      <ellipse cx="94" cy="50" rx="27" ry="26" fill="var(--walnut)" stroke="var(--edge)" stroke-width="1.4"/>
+      <path d="M72 55q0-17 21-17t21 17q0 17-21 18T72 55z" fill="color-mix(in srgb, var(--walnut) 38%, var(--glow))"/>
+      <path d="M72 30l-9-14" stroke="var(--mustard)" stroke-width="4" stroke-linecap="round"/><path d="M72 30l1.6 3" stroke="var(--screen)" stroke-width="4" stroke-linecap="round"/>
+      <circle cx="82" cy="49" r="6.4" fill="var(--glow)" stroke="var(--screen)" stroke-width=".9"/><circle cx="104" cy="49" r="6.4" fill="var(--glow)" stroke="var(--screen)" stroke-width=".9"/>
+      <circle cx="80" cy="50" r="3.6" fill="var(--screen)"/><circle cx="102" cy="50" r="3.6" fill="var(--screen)"/><path d="M80 50l-3.6-3.2a4 4 0 0 1 5 -.4z" fill="var(--glow)"/><path d="M102 50l-3.6-3.2a4 4 0 0 1 5 -.4z" fill="var(--glow)"/>
+      <path d="M84 62q9 8 19 0" fill="none" stroke="var(--screen)" stroke-width="2.2" stroke-linecap="round"/>
+      <circle cx="91" cy="57" r="1.1" fill="var(--screen)"/><circle cx="96" cy="57" r="1.1" fill="var(--screen)"/>
+      <g class="arm"><rect x="46" y="76" width="30" height="13" rx="6.5" fill="var(--edge)" stroke="var(--concrete)" stroke-width="1.4"/><circle cx="44" cy="82" r="6" fill="var(--walnut)" stroke="var(--edge)" stroke-width="1.2"/><path d="M40 80L12 74" stroke="var(--mustard)" stroke-width="3.4" stroke-linecap="round"/><path d="M14 74.4l-5 -1" stroke="var(--screen)" stroke-width="3.4" stroke-linecap="round"/></g>
+    </g>
+  </svg>
+  <aside class="ernest" id="ernest" aria-label="Orientation Reel 1">
+    <p class="reel">Orientation Reel 1</p>
+    <h2>Your First Hire</h2>
+    <p class="say" id="esay">Personnel is the desk below. Tap it to seat a monkey.</p>
+    <button class="ok" id="ernest-ok">Understood</button>
+  </aside>
+  <div class="sr" id="live" aria-live="polite"></div>
+</div>
+
+<script>
+(() => {
+'use strict';
+const HDR = 92, VW = 390, VH = 844, WW = 780, WH = 1340;
+const $ = (s, r = document) => r.querySelector(s);
+const reduce = matchMedia('(prefers-reduced-motion: reduce)');
+const f1 = n => Math.round(n * 10) / 10;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+/* ===== the cast: every typist is authored, so no two share a silhouette, view, gaze or headwear ===== */
+function hash(i) { let h = Math.imul(i + 1, 0x9E3779B1); h ^= h >>> 15; h = Math.imul(h, 0x85EBCA77); h ^= h >>> 13; h = Math.imul(h, 0xC2B2AE3D); h ^= h >>> 16; return h >>> 0; }
+const BEH_LABEL = { type: 'touch-typing', peck: 'hunt-and-peck', slam: 'carriage-return slam', sip: 'sipping from a mug', stretch: 'stretching', read: 'reading a page', doze: 'dozing', sharpen: 'sharpening a pencil', stamp: 'stamping' };
+// H = visible height above the desk, bw = shoulder width, tw = hip/shoulder ratio, hr = head radius
+const CAST = [
+  { fur: 3, H: 62, bw: 38, tw: 1.0, hr: 13, ears: 'round', lean: -6, view: 'f', gaze: [0, .9], eyes: 'open', mouth: 'flat', head: 'phones', body: 'tie', tail: 'up', prop: 0, ps: 1, beh: 'type', shirt: 'sk-paper', chair: 'tall' },
+  { fur: 1, H: 47, bw: 25, tw: 1.2, hr: 12.5, ears: 'big', lean: 8, view: 'pr', gaze: [1, .6], eyes: 'wide', mouth: 'tongue', head: 'swirl', body: 'none', tail: 'curl', prop: 1, ps: -1, beh: 'peck', shirt: 'sk-mustard', chair: 'short', fwd: 4 },
+  { fur: 2, H: 64, bw: 26, tw: .95, hr: 11, ears: 'tuft', lean: 4, view: 'f', gaze: [0, -.9], eyes: 'wide', mouth: 'teeth', head: 'glassesS', body: 'bowtie', tail: 'hang', prop: 5, ps: 1, beh: 'slam', shirt: 'sk-olive', chair: 'round' },
+  { fur: 4, H: 52, bw: 30, tw: 1.35, hr: 12.5, ears: 'big', lean: 0, view: 'l', gaze: [-1, .1], eyes: 'heavy', mouth: 'smirk', head: 'pencil', body: 'cardigan', tail: 'curl', prop: 3, ps: 1, beh: 'sip', shirt: 'sk-shade', chair: 'tall', fwd: 2 },
+  { fur: 0, H: 58, bw: 40, tw: .88, hr: 14.5, ears: 'small', lean: 0, view: 'f', gaze: [0, 0], eyes: 'closed', mouth: 'o', head: 'none', body: 'lanyard', tail: 'none', prop: 4, ps: -1, beh: 'stretch', shirt: 'sk-rust', chair: 'short' },
+  { fur: 5, H: 55, bw: 24, tw: 1.0, hr: 11.5, ears: 'round', lean: -5, view: 'pl', gaze: [-1, .3], eyes: 'open', mouth: 'frown', head: 'glassesR', body: 'bowtie', tail: 'up', prop: 2, ps: 1, beh: 'read', shirt: 'sk-paper', chair: 'round', fwd: 3 },
+  { fur: 3, H: 50, bw: 32, tw: 1.25, hr: 13, ears: 'big', lean: 0, view: 'r', gaze: [.6, .3], eyes: 'heavy', mouth: 'o', head: 'none', body: 'cardigan', tail: 'hang', prop: 0, ps: -1, beh: 'doze', shirt: 'sk-mustard', chair: 'tall', fwd: 3 },
+  { fur: 2, H: 54, bw: 30, tw: 1.0, hr: 12, ears: 'tuft', lean: 7, view: 'l', gaze: [-1, .5], eyes: 'wide', mouth: 'smile', head: 'bow', body: 'none', tail: 'curl', prop: 4, ps: 1, beh: 'sharpen', shirt: 'sk-olive', chair: 'short' },
+  // beyond the first eight desks: generated from the desk index
+];
+const EARS = ['round', 'big', 'small', 'tuft'], VIEWS = ['f', 'l', 'r', 'pl', 'pr'], MOUTHS = ['smile', 'flat', 'o', 'tongue', 'teeth', 'frown', 'smirk'];
+const BEHS = ['type', 'peck', 'slam', 'sip', 'stretch', 'read', 'doze', 'sharpen'];
+function gen(i) {
+  const r = (k, n) => hash(i * 31 + k * 977) % n;
+  return { fur: r(1, 6), H: 46 + r(2, 18), bw: 24 + r(3, 16), tw: .9 + r(4, 45) / 100, hr: 11 + r(5, 4), ears: EARS[r(6, 4)], lean: r(7, 15) - 7, view: VIEWS[r(8, 5)], gaze: [r(9, 3) - 1, r(10, 3) - 1], eyes: ['open', 'wide', 'heavy'][r(11, 3)], mouth: MOUTHS[r(12, 7)], head: ['none', 'none', 'glassesR', 'bow', 'pencil'][r(13, 5)], body: ['none', 'tie', 'cardigan', 'lanyard'][r(14, 4)], tail: ['curl', 'up', 'hang', 'none'][r(15, 4)], prop: r(16, 6), ps: r(17, 2) ? 1 : -1, beh: BEHS[r(18, 8)], shirt: ['sk-paper', 'sk-mustard', 'sk-olive', 'sk-shade', 'sk-rust'][r(19, 5)], chair: ['tall', 'short', 'round'][r(20, 3)] };
+}
+const rot = (p, a, o) => { const r = a * Math.PI / 180, c = Math.cos(r), s = Math.sin(r), x = p[0] - o[0], y = p[1] - o[1]; return [o[0] + x * c - y * s, o[1] + x * s + y * c]; };
+
+/* ===== svg helpers ===== */
+// standing piece: contact + long shadow, fold tabs, front face, cut rim, lighter top face
+function pbox({ x, yb, w, h, d = 8, c = 'walnut', extra = '', before = '', cls = '', tabs = true, shadow = true, glass = false, sk = 1 }) {
+  const i = d * .2, cx = x + w / 2;
+  const sh = shadow ? `<polygon class="shl" points="${x},${yb} ${x + w},${yb} ${f1(x + w + h * .5 * sk)},${f1(yb + h * .2 * sk + 4)} ${f1(x + h * .5 * sk)},${f1(yb + h * .2 * sk + 4)}"/><polygon class="shc" points="${x},${yb} ${x + w},${yb} ${x + w + 3},${yb + 4} ${x + 3},${yb + 4}"/>` : '';
+  const tb = tabs ? `<polygon class="tb" points="${f1(x + w * .1)},${yb - 1} ${f1(x + w * .3)},${yb - 1} ${f1(x + w * .3 + 3)},${yb + 6} ${f1(x + w * .1 - 3)},${yb + 6}"/><polygon class="tb" points="${f1(x + w * .7)},${yb - 1} ${f1(x + w * .9)},${yb - 1} ${f1(x + w * .9 + 3)},${yb + 6} ${f1(x + w * .7 - 3)},${yb + 6}"/>` : '';
+  const fr = glass ? `<rect class="glass-f" x="${x}" y="${yb - h}" width="${w}" height="${h}"/>` : `<rect class="fr" x="${x}" y="${yb - h}" width="${w}" height="${h}" rx="1.5"/><path class="rim" d="M${x + 1.5} ${yb - 1}V${yb - h + 1.5}H${x + w - 1.5}"/>`;
+  const tp = `<polygon class="${glass ? 'glass-t' : 'tp'}" points="${f1(x + i)},${yb - h - d} ${f1(x + w - i)},${yb - h - d} ${x + w},${yb - h} ${x},${yb - h}"/>`;
+  return `<g class="up c-${c} ${cls}" style="transform-origin:${cx}px ${yb}px">${sh}${before}${tb}${fr}${tp}${extra}</g>`;
+}
+function plate(cx, top, w, h, text, legs = 14, nd = 0) {
+  const x = cx - w / 2;
+  return `<g class="up" style="transform-origin:${cx}px ${top + h + legs}px"><g class="nd" style="--nd:${nd}s"><g class="sway" style="transform-origin:${cx}px ${top}px">` +
+    `<rect class="tb" x="${x + 6}" y="${top + h - 1}" width="5" height="${legs}"/><rect class="tb" x="${x + w - 11}" y="${top + h - 1}" width="5" height="${legs}"/>` +
+    `<rect class="fr c-mustard" x="${x}" y="${top}" width="${w}" height="${h}" rx="2"/><path class="rim" d="M${x + 1.5} ${top + h - 1}V${top + 1.5}H${x + w - 1.5}"/><text class="sg" x="${cx}" y="${top + h / 2 + 4.2}">${text}</text></g></g></g>`;
+}
+function bowl(x, y, cord = 12, dl = 0) {
+  return `<g><line x1="${x}" y1="${y - cord}" x2="${x}" y2="${y - 7}" stroke="var(--edge)" stroke-width="1.4"/><circle class="halo pulse" cx="${x}" cy="${y}" r="30" style="animation-delay:${dl}s"/><path d="M${x - 9} ${y - 3}a9 9 0 0 0 18 0z" class="glowf" stroke="var(--edge)" stroke-width="1.2"/><rect x="${x - 4}" y="${y - 8}" width="8" height="5" rx="1.5" class="brass"/></g>`;
+}
+function plant(cx, yb, s = 1, alt = 0) {
+  const cls = alt ? 'leaf2' : 'leaf';
+  const leaves = [-52, -28, -8, 14, 34, 54].map((a, k) => `<ellipse class="${k % 2 ? 'leaf' : cls}" cx="${cx}" cy="${yb - 26 * s}" rx="${3.6 * s}" ry="${(k % 3 ? 12 : 15) * s}" transform="rotate(${a} ${cx} ${yb - 14 * s})"/>`).join('');
+  return `<g class="up" style="transform-origin:${cx}px ${yb}px"><polygon class="shl" points="${cx - 8 * s},${yb} ${cx + 8 * s},${yb} ${cx + 30 * s},${yb + 7 * s} ${cx + 8 * s},${yb + 7 * s}"/><polygon class="shc" points="${cx - 8 * s},${yb} ${cx + 8 * s},${yb} ${cx + 11 * s},${yb + 3} ${cx - 5 * s},${yb + 3}"/>${leaves}<polygon class="fr" style="--c:var(--walnut)" points="${cx - 8 * s},${yb - 13 * s} ${cx + 8 * s},${yb - 13 * s} ${cx + 6 * s},${yb} ${cx - 6 * s},${yb}"/><path class="rim" d="M${cx - 7 * s} ${yb - 12 * s}h${14 * s}"/></g>`;
+}
+const T = (x, y, inner, cls = '', st = '') => `<g transform="translate(${x} ${y})"${cls ? ` class="${cls}"` : ''}${st ? ` style="${st}"` : ''}>${inner}</g>`;
+
+/* ===== monkey parts (local coords: 0,0 = base of desk, y up is negative) ===== */
+function wedge(x, y, r, a1, a2) { const p = a => [f1(x + r * Math.cos(a * Math.PI / 180)), f1(y + r * Math.sin(a * Math.PI / 180))]; const [x1, y1] = p(a1), [x2, y2] = p(a2); return `M${x} ${y}L${x1} ${y1}A${r} ${r} 0 0 1 ${x2} ${y2}Z`; }
+function eyeSVG(x, y, r, g, kind) {
+  if (kind === 'closed') return `<path d="M${f1(x - r)} ${f1(y + r * .2)}Q${x} ${f1(y - r * 1.3)} ${f1(x + r)} ${f1(y + r * .2)}" class="inkl" stroke-width="1.5"/>`;
+  const px = f1(x + g[0] * r * .42), py = f1(y + g[1] * r * .36);
+  const lid = kind === 'heavy' ? `<path d="M${f1(x - r - .4)} ${f1(y + r * .1)}a${f1(r + .4)} ${f1(r + .4)} 0 0 1 ${f1(2 * r + .8)} 0z" class="fur" stroke="var(--screen)" stroke-width=".7"/>` : '';
+  return `<circle cx="${x}" cy="${y}" r="${r}" class="glowf" stroke="var(--screen)" stroke-width=".8"/><circle cx="${px}" cy="${py}" r="${f1(r * .66)}" class="ink"/><path d="${wedge(px, py, r * .66, -70, -10)}" class="glowf"/>${lid}`;
+}
+function headSVG(s, hx, hy, hr) {
+  const v = { f: 0, l: -1, r: 1, pl: -1, pr: 1 }[s.view], prof = s.view[0] === 'p', vv = v || 1;
+  const er = hr * ({ big: .66, round: .5, small: .33, tuft: .42 }[s.ears]);
+  const ear = (x, y, r) => `<circle class="fur" cx="${f1(x)}" cy="${f1(y)}" r="${f1(r)}"/><circle class="face" cx="${f1(x)}" cy="${f1(y)}" r="${f1(r * .55)}"/>` + (s.ears === 'tuft' ? `<path d="M${f1(x - r * .6)} ${f1(y - r * .8)}l-1 -4M${f1(x)} ${f1(y - r)}l0 -5M${f1(x + r * .6)} ${f1(y - r * .8)}l1 -4" class="furl" stroke-width="1.8"/>` : '');
+  let o = '';
+  if (!prof) o += v === 0 ? ear(hx - hr * .98, hy, er) + ear(hx + hr * .98, hy, er) : ear(hx - v * hr * .9, hy + 1, er) + ear(hx + v * hr * .78, hy, er * .62);
+  if (s.flange) o += `<ellipse class="fur" cx="${f1(hx - hr * .92)}" cy="${f1(hy + hr * .25)}" rx="${f1(hr * .42)}" ry="${f1(hr * .6)}"/><ellipse class="fur" cx="${f1(hx + hr * .92)}" cy="${f1(hy + hr * .25)}" rx="${f1(hr * .42)}" ry="${f1(hr * .6)}"/>`;
+  o += `<circle class="fur" cx="${hx}" cy="${hy}" r="${hr}"/>`;
+  const ey = hy - hr * .06;
+  let eyes = '', mx, my = hy + hr * .62, mw = hr * .28;
+  const er0 = hr * (s.eyes === 'wide' ? .31 : .27);
+  if (prof) {
+    o += `<ellipse class="face" cx="${f1(hx + v * hr * .34)}" cy="${f1(hy + hr * .1)}" rx="${f1(hr * .56)}" ry="${f1(hr * .62)}"/><ellipse class="fur" cx="${f1(hx + v * hr * .86)}" cy="${f1(hy + hr * .42)}" rx="${f1(hr * .44)}" ry="${f1(hr * .34)}" style="fill:color-mix(in srgb, var(--fur) 40%, var(--glow))"/><circle cx="${f1(hx + v * hr * 1.18)}" cy="${f1(hy + hr * .3)}" r="1.5" class="ink"/>`;
+    o += ear(hx - v * hr * .22, hy + hr * .08, er);
+    eyes = eyeSVG(f1(hx + v * hr * .5), f1(ey), er0, [v * Math.abs(s.gaze[0] || 1), s.gaze[1]], s.eyes);
+    mx = hx + v * hr * .86; my = hy + hr * .62; mw = hr * .2;
+  } else if (v === 0) {
+    o += `<ellipse class="face" cx="${hx}" cy="${f1(hy + hr * .2)}" rx="${f1(hr * .74)}" ry="${f1(hr * .66)}"/>`;
+    const e = hr * .36; eyes = eyeSVG(f1(hx - e), f1(ey), er0, s.gaze, s.eyes) + eyeSVG(f1(hx + e), f1(ey), er0, s.gaze, s.eyes); mx = hx;
+  } else {
+    o += `<ellipse class="face" cx="${f1(hx + v * hr * .3)}" cy="${f1(hy + hr * .2)}" rx="${f1(hr * .64)}" ry="${f1(hr * .66)}"/>`;
+    const c = hx + v * hr * .3, e = hr * .3; eyes = eyeSVG(f1(c - v * e), f1(ey), er0 * 1.05, s.gaze, s.eyes) + eyeSVG(f1(c + v * e * 1.05), f1(ey), er0 * .85, s.gaze, s.eyes); mx = hx + v * hr * .34;
+  }
+  mx = f1(mx); my = f1(my); mw = f1(mw);
+  const mouth = {
+    smile: `<path d="M${mx - mw} ${my}Q${mx} ${f1(my + mw * .9)} ${mx + mw} ${my}" class="inkl" stroke-width="1.3"/>`,
+    flat: `<path d="M${f1(mx - mw * .8)} ${my}h${f1(mw * 1.6)}" class="inkl" stroke-width="1.4"/>`,
+    o: `<ellipse cx="${mx}" cy="${f1(my + .6)}" rx="${f1(mw * .5)}" ry="${f1(mw * .62)}" class="ink"/>`,
+    tongue: `<path d="M${mx - mw} ${my}Q${mx} ${f1(my + mw * .8)} ${mx + mw} ${my}" class="inkl" stroke-width="1.3"/><path d="M${f1(mx + mw * .1)} ${f1(my + mw * .35)}q${f1(mw * .1)} ${f1(mw * 1.1)} ${f1(mw * .8)} ${f1(mw * .9)}q${f1(mw * .6)} -${f1(mw * .4)} ${f1(mw * .2)} -${f1(mw * 1.2)}z" class="tongue"/>`,
+    teeth: `<rect x="${f1(mx - mw)}" y="${f1(my - 1.8)}" width="${f1(mw * 2)}" height="4" rx="1" class="page" stroke="var(--screen)" stroke-width=".8"/><path d="M${mx} ${f1(my - 1.8)}v4" stroke="var(--screen)" stroke-width=".7"/>`,
+    frown: `<path d="M${mx - mw} ${f1(my + 1.6)}Q${mx} ${f1(my - mw * .7)} ${mx + mw} ${f1(my + 1.6)}" class="inkl" stroke-width="1.3"/>`,
+    smirk: `<path d="M${f1(mx - mw)} ${my}Q${f1(mx + mw * .3)} ${f1(my + mw)} ${f1(mx + mw)} ${f1(my - mw * .5)}" class="inkl" stroke-width="1.3"/>`
+  }[s.mouth];
+  let acc = '';
+  const nearX = hx + vv * hr * .72;
+  switch (s.head) {
+    case 'glassesR': case 'glassesS': {
+      const rr = er0 + 2.1, one = prof;
+      const pts = prof ? [[hx + v * hr * .5, ey]] : v === 0 ? [[hx - hr * .36, ey], [hx + hr * .36, ey]] : [[hx + v * hr * .3 - v * hr * .3, ey], [hx + v * hr * .3 + v * hr * .315, ey]];
+      const sh = p => s.head === 'glassesR' ? `<circle cx="${f1(p[0])}" cy="${f1(p[1])}" r="${f1(rr)}"/>` : `<rect x="${f1(p[0] - rr - .4)}" y="${f1(p[1] - rr)}" width="${f1(2 * rr + .8)}" height="${f1(2 * rr - .6)}" rx="1.6"/>`;
+      acc = `<g class="inkl" stroke-width="1.3">${pts.map(sh).join('')}${pts.length > 1 ? `<path d="M${f1(pts[0][0] + rr)} ${f1(ey - .5)}H${f1(pts[1][0] - rr)}"/>` : `<path d="M${f1(pts[0][0] - v * rr)} ${f1(ey - .5)}L${f1(hx - v * hr * .2)} ${f1(ey - 1)}"/>`}</g>`; break;
+    }
+    case 'bow': acc = `<path d="M${f1(nearX - 1)} ${f1(hy - hr * .92)}l-8 -5v11z M${f1(nearX - 1)} ${f1(hy - hr * .92)}l8 -5v11z" fill="var(--alert)" stroke="var(--edge)" stroke-width="1" stroke-linejoin="round"/><circle cx="${f1(nearX - 1)}" cy="${f1(hy - hr * .92)}" r="2" class="brass"/>`; break;
+    case 'phones': acc = `<path d="M${f1(hx - hr - 1)} ${hy}a${hr + 1} ${hr + 3} 0 0 1 ${2 * hr + 2} 0" fill="none" stroke="var(--screen)" stroke-width="2.6"/>` + (prof ? `<rect x="${f1(hx - v * hr * .22 - 3.5)}" y="${f1(hy - 3)}" width="7" height="10" rx="3" fill="var(--concrete)" stroke="var(--edge)" stroke-width=".9"/>` : `<rect x="${f1(hx - hr - 4.5)}" y="${hy - 4}" width="6" height="10" rx="2.6" fill="var(--concrete)" stroke="var(--edge)" stroke-width=".9"/><rect x="${f1(hx + hr - 1.5)}" y="${hy - 4}" width="6" height="10" rx="2.6" fill="var(--concrete)" stroke="var(--edge)" stroke-width=".9"/>`); break;
+    case 'pencil': acc = `<path d="M${f1(hx - vv * hr * .78)} ${f1(hy - hr * .35)}l${f1(-vv * 4)} -11" stroke="var(--mustard)" stroke-width="3" stroke-linecap="round"/><path d="M${f1(hx - vv * hr * .78 - vv * 4)} ${f1(hy - hr * .35 - 11)}l${f1(-vv * .7)} -2" stroke="var(--screen)" stroke-width="3" stroke-linecap="round"/>`; break;
+    case 'swirl': acc = `<path d="M${f1(hx - 3)} ${f1(hy - hr + .5)}q-2 -9 6 -9q6 0 3 5q-2.5 3 -5.4 1" class="furl" style="stroke:var(--edge)" stroke-width="5"/><path d="M${f1(hx - 3)} ${f1(hy - hr + .5)}q-2 -9 6 -9q6 0 3 5q-2.5 3 -5.4 1" class="furl" stroke-width="3"/>`; break;
+  }
+  return `<g class="eyes" style="transform-origin:${f1(hx)}px ${f1(ey)}px">${eyes}</g>${mouth}${acc}`.replace(/^/, o);
+}
+const prop = (kind, px, y) => {
+  switch (kind) {
+    case 0: return `<g><rect x="${px - 4}" y="${y - 8}" width="8" height="8" rx="1" class="page" style="fill:var(--paper-shade)"/><path d="M${px + 4} ${y - 6}h2.6a2.2 2.2 0 0 1 0 4.4h-2.6" class="inkl" stroke-width="1.1"/><path d="M${px - 1} ${y - 10}q1 -2 0 -3.4" class="inkl" stroke-width=".9" opacity=".6"/></g>`;
+    case 1: return `<g><polygon points="${px - 4.5},${y - 6} ${px + 4.5},${y - 6} ${px + 3.4},${y} ${px - 3.4},${y}" fill="var(--concrete)" stroke="var(--edge)" stroke-width=".9"/><ellipse class="leaf" cx="${px - 3}" cy="${y - 10}" rx="2.2" ry="5" transform="rotate(-25 ${px - 3} ${y - 7})"/><ellipse class="leaf" cx="${px + 3}" cy="${y - 10}" rx="2.2" ry="5" transform="rotate(25 ${px + 3} ${y - 7})"/><ellipse class="leaf" cx="${px}" cy="${y - 12}" rx="2.2" ry="5"/></g>`;
+    case 2: return `<g><rect class="page" x="${px - 7}" y="${y - 2.6}" width="14" height="2.6"/><rect class="page" x="${px - 6}" y="${y - 5.4}" width="14" height="2.6"/><rect class="page" x="${px - 7.5}" y="${y - 8.2}" width="14" height="2.6"/></g>`;
+    case 3: return `<g><rect x="${px - 5}" y="${y - 11}" width="10" height="11" fill="var(--walnut)" stroke="var(--edge)" stroke-width=".9"/><rect x="${px - 3.4}" y="${y - 9.4}" width="6.8" height="7.6" fill="var(--mustard)"/><circle cx="${px}" cy="${y - 6.6}" r="1.5" class="ink"/><path d="M${px - 2.6} ${y - 2.6}q2.6 -2.6 5.2 0z" class="ink"/></g>`;
+    case 4: return `<g><path d="M${px - 4} ${y}h8M${px} ${y}V${y - 6}L${px + 4} ${y - 11}" class="inkl" stroke-width="1.3"/><path d="M${px + 1} ${y - 10}h8l-2 4.4h-3.6z" fill="var(--mustard)" stroke="var(--edge)" stroke-width=".9"/><circle class="halo" cx="${px + 5}" cy="${y - 4}" r="11"/></g>`;
+    default: return `<g><path d="M${px} ${y}V${y - 15}" stroke="var(--screen)" stroke-width="1.1"/><path d="M${px} ${y - 15}l9 3l-9 3z" fill="var(--alert)" stroke="var(--edge)" stroke-width=".8"/></g>`;
+  }
+};
+function torsoPath(sw, hw, ys, yb) {
+  const a = sw / 2, b = hw / 2, k = 9;
+  return `M${-b} ${yb}C${-b * 1.12} ${f1(yb - 16)} ${-a * 1.12} ${f1(ys + 18)} ${-a} ${ys + k}Q${-a} ${ys} ${f1(-a + k)} ${ys}H${f1(a - k)}Q${a} ${ys} ${a} ${ys + k}C${f1(a * 1.12)} ${f1(ys + 18)} ${f1(b * 1.12)} ${f1(yb - 16)} ${b} ${yb}Z`;
+}
+function chairSVG(kind, bw) {
+  const w = bw + 12;
+  if (kind === 'round') return `<ellipse class="chair" cx="0" cy="-56" rx="${w / 2}" ry="19"/>`;
+  if (kind === 'short') return `<rect class="chair" x="${-w / 2}" y="-52" width="${w}" height="26" rx="8"/>`;
+  return `<rect class="chair" x="${-w / 2}" y="-78" width="${w}" height="52" rx="7"/><rect x="${-w / 2 + 4}" y="-74" width="${w - 8}" height="5" rx="2.4" fill="var(--edge)" opacity=".35"/>`;
+}
+function tailSVG(kind, bw, lean) {
+  const x = bw / 2 + 5;
+  const d = { curl: `M${x} -34c13 2 17 -10 10 -20c-5 -7 -12 -3 -9 3`, up: `M${x} -34c16 -4 20 -22 14 -36`, hang: `M${x} -34c12 6 16 14 12 24`, none: '' }[kind];
+  return d ? `<path class="furl tail-o" d="${d}" style="stroke:var(--edge);stroke-width:6"/><path class="furl" d="${d}" stroke-width="3.6"/>` : '';
+}
+
+/* seated monkey + desk. all authored in local coords, then placed with one translate */
+function seatSVG(i, cx, yb, o = {}) {
+  const s = Object.assign({}, CAST[i] || gen(i), o.over || {});
+  const hr = s.hr, ys0 = -37 - s.H + hr * 1.9, dw = o.dw || 64, hw2 = dw / 2;
+  const v = { f: 0, l: -1, r: 1, pl: -1, pr: 1 }[s.view];
+  const lean = s.lean || 0, fwd = s.fwd || 0;
+  const pivot = [0, -30];
+  const hx = (v ? v * fwd : 0) + 0, hy = -37 - s.H + hr + fwd * .7;
+  const ys = hy + hr * .92;
+  const sw = s.bw, hwid = s.bw * s.tw;
+  const sh0 = [[-(sw / 2 - 2), ys + 8], [sw / 2 - 2, ys + 8]].map(p => rot(p, lean, pivot));
+  const hxL = -8, hxR = 8, hyH = -31;
+  const L = sh0[0], R = sh0[1];
+  let hL = [hxL, hyH], hRt = [hxR, hyH];
+  const mouthPt = rot([hx + (v ? v * hr * .5 : 0), hy + hr * .7], lean, pivot);
+  const armLen = Math.hypot(mouthPt[0] - R[0], mouthPt[1] - R[1]);
+  let sa = 0;
+  if (s.beh === 'sip') {
+    const ang = Math.atan2(hyH - R[1] - 1, 18 - R[0]);
+    hRt = [R[0] + armLen * Math.cos(ang) * 1, R[1] + armLen * Math.sin(ang)];
+    // rotate the arm so the mug reaches the mouth
+    const a1 = Math.atan2(hRt[1] - R[1], hRt[0] - R[0]), a2 = Math.atan2(mouthPt[1] - R[1], mouthPt[0] - R[0]);
+    sa = Math.round(((a2 - a1) * 180 / Math.PI + 540) % 360 - 180);
+  }
+  if (s.beh === 'sharpen') hL = [-19, -32];
+  let page = '';
+  if (s.beh === 'read') {
+    const px = hx + (v || s.ps) * (hr * 1.3 + 6), py = hy + hr * .35, ph = 24;
+    hL = [px - 6, py + ph - 1]; hRt = [px + 6, py + ph - 1];
+    page = `<g class="rpage" style="transform-origin:${f1(px)}px ${f1(py + 12)}px"><rect class="page" x="${f1(px - 11)}" y="${f1(py)}" width="22" height="${ph}" rx="1"/><path d="M${f1(px - 7)} ${f1(py + 5)}h14M${f1(px - 7)} ${f1(py + 9)}h14M${f1(px - 7)} ${f1(py + 13)}h14M${f1(px - 7)} ${f1(py + 17)}h9" stroke="var(--concrete)" stroke-width="1"/></g>`;
+  }
+  if (s.beh === 'stamp') { hRt = [hxR + 14, -32]; hL = [-10, -30]; }
+  const bodyAcc = {
+    cardigan: `<path d="M${-hwid / 2} ${f1(ys + 18)}L${f1(-sw * .28)} ${f1(ys + 4)}L${f1(-sw * .06)} ${f1(ys + 18)}V${f1(ys + 52)}H${-hwid / 2 - 2}z M${hwid / 2} ${f1(ys + 18)}L${f1(sw * .28)} ${f1(ys + 4)}L${f1(sw * .06)} ${f1(ys + 18)}V${f1(ys + 52)}H${hwid / 2 + 2}z" fill="var(--olive)" stroke="var(--edge)" stroke-width="1" stroke-linejoin="round"/><circle cx="${f1(-sw * .02)}" cy="${f1(ys + 22)}" r="1.4" class="brass"/><circle cx="${f1(-sw * .02)}" cy="${f1(ys + 30)}" r="1.4" class="brass"/>`,
+    tie: `<path d="M-2.4 ${ys + 3}h4.8l2 20l-4.4 5l-4.4 -5z" fill="var(--alert)" stroke="var(--edge)" stroke-width=".9" stroke-linejoin="round"/>`,
+    bowtie: `<path d="M0 ${ys + 5}l-7 -3.4v7z M0 ${ys + 5}l7 -3.4v7z" fill="var(--mustard)" stroke="var(--screen)" stroke-width=".9" stroke-linejoin="round"/>`,
+    lanyard: `<path d="M${f1(-sw * .26)} ${ys + 1}L0 ${f1(ys + 22)}L${f1(sw * .26)} ${ys + 1}" fill="none" stroke="var(--alert)" stroke-width="1.6"/><rect x="-5" y="${f1(ys + 20)}" width="10" height="13" rx="1.4" class="page"/><circle cx="0" cy="${f1(ys + 25)}" r="2.2" class="ink"/>`, none: ''
+  }[s.body];
+  const sleeveC = s.body === 'cardigan' ? 'style="stroke:var(--olive)"' : '';
+  const arm = (cls, S, H2, extra = '') => `<g class="${cls}" style="transform-origin:${f1(S[0])}px ${f1(S[1])}px"><line class="sleeve" ${sleeveC} x1="${f1(S[0])}" y1="${f1(S[1])}" x2="${f1(H2[0])}" y2="${f1(H2[1] - 1)}"/>${extra}<circle class="hand" cx="${f1(H2[0])}" cy="${f1(H2[1])}" r="3.6"/></g>`;
+  const mug = s.beh === 'sip' ? `<g class="mug" style="transform-origin:${f1(hRt[0])}px ${f1(hRt[1])}px"><rect x="${f1(hRt[0] - 4)}" y="${f1(hRt[1] - 9)}" width="8" height="9" rx="1" fill="var(--edge)" stroke="var(--screen)" stroke-width=".9"/><path d="M${f1(hRt[0] + 4)} ${f1(hRt[1] - 7)}h2.4a2.2 2.2 0 0 1 0 4.4h-2.4" class="inkl" stroke-width="1.1"/></g>` : '';
+  const stamper = s.beh === 'stamp' ? `<g class="stampT"><rect x="${f1(hRt[0] - 1.6)}" y="${f1(hRt[1] - 20)}" width="3.2" height="13" fill="var(--walnut)" stroke="var(--edge)" stroke-width=".8"/><rect x="${f1(hRt[0] - 8)}" y="${f1(hRt[1] - 9)}" width="16" height="8" rx="1.5" fill="var(--screen)" stroke="var(--edge)" stroke-width=".9"/></g>` : '';
+  const armR = arm('armR', R, hRt, mug), armL = arm('armL', L, hL);
+  const pside = (s.beh === 'sip' || s.beh === 'slam') ? -1 : s.beh === 'sharpen' ? 1 : s.ps;
+  const propX = pside * (hw2 - 9);
+  const writing = s.beh === 'sharpen' ? `<g><rect x="-30" y="-37" width="12" height="9" rx="1" fill="var(--concrete)" stroke="var(--edge)" stroke-width=".9"/><g class="cr" style="transform-origin:-24px -33px"><circle cx="-24" cy="-33" r="2.6" class="brass"/><path d="M-24 -33h4.4" class="inkl" stroke-width="1.1"/></g></g>` : '';
+  const tw = s.beh === 'stamp'
+    ? `<rect class="page" x="-${hw2 - 8}" y="-36" width="24" height="11"/><rect class="mark" x="-${hw2 - 11}" y="-34" width="18" height="7" fill="none" stroke="var(--alert)" stroke-width="1.6"/>`
+    : `<rect class="sheet page" x="-6.5" y="-46" width="13" height="10"/><rect x="-11" y="-37" width="22" height="9" rx="1.5" fill="var(--concrete)" stroke="var(--edge)" stroke-width="1"/><path d="M-8 -32h16" stroke="var(--screen)" stroke-width="1.3" stroke-dasharray="1.7 1.3"/>`;
+  const tent = `<polygon class="tb tent" points="-7,-30 7,-30 0,-46"/>`;
+  const zzx = hx + hr + 4;
+  const mk = `<g class="mk"><g transform="rotate(${lean} 0 -30)"><path class="shirt" d="${torsoPath(sw, hwid, ys, -28)}"/>${bodyAcc}<g class="head" style="transform-origin:${f1(hx)}px ${f1(ys + 2)}px">${headSVG(s, hx, hy, hr)}<text class="zz" x="${f1(zzx)}" y="${f1(hy - hr + 2)}" aria-hidden="true">z</text></g></g></g>`;
+  // desk
+  const d = 11, dh = 26;
+  const desk = `<polygon class="shl" points="${-hw2},0 ${hw2},0 ${hw2 + 30},12 ${-hw2 + 6},12"/><polygon class="shc" points="${-hw2},0 ${hw2},0 ${hw2 + 3},4 ${-hw2 + 3},4"/>` +
+    `<polygon class="tb" points="${-hw2 + 6},-1 ${-hw2 + 18},-1 ${-hw2 + 21},6 ${-hw2 + 3},6"/><polygon class="tb" points="${hw2 - 18},-1 ${hw2 - 6},-1 ${hw2 - 3},6 ${hw2 - 21},6"/>` +
+    `<rect class="fr c-walnut" x="${-hw2}" y="${-dh}" width="${dw}" height="${dh}" rx="1.5"/><path class="rim" d="M${-hw2 + 1.5} -1V${-dh + 1.5}H${hw2 - 1.5}"/>` +
+    `<polygon class="tp c-walnut" points="${-hw2 + 3},${-dh - d} ${hw2 - 3},${-dh - d} ${hw2},${-dh} ${-hw2},${-dh}"/><rect x="-5" y="-15" width="10" height="3" rx="1.2" class="brass"/>`;
+  const aa = o.arrive ? ' arrive' : '';
+  const flags = `${s.beh === 'sip' ? `--sa:${sa}deg;` : ''}`;
+  const cls = `up seat b-${s.beh} f${s.fur} ${s.shirt}${s.gaze && s.beh !== 'read' && s.beh !== 'doze' && (hash(i) % 2) ? ' g-glance' : ''}${o.vacant ? ' vacant' : ''}${aa}`;
+  const bpx = mouthPt;
+  return `<g transform="translate(${cx} ${yb})"><g class="${cls}" data-i="${i}" style="transform-origin:0px 0px;--t:${(.85 + (hash(i + 5) % 30) / 100).toFixed(2)};--d:-${((hash(i + 9) % 40) / 10).toFixed(1)}s;${flags}">` +
+    `<g class="tail">${tailSVG(s.tail, sw, lean)}</g>${chairSVG(s.chair, sw)}${mk}${desk}${tw}${writing}${prop(s.prop, propX, -30)}${page}<g class="hands">${armL}${armR}${stamper}</g>${tent}</g></g>`;
+}
+
+/* standing monkey (aisle life): ground at 0,0 */
+function stand(s, pose = {}) {
+  const hr = s.hr || 11, H = s.H || 66, legH = 22;
+  const hy = -(H - hr), ys = hy + hr * .92, sw = s.bw || 22, hwid = sw * (s.tw || 1);
+  const v = { f: 0, l: -1, r: 1, pl: -1, pr: 1 }[s.view || 'pr'];
+  const L = [-(sw / 2 - 2), ys + 8], R = [sw / 2 - 2, ys + 8];
+  const hl = pose.hl || [-7, -legH - 6], hrt = pose.hr || [7, -legH - 6];
+  const arm = (cls, S, Hd, ex = '') => `<g class="${cls}" style="transform-origin:${f1(S[0])}px ${f1(S[1])}px"><line class="sleeve" x1="${f1(S[0])}" y1="${f1(S[1])}" x2="${f1(Hd[0])}" y2="${f1(Hd[1] - 1)}"/>${ex}<circle class="hand" cx="${f1(Hd[0])}" cy="${f1(Hd[1])}" r="3.6"/></g>`;
+  const legs = `<rect class="fur" x="${-hwid / 2 + 2}" y="${-legH}" width="8" height="${legH}" rx="3"/><rect class="fur" x="${hwid / 2 - 10}" y="${-legH}" width="8" height="${legH}" rx="3"/><ellipse class="fur" cx="${-hwid / 2 + 8}" cy="-1" rx="7" ry="3.6"/><ellipse class="fur" cx="${hwid / 2 - 4}" cy="-1" rx="7" ry="3.6"/>`;
+  const tail = s.tail ? `<path class="furl" d="M${-v * (sw / 2) || -sw / 2} ${-legH - 6}c${-v * 14 || -14} 4 ${-v * 18 || -18} -8 ${-v * 12 || -12} -18" style="stroke:var(--edge);stroke-width:6"/><path class="furl" d="M${-v * (sw / 2) || -sw / 2} ${-legH - 6}c${-v * 14 || -14} 4 ${-v * 18 || -18} -8 ${-v * 12 || -12} -18" stroke-width="3.6"/>` : '';
+  return `<g class="f${s.fur} ${s.shirt || 'sk-paper'}"><polygon class="shl" points="${-12},0 12,0 40,9 14,9"/><polygon class="shc" points="-12,0 12,0 14,3 -10,3"/>${tail}${legs}<path class="shirt" d="${torsoPath(sw, hwid, ys, -legH + 4)}"/>${pose.body || ''}${arm('armL', L, hl, pose.xl || '')}${headBlock(s, hy, hr)}${arm('armR', R, hrt, pose.xr || '')}${pose.front || ''}</g>`;
+}
+const headBlock = (s, hy, hr) => `<g class="head">${headSVG(Object.assign({ eyes: 'open', mouth: 'smile', gaze: [0, 0], ears: 'round', head: 'none', view: 'pr' }, s), 0, hy, hr)}</g>`;
+
+/* ===== editor, candidate ===== */
+const EDITOR = { fur: 5, H: 66, bw: 42, tw: .85, hr: 15, ears: 'small', lean: 0, view: 'f', gaze: [0, .8], eyes: 'heavy', mouth: 'frown', head: 'none', body: 'tie', tail: 'none', prop: 2, ps: 1, beh: 'stamp', shirt: 'sk-paper', chair: 'tall', flange: true };
+const CANDIDATE = { fur: 4, H: 56, bw: 24, tw: 1.1, hr: 12, ears: 'big', view: 'pl', gaze: [-1, -.7], eyes: 'wide', mouth: 'o', head: 'none', tail: true, shirt: 'sk-rust' };
+
+/* ===== build the map ===== */
+function build() {
+  const defs = `<defs><radialGradient id="halo"><stop offset="0" style="stop-color:var(--glow);stop-opacity:.85"/><stop offset="1" style="stop-color:var(--glow);stop-opacity:0"/></radialGradient>` +
+    `<filter id="paperfx" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".8" numOctaves="2" seed="7" result="n"/><feColorMatrix in="n" type="saturate" values="0"/></filter>` +
+    `<filter id="soft" x="-20%" y="-20%" width="140%" height="160%"><feGaussianBlur stdDeviation="2.6"/></filter>` +
+    `<pattern id="dotp" width="40" height="40" patternUnits="userSpaceOnUse"><circle cx="20" cy="20" r="1.5" class="dots"/></pattern>` +
+    `<clipPath id="glassclip">${[30, 124, 218, 492, 586, 680].map(x => `<rect x="${x + 5}" y="22" width="60" height="62"/>`).join('')}</clipPath></defs>`;
+  let s = defs;
+  /* sheet on the table */
+  s += `<rect class="table-shadow" x="-4" y="104" width="796" height="1250" rx="6"/><rect class="floor-edge" x="0" y="106" width="780" height="1240" rx="4"/><rect class="floor" x="0" y="100" width="780" height="1240" rx="4"/>`;
+  s += `<rect class="grain" x="0" y="100" width="780" height="1240" filter="url(#paperfx)"/><rect x="0" y="100" width="780" height="1240" fill="url(#dotp)"/><rect class="floor-rim" x="1" y="101" width="778" height="1238" rx="4"/>`;
+  s += `<path class="crease-hi" d="M6 391.5H774M6 931.5H774"/><path class="crease" d="M6 390.5H774M6 930.5H774"/>`;
+  s += [[10, 106, -35], [770, 106, 35], [10, 1334, 35], [770, 1334, -35]].map(([x, y, a]) => `<rect class="tape" x="${x - 11}" y="${y - 5}" width="22" height="10" transform="rotate(${a} ${x} ${y})"/>`).join('');
+  /* rugs and the mail-cart route (flat, on the floor) */
+  s += `<rect class="pad-sh" x="316" y="942" width="250" height="40" rx="3"/><rect class="rug" x="312" y="936" width="250" height="40" rx="3" style="fill:color-mix(in srgb, var(--alert) 26%, var(--pad))"/><rect x="320" y="942" width="234" height="28" fill="none" stroke="var(--mustard)" stroke-width="2.4"/><path d="M332 956h210" stroke="var(--olive)" stroke-width="3" stroke-dasharray="14 6"/>` + [...Array(14)].map((_, k) => `<path d="M${316 + k * 17.5} 976v5M${316 + k * 17.5} 936v-4" stroke="var(--edge)" stroke-width="1.4"/>`).join('');
+  s += `<rect class="pad-sh" x="304" y="354" width="190" height="54" rx="3"/><rect class="rug" x="300" y="348" width="190" height="54" rx="3" style="fill:color-mix(in srgb, var(--olive) 30%, var(--pad))"/><rect x="308" y="355" width="174" height="40" fill="none" stroke="var(--edge)" stroke-width="1.6" stroke-dasharray="5 4"/>`;
+  s += `<path class="route" d="M120 440H650Q660 440 660 450V918Q660 928 650 928H130Q120 928 120 918V450Q120 440 130 440Z"/>`;
+  s += `<path d="M390 437l-8 3 8 3z M660 680l-3 -8 -3 8z M390 925l8 3 -8 3z M120 680l3 8 3 -8z" fill="var(--mustard)" stroke="var(--screen)" stroke-width=".8"/>`;
+  /* back wall with windows, elevator, clouds */
+  const win = [30, 124, 218, 492, 586, 680].map(x => `<rect x="${x}" y="17" width="70" height="72" fill="var(--concrete)" stroke="var(--edge)" stroke-width="1.4"/><rect class="skyg" x="${x + 5}" y="22" width="60" height="62"/>`).join('');
+  const sill = [30, 124, 218, 492, 586, 680].map(x => `<rect x="${x - 3}" y="88" width="76" height="6" fill="var(--edge)" opacity=".9"/><path d="M${x + 35} 22v62M${x + 5} 53h60" stroke="var(--concrete)" stroke-width="2"/>`).join('');
+  const clouds = `<g clip-path="url(#glassclip)"><g class="cloud" style="animation-delay:-26s"><ellipse cx="0" cy="40" rx="22" ry="7"/><ellipse cx="14" cy="34" rx="14" ry="7"/></g><g class="cloud" style="animation-delay:-62s"><ellipse cx="0" cy="62" rx="26" ry="6"/><ellipse cx="-10" cy="56" rx="12" ry="6"/></g></g>`;
+  const elev = `<rect x="335" y="26" width="110" height="74" fill="var(--concrete)" stroke="var(--edge)" stroke-width="1.6"/><rect x="343" y="34" width="42" height="66" fill="color-mix(in srgb, var(--edge) 70%, var(--concrete))" stroke="var(--edge)" stroke-width="1.3"/><rect x="395" y="34" width="42" height="66" fill="color-mix(in srgb, var(--edge) 70%, var(--concrete))" stroke="var(--edge)" stroke-width="1.3"/><path d="M390 34v66" stroke="var(--screen)" stroke-width="1.6"/><rect x="351" y="48" width="2" height="48" fill="var(--edge)" opacity=".5"/>` +
+    `<rect x="374" y="12" width="32" height="14" rx="2" class="ink"/><text x="380" y="23" class="sg" style="fill:var(--screen-ink);text-anchor:start;font-size:11px">1</text><text x="394" y="23" class="sg elv" style="fill:var(--screen-ink);text-anchor:start;font-size:11px">2</text><path d="M410 52l6 -7l6 7z" fill="var(--mustard)" stroke="var(--screen)" stroke-width=".9"/><circle cx="416" cy="62" r="3" class="ink"/>`;
+  s += `<g class="up" style="transform-origin:390px 100px"><polygon class="shl" points="0,100 780,100 800,118 20,118" style="opacity:.22"/><rect class="fr c-wall" x="0" y="6" width="780" height="94"/><path class="rim" d="M2 99V8H778"/><polygon class="tp c-wall" points="6,0 774,0 780,6 0,6"/>${win}${clouds}${sill}${elev}<path d="M0 66H780" stroke="var(--edge)" stroke-width="1" stroke-dasharray="2 5" opacity=".6"/></g>`;
+  /* floor 2 notice, barrier, cone */
+  s += plate(390, 108, 196, 18, 'Floor 2: under construction', 28);
+  s += pbox({ x: 346, yb: 172, w: 88, h: 20, d: 5, c: 'paper', tabs: false, extra: [0, 1, 2, 3].map(k => `<polygon points="${352 + k * 22},${152} ${362 + k * 22},${152} ${356 + k * 22},${172} ${346 + k * 22},${172}" fill="var(--mustard)"/>`).join('') + `<rect x="${346}" y="${152}" width="88" height="20" fill="none" stroke="var(--screen)" stroke-width="1"/>` });
+  s += `<g class="up" style="transform-origin:330px 176px"><polygon class="shc" points="320,176 340,176 344,181 316,181"/><polygon class="fr" style="--c:var(--tangerine)" points="324,176 336,176 332,150 328,150"/><rect x="326" y="160" width="6" height="4" fill="var(--edge)"/><rect x="318" y="175" width="24" height="4" class="fr" style="--c:var(--screen)"/></g>`;
+  s += `<g class="up" style="transform-origin:456px 176px"><polygon class="shc" points="446,176 468,176 470,180 444,180"/><path class="fr" style="--c:var(--concrete)" d="M448 148h18l2 28h-22z"/><path d="M448 154h20" stroke="var(--edge)" stroke-width="1.4"/></g>`;
+  
+  /* ---- zone: departments (three cabinets, each its own paper) */
+  s += `<g class="zone" id="z-departments"><rect class="pad-sh" x="38" y="160" width="270" height="185" rx="4"/><rect class="pad-sh2" x="34" y="156" width="270" height="185" rx="4"/><rect class="pad t-dp" x="30" y="150" width="270" height="185" rx="4"/>`;
+  s += plate(165, 156, 128, 20, 'Departments', 18, 0);
+  const lab = (x, y, c) => `<rect x="${x}" y="${y}" width="14" height="6" rx="1" fill="${c}" stroke="var(--screen)" stroke-width=".7"/>`;
+  // cabinet 1: Recruiting, tall, three drawers, resumes poking out, person icon
+  s += pbox({ x: 46, yb: 314, w: 66, h: 92, d: 11, c: 'steel', extra:
+    [0, 1, 2].map(k => `<rect x="52" y="${232 + k * 28}" width="54" height="24" rx="1.2" fill="none" stroke="var(--edge)" stroke-width="1"/><rect x="69" y="${240 + k * 28}" width="20" height="8" rx="1.6" class="brass"/><rect x="${74}" y="${250 + k * 28}" width="10" height="2.6" rx="1.3" class="ink" opacity=".5"/>`).join('') +
+    `<circle cx="79" cy="226" r="0" /><g class="drw" style="--d:-2s"><rect x="58" y="${226}" width="14" height="8" class="page"/><rect x="86" y="${228}" width="12" height="6" class="page"/></g><circle cx="62" cy="243" r="2.4" class="ink"/><path d="M58 250a4 4 0 0 1 8 0z" class="ink"/>` +
+    `<rect class="page" x="56" y="218" width="16" height="18" transform="rotate(-8 64 236)"/><rect class="page" x="75" y="214" width="14" height="22" transform="rotate(5 82 236)"/>` });
+  // cabinet 2: Construction, wide and short, blueprint roll and a T-square on top, ajar drawer
+  s += pbox({ x: 128, yb: 314, w: 80, h: 62, d: 11, c: 'steel', extra:
+    `<g class="drw" style="--d:-5s"><rect x="134" y="262" width="68" height="26" rx="1.2" fill="color-mix(in srgb, var(--edge) 70%, var(--concrete))" stroke="var(--edge)" stroke-width="1"/><rect x="156" y="270" width="24" height="8" rx="1.6" class="brass"/></g><rect x="134" y="292" width="68" height="18" rx="1.2" fill="none" stroke="var(--edge)" stroke-width="1"/><rect x="156" y="298" width="24" height="7" rx="1.6" class="brass"/>` +
+    `<path d="M142 270l8 -10l8 10z" fill="none" stroke="var(--screen)" stroke-width="1.6" stroke-linejoin="round"/>` +
+    `<rect x="138" y="236" width="52" height="9" rx="4.5" fill="var(--edge)" stroke="var(--screen)" stroke-width="1"/><ellipse cx="190" cy="240.5" rx="3" ry="4.5" fill="var(--glow)" stroke="var(--screen)" stroke-width="1"/><path d="M146 240h30" stroke="var(--screen)" stroke-width=".8" stroke-dasharray="3 2"/><path d="M196 226v22h14" fill="none" stroke="var(--screen)" stroke-width="2.4" stroke-linecap="round"/>` });
+  // cabinet 3: Editing, narrow tall, pencil jar and red-marked proofs
+  s += pbox({ x: 222, yb: 314, w: 62, h: 104, d: 11, c: 'steel', extra:
+    [0, 1, 2, 3].map(k => `<rect x="228" y="${222 + k * 22}" width="50" height="18" rx="1.2" fill="none" stroke="var(--edge)" stroke-width="1"/><rect x="243" y="${228 + k * 22}" width="20" height="6" rx="1.6" class="brass"/>`).join('') +
+    `<g class="drw" style="--d:-7s"><rect x="230" y="${222}" width="46" height="18" fill="var(--edge)" opacity="0"/></g>` +
+    `<rect x="238" y="198" width="22" height="22" rx="2" fill="var(--edge)" stroke="var(--screen)" stroke-width="1"/><path d="M243 198l-3 -14M249 198l1 -17M255 198l5 -13" stroke="var(--alert)" stroke-width="2.4" stroke-linecap="round"/><path d="M247 205h8" stroke="var(--alert)" stroke-width="1.4"/>` +
+    `<rect class="page" x="266" y="214" width="14" height="18" transform="rotate(10 273 232)"/><path d="M268 220l8 2M268 225l8 2" stroke="var(--alert)" stroke-width="1.4" transform="rotate(10 273 232)"/>` });
+  s += `<path class="ear" d="M286 335h-22l22 -22z" fill="var(--edge)" stroke="var(--concrete)" stroke-width="1.2" style="--nd:2s"/><rect class="ring" x="28" y="148" width="274" height="189" rx="8"/></g>`;
+
+  /* ---- zone: director's office (glass; a silhouette, a lamp, a folder that gets stamped) */
+  const ox = 520, ow = 196, oyb = 322, oh = 82;
+  s += `<g class="zone" id="z-director"><rect class="pad-sh" x="488" y="160" width="270" height="185" rx="4"/><rect class="pad-sh2" x="484" y="156" width="270" height="185" rx="4"/><rect class="pad t-dr" x="480" y="150" width="270" height="185" rx="4"/>`;
+  s += plate(615, 156, 112, 20, 'Director', 18, 3);
+  s += `<g class="up" style="transform-origin:${ox + ow / 2}px ${oyb}px"><polygon class="shl" points="${ox},${oyb} ${ox + ow},${oyb} ${ox + ow + 30},${oyb + 16} ${ox + 28},${oyb + 16}"/><polygon class="shc" points="${ox},${oyb} ${ox + ow},${oyb} ${ox + ow + 3},${oyb + 4} ${ox + 3},${oyb + 4}"/>` +
+    `<rect x="${ox}" y="${oyb - oh}" width="${ow}" height="${oh}" fill="color-mix(in srgb, var(--walnut) 34%, var(--glow))" stroke="var(--edge)" stroke-width="1.7"/>` +
+    // window behind with warm light
+    `<polygon points="${ox + 136},${oyb - 74} ${ox + 184},${oyb - 74} ${ox + 180},${oyb - 40} ${ox + 140},${oyb - 40}" fill="var(--glow)" stroke="var(--edge)" stroke-width="1.2"/>` +
+    // framed notice board + diploma-ish papers
+    `<rect x="${ox + 10}" y="${oyb - 72}" width="38" height="30" fill="var(--edge)" stroke="var(--edge)" stroke-width="1.2"/><path d="M${ox + 15} ${oyb - 64}h28M${ox + 15} ${oyb - 59}h28M${ox + 15} ${oyb - 54}h14" stroke="var(--concrete)" stroke-width="1.1"/><rect x="${ox + 34}" y="${oyb - 52}" width="10" height="6" fill="none" stroke="var(--alert)" stroke-width="1.4"/>` +
+    // seated director silhouette, behind desk, leaning slowly
+    `<g class="dsil" style="transform-origin:${ox + 96}px ${oyb - 22}px"><rect class="sil" x="${ox + 82}" y="${oyb - 62}" width="30" height="44" rx="12"/><circle class="sil" cx="${ox + 97}" cy="${oyb - 62}" r="13"/><circle class="sil" cx="${ox + 82}" cy="${oyb - 63}" r="5.4"/><circle class="sil" cx="${ox + 112}" cy="${oyb - 63}" r="5.4"/><path d="M${ox + 108} ${oyb - 40}L${ox + 124} ${oyb - 32}" stroke="var(--screen)" stroke-width="7" stroke-linecap="round" opacity=".78"/></g>` +
+    // desk
+    `<rect class="fr c-walnut" x="${ox + 30}" y="${oyb - 26}" width="132" height="22" rx="1.5"/><polygon class="tp c-walnut" points="${ox + 34},${oyb - 38} ${ox + 158},${oyb - 38} ${ox + 162},${oyb - 26} ${ox + 30},${oyb - 26}"/><rect x="${ox + 86}" y="${oyb - 20}" width="20" height="3.4" rx="1.2" class="brass"/><rect x="${ox + 38}" y="${oyb - 20}" width="30" height="12" fill="none" stroke="var(--edge)" stroke-width="1"/>` +
+    // folder (stamped), lamp, nameplate
+    `<rect x="${ox + 126}" y="${oyb - 44}" width="26" height="9" fill="var(--mustard)" stroke="var(--edge)" stroke-width="1"/><rect class="dmk" x="${ox + 132}" y="${oyb - 43}" width="14" height="6" fill="none" stroke="var(--alert)" stroke-width="1.6"/><g class="dst"><rect x="${ox + 137}" y="${oyb - 58}" width="3" height="12" fill="var(--walnut)" stroke="var(--edge)" stroke-width=".7"/><rect x="${ox + 130}" y="${oyb - 48}" width="16" height="7" rx="1.4" class="ink"/></g>` +
+    `<path d="M${ox + 48} ${oyb - 38}l8 -14l10 -4" class="inkl" stroke-width="1.8"/><path d="M${ox + 62} ${oyb - 58}h13l-3 7h-8z" fill="var(--mustard)" stroke="var(--edge)" stroke-width="1"/><circle class="halo pulse" cx="${ox + 70}" cy="${oyb - 50}" r="26"/><rect x="${ox + 96}" y="${oyb - 42}" width="22" height="4" fill="var(--edge)" stroke="var(--screen)" stroke-width=".7"/></g>`;
+  s += `<g class="up" style="transform-origin:${ox + ow / 2}px ${oyb}px">` +
+    `<rect class="glass-f" x="${ox}" y="${oyb - oh}" width="42" height="${oh + 3}"/><rect class="glass-f" x="${ox + 88}" y="${oyb - oh}" width="${ow - 88}" height="${oh + 3}"/>` +
+    `<path d="M${ox + 8} ${oyb - 6}l24 -52M${ox + 100} ${oyb - 6}l30 -60M${ox + 150} ${oyb - 6}l30 -60" stroke="var(--edge)" stroke-width="3.4" opacity=".55"/>` +
+    `<path d="M${ox + 130} ${oyb + 3}V${oyb - oh}" stroke="var(--mustard)" stroke-width="2.2"/>` +
+    `<polygon class="glass-t" points="${ox + 8},${oyb - oh - 8} ${ox + ow - 8},${oyb - oh - 8} ${ox + ow},${oyb - oh} ${ox},${oyb - oh}"/>` +
+    `<polygon class="glass-f" points="${ox + 42},${oyb + 3} ${ox + 60},${oyb + 11} ${ox + 60},${oyb + 11 - oh + 6} ${ox + 42},${oyb - oh}" style="fill:color-mix(in srgb, var(--glow) 40%, transparent)"/><circle cx="${ox + 56}" cy="${oyb - 34}" r="2.2" class="brass"/></g>`;
+  s += `<path class="ear" d="M740 335h-22l22 -22z" fill="var(--edge)" stroke="var(--concrete)" stroke-width="1.2" style="--nd:5s"/><rect class="ring" x="478" y="148" width="274" height="189" rx="8"/></g>`;
+
+  /* ---- zone: typing pool */
+  s += `<g class="zone" id="z-pool"><rect class="pad-sh" x="228" y="460" width="340" height="440" rx="5"/><rect class="pad-sh2" x="224" y="456" width="340" height="440" rx="5"/><rect class="pad t-pl" x="220" y="450" width="340" height="440" rx="5"/>`;
+  s += plate(390, 458, 124, 21, 'Typing Pool', 14, 1.4);
+  s += `<g><circle class="halo pulse" cx="318" cy="486" r="24"/><circle class="halo pulse" cx="462" cy="486" r="24" style="animation-delay:-1.6s"/><path d="M311 489a7 7 0 0 0 14 0z M455 489a7 7 0 0 0 14 0z" class="glowf" stroke="var(--edge)" stroke-width="1.2"/></g>`;
+  const xs = [273, 351, 429, 507];
+  const rows = [610, 715, 820];
+  const seats = [];
+  for (let i = 0; i < 8; i++) seats.push(seatSVG(i, xs[i % 4], rows[i >> 2]));
+  seats.push(seatSVG(8, xs[0], rows[2], { vacant: true }), seatSVG(9, xs[1], rows[2], { vacant: true }));
+  s += seats.slice(0, 4).join('') + seats.slice(4, 8).join('') + seats.slice(8).join('');
+  s += seatSVG(40, 466, 820, { over: EDITOR, dw: 118, vacant: false }).replace('data-i="40"', 'data-editor="1"');
+  s += `<g class="up" style="transform-origin:548px 820px"><polygon class="shl" points="542,820 554,820 590,836 578,836"/><polygon class="shc" points="542,820 554,820 557,824 545,824"/><rect class="fr c-steel" x="542" y="706" width="12" height="114" rx="2"/><rect x="540" y="700" width="16" height="8" rx="2" class="brass"/><rect x="540" y="814" width="16" height="8" rx="2" class="brass"/><rect x="540" y="754" width="16" height="4" rx="1.5" class="brass"/><g class="cap"><rect x="545" y="796" width="6" height="12" rx="2.6" fill="var(--edge)" stroke="var(--screen)" stroke-width=".8"/></g></g>`;
+  s += plant(240, 878, 1.1);
+  s += `<path class="ear" d="M556 886h-22l22 -22z" fill="var(--edge)" stroke="var(--concrete)" stroke-width="1.2" style="--nd:0s"/><rect class="ring" x="218" y="448" width="344" height="444" rx="8"/></g>`;
+
+  /* ---- zone: personnel + entrance */
+  s += `<g class="zone" id="z-personnel"><rect class="pad-sh" x="118" y="975" width="250" height="200" rx="4"/><rect class="pad-sh2" x="114" y="971" width="250" height="200" rx="4"/><rect class="pad t-pe" x="110" y="965" width="250" height="200" rx="4"/>`;
+  s += plate(235, 972, 112, 20, 'Personnel', 14, 2.6);
+  s += `<g class="bob"><circle class="halo pulse" cx="170" cy="1004" r="24"/><path d="M163 1006a7 7 0 0 0 14 0z" class="glowf" stroke="var(--edge)" stroke-width="1.2"/></g>`;
+  s += seatSVG(41, 235, 1122, { over: { fur: 3, H: 56, bw: 30, tw: 1.1, hr: 12.5, ears: 'round', lean: 0, view: 'f', gaze: [.5, .6], eyes: 'open', mouth: 'smile', head: 'glassesR', body: 'bowtie', tail: 'curl', prop: 4, ps: 1, beh: 'slam', shirt: 'sk-paper', chair: 'round' } });
+  // in-tray stacks + filing box
+  s += pbox({ x: 306, yb: 1148, w: 40, h: 54, d: 8, c: 'steel', extra: `<rect x="311" y="1102" width="30" height="20" rx="1.2" fill="none" stroke="var(--edge)" stroke-width="1"/><rect x="311" y="1126" width="30" height="16" rx="1.2" fill="none" stroke="var(--edge)" stroke-width="1"/><rect x="319" y="1109" width="14" height="6" rx="1.4" class="brass"/><rect x="319" y="1131" width="14" height="6" rx="1.4" class="brass"/>` });
+  s += `<g class="up" style="transform-origin:146px 1146px"><polygon class="shc" points="130,1146 164,1146 167,1150 133,1150"/><rect class="fr c-paper" x="132" y="1128" width="32" height="18" rx="1.5"/><rect class="fr c-paper" x="135" y="1118" width="32" height="18" rx="1.5"/><path d="M139 1124h20M139 1128h14" stroke="var(--concrete)" stroke-width="1"/></g>`;
+  s += `<path class="ear" d="M356 1161h-22l22 -22z" fill="var(--edge)" stroke="var(--concrete)" stroke-width="1.2" style="--nd:4s"/><rect class="ring" x="108" y="963" width="254" height="204" rx="8"/></g>`;
+  /* entrance: mat + door + the candidate waiting */
+  s += `<rect class="pad t-pe" x="175" y="1304" width="120" height="26" rx="2" style="fill:color-mix(in srgb, var(--mustard) 40%, var(--pad))"/>`;
+  s += pbox({ x: 205, yb: 1300, w: 60, h: 96, d: 9, c: 'concrete', extra: `<rect x="212" y="1212" width="46" height="88" fill="var(--glow)" stroke="var(--edge)" stroke-width="1.2"/><polygon points="212,1212 212,1300 192,1307 192,1206" fill="var(--olive)" stroke="var(--edge)" stroke-width="1.2"/><circle cx="196" cy="1256" r="2" class="brass"/><path d="M222 1226h26M222 1232h20" stroke="var(--concrete)" stroke-width="1.2"/>` });
+  s += `<text class="sg sm" x="235" y="1321">Entrance</text>`;
+  s += T(336, 1284, `<g id="cand" class="cand">${stand(Object.assign({}, CANDIDATE, { H: 58, bw: 24 }), { hl: [-9, -26], hr: [12, -22], xr: '', front: `<rect x="10" y="-26" width="22" height="16" rx="2" fill="var(--walnut)" stroke="var(--edge)" stroke-width="1.2"/><path d="M16 -26v-4h10v4" fill="none" stroke="var(--edge)" stroke-width="1.6"/><rect x="19" y="-20" width="4" height="4" class="brass"/>` })}</g>`);
+  s += plant(130, 1300, 1.2) + plant(398, 1304, 1.1, 1);
+  /* a waiting bench with a reader */
+  s += T(556, 1288, stand({ fur: 0, H: 58, bw: 28, tw: 1.15, hr: 12.5, ears: 'round', view: 'l', gaze: [-1, .7], eyes: 'heavy', mouth: 'flat', head: 'glassesR', tail: true, shirt: 'sk-shade' }, { hl: [-14, -34], hr: [-4, -34], front: `<g class="rpage" style="transform-origin:-18px -44px"><rect class="page" x="-28" y="-52" width="20" height="24" rx="1" transform="rotate(-6 -18 -40)"/><path d="M-24 -46h12M-24 -42h12M-24 -38h8" stroke="var(--concrete)" stroke-width="1" transform="rotate(-6 -18 -40)"/></g>` }));
+  s += pbox({ x: 500, yb: 1296, w: 112, h: 16, d: 10, c: 'walnut', extra: `<rect x="504" y="1268" width="104" height="8" fill="var(--paper-shade)" stroke="var(--edge)" stroke-width="1"/>` });
+  s += pbox({ x: 664, yb: 1296, w: 46, h: 62, d: 9, c: 'mustard', extra: `<rect x="676" y="1246" width="22" height="4" rx="2" class="ink"/><rect class="page" x="684" y="1238" width="14" height="12" transform="rotate(12 690 1244)"/><rect x="672" y="1262" width="30" height="20" fill="var(--edge)" stroke="var(--screen)" stroke-width=".9"/><path d="M676 1268h22M676 1273h14" stroke="var(--concrete)" stroke-width="1"/>` });
+  s += plant(736, 1300, 1.3, 1);
+  // disposal station (right aisle): a monkey feeds a form into the shredder; tidy strips fall into the drawer
+  s += pbox({ x: 628, yb: 1120, w: 70, h: 52, d: 12, c: 'steel', extra: `<rect x="640" y="1076" width="46" height="4" rx="2" class="ink"/><rect x="636" y="1092" width="54" height="22" rx="1.2" fill="none" stroke="var(--edge)" stroke-width="1"/><rect x="654" y="1098" width="18" height="6" rx="1.6" class="brass"/><g class="shred"><rect class="page" x="654" y="1070" width="14" height="12"/></g><path d="M646 1114v6M652 1114v6M658 1114v6M664 1114v6M670 1114v6M676 1114v6" stroke="var(--edge)" stroke-width="1.6"/>` });
+  s += T(604, 1126, stand({ fur: 3, H: 62, bw: 26, tw: 1.1, hr: 12, ears: 'tuft', view: 'pr', gaze: [1, .5], eyes: 'open', mouth: 'flat', head: 'swirl', tail: true, shirt: 'sk-mustard' }, { hr: [22, -52], hl: [-6, -24] }));
+  s += plant(740, 1126, 1.1) + plant(600, 1040, .9, 1);
+
+  /* ---- aisle life */
+  // mailroom pigeonholes (left aisle)
+  s += pbox({ x: 36, yb: 640, w: 74, h: 96, d: 10, c: 'wall', extra: [0, 1, 2, 3].map(r => [0, 1, 2].map(c => `<rect x="${42 + c * 22}" y="${552 + r * 22}" width="18" height="18" fill="var(--screen)" opacity=".78" stroke="var(--edge)" stroke-width="1"/>`).join('')).join('') + `<rect class="page" x="45" y="560" width="12" height="9"/><rect class="page" x="68" y="582" width="12" height="9" transform="rotate(-6 74 586)"/><rect class="page" x="88" y="604" width="12" height="9"/><rect class="page" x="46" y="626" width="12" height="9" transform="rotate(5 52 630)"/>` });
+  // gardener monkey + big plant (left aisle)
+  s += plant(176, 748, 1.9, 1);
+  s += T(122, 756, stand({ fur: 2, H: 62, bw: 26, tw: 1.1, hr: 12, ears: 'big', view: 'pr', gaze: [1, .8], eyes: 'open', mouth: 'smile', tail: true, shirt: 'sk-olive' }, { hr: [16, -40], hl: [-6, -22], xr: `<g class="can" style="transform-origin:16px -40px"><rect x="14" y="-50" width="16" height="12" rx="2" fill="var(--concrete)" stroke="var(--edge)" stroke-width="1.2"/><path d="M30 -46l12 -2l-1 4l-11 2z" fill="var(--concrete)" stroke="var(--edge)" stroke-width="1"/><path d="M14 -48q-6 -4 0 -8" fill="none" stroke="var(--edge)" stroke-width="1.6"/><circle class="drp" cx="42" cy="-44" r="1.8" fill="var(--edge)" stroke="var(--concrete)" stroke-width=".6"/><circle class="drp" cx="39" cy="-46" r="1.5" fill="var(--edge)" stroke="var(--concrete)" stroke-width=".6" style="animation-delay:.4s"/></g>` }));
+  s += plant(52, 840, 1.0) + plant(100, 888, .8, 1);
+  // water-cooler nook (top aisle, in the default frame)
+  s += `<g transform="translate(0 -14)">`;
+  s += pbox({ x: 372, yb: 392, w: 30, h: 46, d: 6, c: 'steel', extra: `<rect x="378" y="368" width="8" height="5" rx="1" fill="var(--tangerine)" stroke="var(--screen)" stroke-width=".7"/><rect x="390" y="368" width="8" height="5" rx="1" fill="var(--edge)" stroke="var(--screen)" stroke-width=".7"/><rect x="379" y="382" width="18" height="12" fill="none" stroke="var(--edge)" stroke-width="1"/><circle cx="388" cy="388" r="2.4" fill="var(--glow)" stroke="var(--screen)" stroke-width=".7"/>` });
+  s += `<g class="up" style="transform-origin:387px 404px"><rect x="374" y="316" width="26" height="36" rx="9" class="glass-f" style="fill:color-mix(in srgb, var(--paper) 55%, var(--glow));stroke:var(--edge)"/><path d="M377 335h20" stroke="var(--edge)" stroke-width="1.4" opacity=".8"/><circle class="bub" cx="384" cy="346" r="1.8" fill="var(--edge)" style="--d:0s"/><circle class="bub" cx="391" cy="348" r="1.4" fill="var(--edge)" style="--d:-1.1s"/><rect x="378" y="311" width="18" height="6" rx="2" class="fr c-steel"/></g>`;
+  s += T(348, 410, stand({ fur: 5, H: 68, bw: 24, tw: 1.0, hr: 11.5, ears: 'tuft', view: 'pr', gaze: [1, -.2], eyes: 'heavy', mouth: 'smirk', head: 'none', tail: true, shirt: 'sk-paper' }, { hr: [19, -40], hl: [-4, -26], xr: `<g class="cupa" style="--sa:-70deg;transform-origin:19px -40px"><path d="M15 -50h9l-4.5 12z" fill="var(--edge)" stroke="var(--screen)" stroke-width=".9"/></g>`, body: `<path d="M-2 -52h4l1.6 14l-3.6 4l-3.6 -4z" fill="var(--alert)" stroke="var(--edge)" stroke-width=".8"/>` }));
+  s += `</g>`;
+  s += `<g transform="translate(0 -14)">`;
+  // coat rack
+  s += `<g class="up" style="transform-origin:448px 408px"><polygon class="shl" points="438,408 458,408 492,420 468,420"/><polygon class="shc" points="438,408 458,408 461,412 441,412"/><path d="M448 408V330" stroke="var(--walnut)" stroke-width="5" stroke-linecap="round"/><path d="M448 330V330" stroke="var(--edge)" stroke-width="1"/><path d="M432 410l16 -6l16 6M448 404v6" stroke="var(--walnut)" stroke-width="4" stroke-linecap="round" fill="none"/><path d="M448 340l-14 -6M448 340l14 -6M448 352l-14 -4M448 352l14 -4" stroke="var(--walnut)" stroke-width="3" stroke-linecap="round"/>` +
+    `<g class="coat" style="--d:0s;transform-origin:434px 336px"><path d="M426 338h16l4 36h-24z" fill="var(--olive)" stroke="var(--edge)" stroke-width="1.3" stroke-linejoin="round"/><path d="M434 338v36" stroke="var(--edge)" stroke-width=".9"/></g><g class="coat" style="--d:-2s;transform-origin:462px 336px"><path d="M454 338h16l5 40h-26z" fill="var(--edge)" stroke="var(--concrete)" stroke-width="1.3" stroke-linejoin="round"/><circle cx="462" cy="352" r="1.4" class="brass"/></g><path d="M440 326q8 -9 16 0z" fill="var(--alert)" stroke="var(--edge)" stroke-width="1.2"/></g>`;
+  s += plant(318, 402, .9);
+  s += `</g>`;
+  // copier (right aisle)
+  s += pbox({ x: 600, yb: 672, w: 76, h: 54, d: 14, c: 'steel', extra: `<rect x="606" y="626" width="64" height="9" fill="var(--screen)" opacity=".7"/><rect class="scan" x="610" y="623" width="6" height="14" fill="var(--glow)" stroke="var(--screen)" stroke-width=".7"/><rect x="606" y="642" width="30" height="14" rx="2" class="ink"/><text x="621" y="653" class="sg" style="fill:var(--screen-ink);font-size:13px">∞</text><rect x="642" y="644" width="22" height="10" rx="1.4" class="brass"/><rect x="606" y="660" width="64" height="5" fill="var(--screen)" opacity=".5"/><g class="eject"><rect class="page" x="624" y="664" width="26" height="14"/></g>` });
+  s += plant(724, 704, 1.4) + plant(716, 560, 1.0, 1);
+  s += plant(610, 902, .9);
+  // mail cart (route loop) and paper airplane
+  s += `<g class="cartpos" style="--cd:var(--cdur);--cdl:-1.4s"><g class="cartflip" style="--cd:var(--cdur);--cdl:-1.4s">${cart()}</g></g>`;
+  s += `<g transform="translate(236 396)"><path class="planesh" d="M0 20l22 -6l-4 6l-8 2z" fill="var(--screen)"/><g class="plane"><path d="M0 0l30 -9l-9 14z" fill="var(--edge)" stroke="var(--concrete)" stroke-width="1.1" stroke-linejoin="round"/><path d="M0 0l21 5l-5 4z" fill="var(--edge)" stroke="var(--concrete)" stroke-width="1.1" stroke-linejoin="round"/><path d="M21 5l9 -14" stroke="var(--concrete)" stroke-width=".9"/></g></g>`;
+  s += `<text class="sg sm" x="0" y="0" style="display:none"></text>`;
+  $('#map').innerHTML = s;
+}
+function cart() {
+  return `<polygon class="shl" points="-30,0 30,0 54,9 -6,9"/><polygon class="shc" points="-28,0 28,0 31,3 -25,3"/>` +
+    // trundling monkey in profile pushing from behind
+    `<g transform="translate(-20 0)" class="cartbob">${stand({ fur: 1, H: 60, bw: 22, tw: 1.1, hr: 11, ears: 'big', view: 'pr', gaze: [1, .2], eyes: 'open', mouth: 'smile', tail: true, shirt: 'sk-mustard' }, { hr: [14, -30], hl: [10, -28] })}</g>` +
+    `<rect class="fr c-steel" x="-6" y="-34" width="56" height="26" rx="2"/><path class="rim" d="M-4 -10V-33H48"/><rect x="-2" y="-30" width="48" height="8" fill="var(--edge)" stroke="var(--screen)" stroke-width=".8"/><rect class="page" x="2" y="-38" width="14" height="9" transform="rotate(-6 8 -34)"/><rect class="page" x="20" y="-37" width="12" height="8" transform="rotate(5 26 -33)"/><rect x="34" y="-41" width="12" height="12" fill="var(--walnut)" stroke="var(--edge)" stroke-width="1"/><path d="M34 -35h12M40 -41v12" stroke="var(--mustard)" stroke-width="1.4"/>` +
+    `<path d="M-6 -34h-8l-2 10" stroke="var(--screen)" stroke-width="2.4" fill="none" stroke-linecap="round"/><path d="M50 -34v-14" stroke="var(--screen)" stroke-width="1.4"/><path d="M50 -48l9 3l-9 3z" fill="var(--alert)" stroke="var(--edge)" stroke-width=".8"/>` +
+    `<g class="wheel" style="transform-origin:4px -4px"><circle cx="4" cy="-4" r="5" fill="var(--screen)" stroke="var(--edge)" stroke-width="1.2"/><path d="M4 -8v8" stroke="var(--edge)" stroke-width="1.2"/></g><g class="wheel" style="transform-origin:40px -4px"><circle cx="40" cy="-4" r="5" fill="var(--screen)" stroke="var(--edge)" stroke-width="1.2"/><path d="M40 -8v8" stroke="var(--edge)" stroke-width="1.2"/></g>`;
+}
+// mail-cart keyframes: a loop of the aisles around the pool, with a short stop at each corner
+(function routeCSS() {
+  const pts = [[120, 440], [660, 440], [660, 928], [120, 928], [120, 440]], sp = 38, dwell = 2.5;
+  const segs = []; let t = 0;
+  const ev = [{ t: 0, p: pts[0], f: 1 }];
+  for (let k = 1; k < pts.length; k++) {
+    const d = Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]), dt = d / sp; t += dt;
+    ev.push({ t, p: pts[k], f: pts[k][0] <= pts[k - 1][0] && k >= 3 ? -1 : pts[k][0] < pts[k - 1][0] ? -1 : 1 });
+    if (k < pts.length - 1) { t += dwell; ev.push({ t, p: pts[k], f: ev[ev.length - 1].f }); }
+  }
+  const total = t; const pc = x => (x / total * 100).toFixed(2) + '%';
+  let a = '', b = '';
+  ev.forEach(e => { a += `${pc(e.t)}{transform:translate(${e.p[0]}px,${e.p[1]}px)}`; });
+  // flip: moving right/down faces right (1), moving left/up faces left (-1); transitions happen at the stops
+  const fl = [[0, 1], [ev[1].t, 1], [ev[2].t, 1], [ev[3].t + .01, -1], [ev[5].t + .01, -1], [ev[6].t, -1], [total - .02, 1]];
+  const flipKF = `0%{transform:scaleX(1)}${pc(ev[4].t - .05)}{transform:scaleX(-1)}${pc(ev[6].t)}{transform:scaleX(-1)}${pc(ev[7].t - .01)}{transform:scaleX(1)}`;
+  // dynamic duration to match: --cd is set to total seconds
+  const st = document.createElement('style');
+  st.textContent = `@keyframes cartxy{${a}}@keyframes cartflip{${flipKF}}`;
+  document.head.appendChild(st);
+  document.documentElement.style.setProperty('--cdur', total + 's');
+  window.__cartTotal = total;
+})();
+
+build();
+
+/* ===== state + readout ===== */
+const state = { seated: 8, desks: 10, bananas: 1284, income: 12.4, monkeys: 8, hireCost: 40, deskCost: 120, open: null, ernest: false, tut: false };
+const fmt = n => n.toLocaleString('en-US');
+function paintReadout() { $('#r-ban').textContent = fmt(Math.floor(state.bananas)); $('#r-inc').textContent = state.income.toFixed(1) + '/s'; $('#r-mon').textContent = state.monkeys; }
+setInterval(() => { state.bananas += state.income; paintReadout(); }, 1000);
+const say = t => { const l = $('#live'); l.textContent = ''; setTimeout(() => (l.textContent = t), 30); };
+
+/* ===== zones ===== */
+const Z = {
+  personnel: { n: 1, name: 'Personnel', form: 'Form 3-H · Hiring', box: [100, 962, 270, 222], sy: 975, hint: () => `${state.desks - state.seated} desk${state.desks - state.seated === 1 ? '' : 's'} free` },
+  pool: { n: 2, name: 'Typing Pool', form: 'Form 7-T · Output', box: [212, 446, 356, 452], sy: 460, hint: () => 'Typing and editing' },
+  departments: { n: 3, name: 'Departments', form: 'Form 5-D · Funding', box: [26, 146, 282, 196], sy: 160, hint: () => 'Three departments' },
+  director: { n: 4, name: "Director's Office", form: 'Form 9-R · Readiness', box: [474, 146, 282, 200], sy: 160, hint: () => 'Readiness and Permit' }
+};
+function dial(label, val, max, word) {
+  const a = -180 + 180 * (val / max);
+  return `<div class="gauge"><svg viewBox="0 0 100 62" role="img" aria-label="${label}: ${word}"><path d="M10 54A40 40 0 0 1 90 54" fill="none" stroke="var(--concrete)" stroke-width="8"/><path d="M62 21.5A40 40 0 0 1 90 54" fill="none" stroke="var(--mustard)" stroke-width="8"/><line x1="50" y1="54" x2="50" y2="22" stroke="var(--ink)" stroke-width="3" stroke-linecap="round" transform="rotate(${a + 90} 50 54)"/><circle cx="50" cy="54" r="5" fill="var(--walnut)" stroke="var(--edge)"/></svg><p class="lab">${label}</p><div class="gv">${word}</div></div>`;
+}
+const SHEETS = {
+  personnel() {
+    const free = state.desks - state.seated, full = free <= 0;
+    const desks = Array.from({ length: state.desks }, (_, i) => `<i class="${i < state.seated ? 'on' : ''}"></i>`).join('');
+    const ptr = state.tut && !full ? `<svg class="pt" viewBox="0 0 46 34" aria-hidden="true"><path d="M2 10h24V2l18 15l-18 15v-8H2z" fill="var(--mustard)" stroke="var(--ink)" stroke-width="2.4" stroke-linejoin="round"/></svg>` : '';
+    return `<div class="panel"><p class="lab">Seated</p><div class="big" id="seatnum">${state.seated} / ${state.desks} <small>desks</small></div>
+      <div class="desks" role="progressbar" aria-label="Desks seated" aria-valuemin="0" aria-valuemax="${state.desks}" aria-valuenow="${state.seated}" aria-valuetext="${state.seated} of ${state.desks} desks seated">${desks}</div>
+      <p class="note">${full ? 'Every desk is taken. Buy a desk before the next hire.' : `${free} free desk${free === 1 ? '' : 's'}. A monkey is waiting at the entrance.`}</p></div>
+      <div class="hirebox${state.tut && !full ? ' tut' : ''}">${ptr}<button class="hire ${state.tut ? 'nudge' : ''}" id="hire" ${full ? 'disabled' : ''}>Hire monkey</button>
+      <p class="delta" id="hiredelta">${full ? '' : `Monkeys ${state.monkeys} → ${state.monkeys + 1} · Income ${state.income.toFixed(1)} → ${(state.income + 1.1).toFixed(1)}/s`}</p>
+      <p class="why">${full ? 'No free desk. Buy one below.' : `Cost ${state.hireCost} bananas. You have ${fmt(Math.floor(state.bananas))}.`}</p></div>
+      <div class="panel sheetinner" style="margin-top:14px"><div class="row2"><div><p class="lab">Desk ${state.desks + 1}</p><p class="delta">Desks ${state.desks} → ${state.desks + 1} · ${state.deskCost} bananas</p></div><button class="btn2" id="buydesk">Buy desk</button></div></div>`;
+  },
+  pool() {
+    return `<div class="panel"><div class="gauges">${dial('Typing', 7, 10, 'Partial')}${dial('Editing', 9, 10, 'Full')}</div>
+      <p class="note"><b>Bottleneck:</b> editing capacity is fully committed. Submissions in excess are discarded.</p></div>
+      <div class="hirebox" style="margin-top:12px"><div class="row2" style="width:100%"><div><p class="lab">Move one monkey to Editing</p><p class="delta">Certified 4.0/s → 5.1/s</p></div><button class="btn2">Reassign</button></div></div>
+      <p class="why" style="margin-top:8px">Seated: 8 typing, 1 Editor at the stamping desk.</p>`;
+  },
+  departments() {
+    const row = (nm, lv, pct, cost) => `<div class="drow"><div><span class="nm">${nm}</span> <span class="delta">Level ${lv} → ${lv + 1}</span><div class="bar" role="progressbar" aria-label="${nm} output" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}" aria-valuetext="${pct} percent of demand"><i style="width:${pct}%"></i></div></div><button class="btn2">${cost}</button></div>`;
+    return `<div class="panel">${row('Recruiting', 3, 70, '90 🍌')}${row('Construction', 2, 40, '120 🍌')}${row('Editing', 4, 90, '150 🍌')}</div><p class="why" style="margin-top:8px">Funding split: balanced. Each purchase is signed once on a single requisition form.</p>`;
+  },
+  director() {
+    return `<div class="panel"><div class="gauges">${dial('Scale', 6, 10, 'Partial')}${dial('Stability', 2, 10, 'Building')}</div>
+      <p class="note">Infinity Permit: <span class="stamp">NOT ISSUED</span></p></div>
+      <div class="hirebox" style="margin-top:12px"><button class="btn2" style="min-height:50px;width:100%" disabled>Declare Infinity</button><p class="why">Locked: the Permit is not issued. Hold Full readiness for 60 s.</p></div>`;
+  }
+};
+
+/* ===== camera: a free-panning sheet on a table ===== */
+const cam = $('#cam'), sheet = $('#sheet'), ernest = $('#ernest'), efig = $('#efig'), aim = $('#aim');
+let cx = -195, cy = -202, cs = 1;            // translate + scale of the world on screen
+const DEFAULT = [-195, -202, 1];
+function put(x, y, s) { cx = x; cy = y; cs = s; cam.style.setProperty('--tx', x + 'px'); cam.style.setProperty('--ty', y + 'px'); cam.style.setProperty('--s', s); }
+const lim = () => ({ minX: VW - WW - 18, maxX: 18, minY: VH - WH - 14, maxY: HDR + 6 });   // a sliver of table shows at each edge
+function clampFree(x, y) { const l = lim(); return [clamp(x, l.minX, l.maxX), clamp(y, l.minY, l.maxY)]; }
+function goTo(wx, wy, sx, sy, s = 1, free = true) {                 // put world point (wx,wy) at screen (sx,sy)
+  let x = sx - s * wx, y = sy - s * wy;
+  if (free) [x, y] = clampFree(x, y);
+  put(x, y, s);
+}
+function frameZone(id) {
+  const [bx, by, bw, bh] = Z[id].box;
+  const sh = sheet.offsetHeight || 430, bottom = VH - sh - 34, top = state.ernest ? HDR + 80 : HDR + 8;
+  const s = clamp(Math.min((VW - 8) / bw, (bottom - top) / bh), .5, 1.35);
+  goTo(bx + bw / 2, by + bh / 2, VW / 2, (top + bottom) / 2, s, false);
+}
+function open(id) {
+  const z = Z[id];
+  if (!state.open) free = [cx, cy, cs];
+  if (state.open && state.open !== id) $(`#z-${state.open}`).classList.remove('pop', 'active');
+  state.open = id;
+  $('#foldtab').innerHTML = `<b>${z.n}</b>${z.name}`;
+  renderBody(id);
+  sheet.setAttribute('aria-label', z.name + ' sheet');
+  $(`#z-${id}`).classList.add('pop', 'active');
+  ernest.classList.toggle('docked', state.ernest);
+  sheet.classList.add('open');
+  frameZone(id);
+  document.querySelectorAll('#dirlist button').forEach(b => b.setAttribute('aria-current', b.dataset.zone === id ? 'true' : 'false'));
+  say(z.name + ' opened.');
+  setTimeout(() => { if (state.open === id) { frameZone(id); aimErnest(); } }, 60);
+  aimErnest();
+}
+let free = DEFAULT.slice();
+function close() {
+  if (!state.open) return;
+  const id = state.open; state.open = null;
+  $(`#z-${id}`).classList.remove('pop', 'active');
+  sheet.classList.remove('open');
+  put(...free);
+  ernest.classList.remove('docked');
+  document.querySelectorAll('#dirlist button').forEach(b => b.setAttribute('aria-current', 'false'));
+  const hot = $(`.hot[data-zone="${id}"]`); if (hot) hot.focus({ preventScroll: true });
+  say('Back on the floor.');
+  aimErnest();
+}
+function wire() {
+  const c = $('#closebtn'); if (c) c.onclick = close;
+  const h = $('#hire'); if (h) h.onclick = hire;
+  const b = $('#buydesk'); if (b) b.onclick = buyDesk;
+}
+function renderBody(id) {
+  const z = Z[id];
+  $('#sheetbody').innerHTML = `<div class="sheet-head"><div><h2>${z.name}</h2><p class="form">${z.form}</p></div><button class="close" id="closebtn" aria-label="Fold down ${z.name}"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 5l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.4"/></svg>Fold down</button></div>` + SHEETS[id]();
+  wire();
+}
+function hire() {
+  if (state.seated >= state.desks) return;
+  const idx = state.seated;
+  state.seated++; state.monkeys++; state.income += 1.1; state.bananas -= state.hireCost;
+  const seat = $(`.seat[data-i="${idx}"]`);
+  if (seat) { seat.classList.remove('vacant'); seat.classList.add('arrive'); setTimeout(() => seat.classList.remove('arrive'), 800); }
+  const cand = $('#cand'); if (cand) cand.classList.add('gone');
+  if (state.seated < state.desks) setTimeout(() => cand && cand.classList.remove('gone'), 2200);
+  paintReadout(); say(`Monkey seated at desk ${idx + 1}. ${state.seated} of ${state.desks} desks seated.`);
+  const h = $('#hire'); const focusHire = document.activeElement === h;
+  renderBody('personnel'); if (focusHire && $('#hire') && !$('#hire').disabled) $('#hire').focus(); else if ($('#buydesk')) $('#buydesk').focus();
+}
+function buyDesk() { state.desks++; state.bananas -= state.deskCost; paintReadout(); say(`Desk ${state.desks} installed.`); renderBody('personnel'); $('#buydesk').focus(); }
+
+/* directory */
+const dir = $('#dir'), dirbtn = $('#dirbtn');
+$('#dirlist').innerHTML = Object.entries(Z).map(([id, z]) => `<li><button data-zone="${id}" aria-current="false"><span class="fl" aria-hidden="true">${z.n}</span><span class="nm">${z.name}<span class="hn">${z.hint()}</span></span></button></li>`).join('') +
+  `<li><div class="dis" role="note"><span class="fl" aria-hidden="true">2</span><span class="nm">Floor 2<span class="hn">Under construction. Not yet open.</span></span></div></li>`;
+function closeDir() { dir.hidden = true; dirbtn.setAttribute('aria-expanded', 'false'); }
+dirbtn.addEventListener('click', () => { const o = dir.hidden; dir.hidden = !o; dirbtn.setAttribute('aria-expanded', String(o)); if (o) document.querySelectorAll('#dirlist button').forEach(b => { b.querySelector('.hn').textContent = Z[b.dataset.zone].hint(); }); });
+$('#dirlist').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; closeDir(); open(b.dataset.zone); });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { if (!dir.hidden) { closeDir(); dirbtn.focus(); } else close(); }
+  if (!state.open && e.target === document.body && e.key.startsWith('Arrow')) { const d = { ArrowLeft: [80, 0], ArrowRight: [-80, 0], ArrowUp: [0, 80], ArrowDown: [0, -80] }[e.key]; const [x, y] = clampFree(cx + d[0], cy + d[1]); put(x, y, 1); }
+});
+document.addEventListener('pointerdown', e => { if (!dir.hidden && !e.target.closest('#dir, #dirbtn')) closeDir(); });
+
+/* ===== free pan: drag with gentle momentum, clamped edges ===== */
+let dragMoved = false, coasting = false;
+(() => {
+  let down = false, moved = false, sx = 0, sy = 0, ox = 0, oy = 0, hist = [], raf = 0;
+  const live = () => { const m = new DOMMatrix(getComputedStyle(cam).transform); return [m.m41, m.m42]; };
+  cam.addEventListener('pointerdown', e => {
+    if (state.open) return;
+    cancelAnimationFrame(raf); const wasCoast = coasting; coasting = false;
+    const [lx, ly] = live(); put(lx, ly, 1); cam.classList.add('dragging');
+    down = true; moved = false; sx = e.clientX; sy = e.clientY; ox = lx; oy = ly; hist = [[performance.now(), lx, ly]];
+    if (wasCoast) dragMoved = true;
+  });
+  window.addEventListener('pointermove', e => {
+    if (!down) return;
+    const dx = e.clientX - sx, dy = e.clientY - sy;
+    if (!moved && Math.hypot(dx, dy) < 6) return;
+    moved = true;
+    const [x, y] = clampFree(ox + dx, oy + dy); put(x, y, 1);
+    hist.push([performance.now(), x, y]); if (hist.length > 6) hist.shift();
+  });
+  window.addEventListener('pointerup', () => {
+    if (!down) return; down = false;
+    if (!moved) { cam.classList.remove('dragging'); if (dragMoved) setTimeout(() => (dragMoved = false), 80); return; }
+    dragMoved = true; setTimeout(() => (dragMoved = false), 120);
+    const a = hist[0], b = hist[hist.length - 1], dt = Math.max(1, b[0] - a[0]);
+    let vx = (b[1] - a[1]) / dt, vy = (b[2] - a[2]) / dt;
+    if (performance.now() - b[0] > 90 || reduce.matches) { cam.classList.remove('dragging'); return; }
+    coasting = true; let last = performance.now();
+    const step = t => {
+      const d = Math.min(32, t - last); last = t;
+      const k = Math.pow(.93, d / 16); vx *= k; vy *= k;
+      let nx = cx + vx * d, ny = cy + vy * d; const [qx, qy] = clampFree(nx, ny);
+      if (qx !== nx) vx = 0; if (qy !== ny) vy = 0;
+      put(qx, qy, 1);
+      if (Math.hypot(vx, vy) > .03 && coasting) raf = requestAnimationFrame(step); else { coasting = false; cam.classList.remove('dragging'); setTimeout(() => (dragMoved = false), 80); }
+    };
+    raf = requestAnimationFrame(step);
+  });
+})();
+document.querySelectorAll('.hot').forEach(h => h.addEventListener('click', () => { if (dragMoved) return; closeDir(); open(h.dataset.zone); }));
+
+/* ===== Ernest: peeks in from the top-right corner, points, never covers the lesson ===== */
+function aimErnest() {
+  if (!state.ernest) { aim.classList.remove('in'); return; }
+  const handX = 236, handY = 236;                 // screen position of his pointer tip
+  let tx, ty;
+  if (state.open) { aim.classList.remove('in'); efig.style.setProperty('--aim', '24deg'); $('#esay').textContent = state.open === 'personnel' ? 'Press Hire monkey.' : 'Back to Personnel to hire.'; return; }
+  $('#esay').textContent = 'Personnel is the desk below. Tap it to seat a monkey.';
+  const [bx, by, bw] = Z.personnel.box;
+  tx = cx + cs * (bx + bw / 2); ty = cy + cs * (Z.personnel.sy - 8);
+  const dx = tx - handX, dy = ty - handY;
+  const q = `M${handX} ${handY}Q${handX - 40} ${(handY + ty) / 2} ${tx} ${ty - 14}`;
+  $('#aimline').setAttribute('d', q);
+  const ang = Math.atan2(14, 0) ; // pointing straight down at the end
+  $('#aimhead').setAttribute('d', `M${tx} ${ty} l-9 -14 h18z`);
+  efig.style.setProperty('--aim', '28deg');
+  aim.classList.add('in');
+}
+function showErnest() {
+  state.ernest = true; state.tut = true;
+  if (!state.open) { goTo(Z.personnel.box[0] + Z.personnel.box[2] / 2, 1100, VW / 2, 600, 1); }   // pan so Personnel sits below the card
+  ernest.classList.toggle('docked', !!state.open); ernest.classList.add('in'); efig.classList.add('in');
+  if (state.open === 'personnel') { renderBody('personnel'); }
+  setTimeout(aimErnest, reduce.matches ? 0 : 20);
+}
+$('#ernest-ok').addEventListener('click', () => {
+  state.ernest = false; state.tut = false; ernest.classList.remove('in'); efig.classList.remove('in'); aim.classList.remove('in');
+  if (state.open === 'personnel') renderBody('personnel');
+  if (state.open) frameZone(state.open);
+  say('Orientation card dismissed.');
+});
+if (!/noernest/.test(location.search)) setTimeout(showErnest, reduce.matches ? 500 : 3000);
+
+window.__beh = Array.from({ length: 8 }, (_, i) => CAST[i].beh);
+window.__cam = { put, goTo, open, close, showErnest, get: () => [cx, cy, cs] };
+paintReadout();
+})();
+</script>
+</body>
+</html>
