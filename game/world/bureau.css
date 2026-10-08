@@ -1,8 +1,8 @@
 /* The Bureau shell: world art, header, feed strip, directory, sheets, Ernest.
    Ported from design/explorations/floor-r4. Tokens live in game/style.css. */
 /* ---------- stage, camera, world ---------- */
-.stage { position: absolute; inset: 0; overflow: hidden; width: 390px; max-width: 100%; margin: 0 auto; }
-@media (min-width: 391px) { .stage { box-shadow: 0 0 0 1px var(--concrete); } }
+.stage { position: absolute; inset: 0; overflow: hidden; width: 100%; max-width: 560px; margin: 0 auto; }
+@media (min-width: 561px) { .stage { box-shadow: 0 0 0 1px var(--concrete); } }
 .cam {
   position: absolute; left: 0; top: 0; width: 780px; height: 1764px;
   transform: translate3d(-95px, -734px, 0) scale(1.04); transform-origin: 0 0;
@@ -534,3 +534,4 @@ body.moving .chip { opacity: 0 !important; }
 .dir { max-height: calc(100dvh - var(--hdr, 138px) - 24px); overflow: auto; }
 .dir .dir-actions .btn2 { width: auto; min-height: 44px; display: inline-flex; grid-template-columns: none; padding: 4px 12px; border: 2px solid var(--ctl); background: var(--btn); color: var(--ink); box-shadow: 0 3px 0 var(--ctl), 0 5px 6px var(--soft-sh); font: 700 .82rem var(--font-display); letter-spacing: .08em; text-transform: uppercase; border-radius: 3px 3px 10px 3px; }
 .dir .dir-actions .btn2.danger { border-color: var(--stamp); color: var(--stamp); box-shadow: 0 3px 0 var(--stamp); }
+.sheet h2:focus { outline: none; }   /* the heading takes focus on open so screen readers land there; it is not a control */

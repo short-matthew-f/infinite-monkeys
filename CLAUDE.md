@@ -90,8 +90,8 @@ Hard rules:
 
 Every push to `main` deploys. After each push, once the Actions run is green,
 give Matt a short **"what to look for"** guide in chat:
-1. **Build:** the short commit SHA. The footer shows `Build <sha> · <time>`, so
-   he can confirm the device is running it.
+1. **Build:** the short commit SHA. The Directory card shows `Build <sha> · <time>`,
+   so he can confirm the device is running it.
 2. **How to get it:** open or return to the app, and a "New version available"
    bar appears (or tap "Check for updates"). Tap Reload.
 3. **What changed:** two to five bullets in player terms, not code terms.
