@@ -1,13 +1,14 @@
-// Departments: levels, stages, funding shares with a live preview of the
-// Readiness meters, and the paired Recruiter + Builder purchase (F6).
+// Departments: funding shares with a live preview of the Readiness meters, levels and stages,
+// and the paired Recruiter + Builder purchase (F6). Contents of a paper sheet.
 import {
-  DEPTS, N, buyDeptLevel, buyDeptStage, capability, deptLevelCost, deptOutput, deptStageCost, fundingEffect,
+  DEPTS, N, buyDeptLevel, buyDeptStage, deptLevelCost, deptOutput, deptStageCost, fundingEffect,
   meters, nullSink, recordPreview, setShares, suggestShares,
   type DeptId, type GameState, type Shares,
 } from '../../core/index.js';
 import type { Action, Ctx, Screen } from '../ctx.js';
-import { h, text, enable, fill } from '../ui/dom.js';
+import { h, text, enable } from '../ui/dom.js';
 import * as f from '../ui/format.js';
+import { afford, field, figure, formbox, ledger, readinessBottleneck, setCost, setWhy, stack, stamp, why, type Ledger } from '../ui/forms.js';
 import './departments.css';
 
 const NAMES: Record<DeptId, string> = { recruiting: 'Recruiting', construction: 'Construction', editing: 'Editing' };
@@ -17,78 +18,29 @@ const BLURB: Record<DeptId, string> = {
   construction: 'Builds desks for the monkeys.',
   editing: 'Reviews submissions. Without Editors, finds go to waste.',
 };
-
-/** Presentation-only wording for a 0..1 meter, so color is never the only signal. */
-function meterWord(v: number): string {
-  if (v >= 1 - 1e-9) return 'Full';
-  if (v >= 0.75) return 'Nearly';
-  if (v >= 0.4) return 'Partial';
-  if (v > 0) return 'Low';
-  return 'Idle';
-}
+const REF: Record<DeptId, string> = { recruiting: '5-D/1', construction: '5-D/2', editing: '5-D/3' };
 
 const balancedBuy: Action = (s, t, k) => buyDeptLevel(s, t, k, 'recruiting') && buyDeptLevel(s, t, k, 'construction');
 
+const CLOSED = 'Closed after Infinity.';
+
 interface DeptEls {
-  level: HTMLElement; stage: HTMLElement; cap: HTMLElement; out: HTMLElement; note: HTMLElement;
-  levelCost: HTMLElement; levelBtn: HTMLButtonElement; stageCost: HTMLElement; stageBtn: HTMLButtonElement;
+  level: HTMLElement; stage: HTMLElement; out: HTMLElement;
+  levelDelta: HTMLElement; levelCost: HTMLElement; levelBtn: HTMLButtonElement; levelWhy: HTMLElement;
+  stageDelta: HTMLElement; stageCost: HTMLElement; stageBtn: HTMLButtonElement; stageWhy: HTMLElement;
+  stageRow: HTMLElement; finalRow: HTMLElement; finalNote: HTMLElement;
 }
 interface FundEls {
-  slider: HTMLInputElement; share: HTMLElement; mult: HTMLElement; outNow: HTMLElement; outNew: HTMLElement;
-  barNow: HTMLElement; barNew: HTMLElement; wordNow: HTMLElement; wordNew: HTMLElement; newRow: HTMLElement;
+  slider: HTMLInputElement; share: HTMLElement; now: Ledger; next: Ledger; nextRow: HTMLElement; out: HTMLElement;
 }
 
 function mount(root: HTMLElement, ctx: Ctx): () => void {
   const { t } = ctx;
   let draft: Shares | null = null;
 
-  // ----- first-Recruiter prompt + balanced buy -----
-  const pairBtn = (primary: boolean) => {
-    const cost = h('span', { class: 'cost' });
-    const btn = h('button', { class: primary ? 'primary' : '', onclick: () => ctx.act(balancedBuy) }, 'Balanced buy ', cost);
-    return { btn, cost };
-  };
-  const prompt = pairBtn(true);
-  const promptPanel = h('section', { class: 'panel dept-prompt', role: 'note' },
-    h('h2', {}, 'Your first Recruiter'),
-    h('p', {}, 'Recruiters hire for you, but each new monkey needs a desk. Buy a Recruiter and a Builder together.'),
-    prompt.btn,
-  );
-  const pair = pairBtn(false);
-  const pairPanel = h('section', { class: 'panel' },
-    h('h2', {}, 'Balanced buy'),
-    h('p', { class: 'label' }, 'One requisition, two lines: +1 Recruiting level and +1 Construction level, signed once.'),
-    pair.btn,
-  );
+  const outOf = (s: GameState, d: DeptId): string => f.rate(deptOutput(s, t, d));
 
-  // ----- departments -----
-  const deptEls = {} as Record<DeptId, DeptEls>;
-  const deptPanels = DEPTS.map((d) => {
-    const e: DeptEls = {
-      level: h('span', { class: 'value' }), stage: h('span', { class: 'value' }), cap: h('span', { class: 'value' }),
-      out: h('span', { class: 'value' }), note: h('p', { class: 'label' }),
-      levelCost: h('span', { class: 'cost' }), stageCost: h('span', { class: 'cost' }),
-      levelBtn: h('button', { onclick: () => ctx.act((s, tt, k) => buyDeptLevel(s, tt, k, d)) }),
-      stageBtn: h('button', { onclick: () => ctx.act((s, tt, k) => buyDeptStage(s, tt, k, d)) }),
-    };
-    e.levelBtn.append('Level up ', e.levelCost);
-    e.stageBtn.append(e.stageCost);
-    deptEls[d] = e;
-    return h('section', { class: 'panel' },
-      h('h2', {}, NAMES[d]),
-      h('p', { class: 'label' }, BLURB[d]),
-      h('div', { class: 'dept-stats' },
-        h('div', {}, h('span', { class: 'label' }, 'Level'), e.level),
-        h('div', {}, h('span', { class: 'label' }, 'Stage'), e.stage),
-        h('div', {}, h('span', { class: 'label' }, 'Capability'), e.cap),
-        h('div', {}, h('span', { class: 'label' }, `Output (${UNITS[d]})`), e.out),
-      ),
-      h('div', { class: 'dept-buttons' }, e.levelBtn, e.stageBtn),
-      e.note,
-    );
-  });
-
-  // ----- funding -----
+  // ----- funding (first: Apply is the screen's main action once a slider moves) -----
   const fundEls = {} as Record<DeptId, FundEls>;
   const setDraftFor = (d: DeptId, pctValue: number) => {
     const s = ctx.state();
@@ -106,84 +58,148 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
     draft = next;
     render();
   };
-  const sliders = DEPTS.map((d) => {
+  const fundRows = DEPTS.map((d) => {
     const slider = h('input', {
-      type: 'range', min: 0, max: 100, step: 1, class: 'fund-slider', 'aria-label': `${NAMES[d]} funding share`,
+      type: 'range', min: 0, max: 100, step: 1, 'aria-label': `${NAMES[d]} funding share`,
       oninput: () => setDraftFor(d, Number(slider.value)),
     });
     const e: FundEls = {
-      slider, share: h('span', { class: 'value' }), mult: h('span', { class: 'label' }),
-      outNow: h('span', { class: 'cost' }), outNew: h('span', { class: 'cost' }),
-      barNow: h('span', { class: 'meter-fill' }), barNew: h('span', { class: 'meter-fill' }),
-      wordNow: h('span', { class: 'meter-word' }), wordNew: h('span', { class: 'meter-word' }),
-      newRow: h('div', { class: 'meter-row', hidden: true }),
+      slider, share: figure(), now: ledger(`${NAMES[d]} readiness now`), next: ledger(`${NAMES[d]} readiness if applied`),
+      nextRow: h('div', { class: 'fund-next' }), out: h('p', { class: 'delta' }),
     };
-    e.newRow.append(h('span', { class: 'label' }, 'If applied'), h('span', { class: 'meter' }, e.barNew), e.wordNew);
+    e.nextRow.append(h('span', { class: 'lab' }, 'If applied'), e.next.el);
     fundEls[d] = e;
     return h('div', { class: 'fund-row' },
-      h('div', { class: 'fund-head' }, h('span', { class: 'fund-name' }, NAMES[d]), e.share, e.mult),
+      field(NAMES[d], e.share),
       slider,
-      h('div', { class: 'meter-row' }, h('span', { class: 'label' }, 'Readiness'), h('span', { class: 'meter' }, e.barNow), e.wordNow),
-      e.newRow,
-      h('p', { class: 'label' }, `Output ${UNITS[d]}: `, e.outNow, e.outNew),
+      h('div', { class: 'fund-meter' }, h('span', { class: 'lab' }, 'Readiness'), e.now.el),
+      e.nextRow,
+      e.out,
     );
   });
 
-  const suggestBtn = h('button', { onclick: () => {
+  const bottleneck = h('p', { class: 'note' });
+  const suggestBtn = h('button', { type: 'button', onclick: () => {
     const s = ctx.state();
     if (!draft) recordPreview(s, ctx.sink, 'funding', 'shares');
     draft = { ...suggestShares(s, t) };
     render();
   } }, 'Use suggested');
-  const resetBtn = h('button', { class: 'quiet', onclick: () => { draft = null; render(); } }, 'Discard changes');
-  const applyBtn = h('button', { class: 'primary', onclick: () => {
+  const resetBtn = h('button', { class: 'quiet', type: 'button', onclick: () => { draft = null; render(); } }, 'Discard changes');
+  const applyBtn = h('button', { class: 'strong', type: 'button', onclick: () => {
     if (!draft) return;
     const next = draft;
     if (ctx.act((s, tt, k) => setShares(s, tt, k, next))) draft = null;
     render();
-  } }, 'Apply');
-  const fundNote = h('p', { class: 'label' });
-  const suggestNote = h('p', { class: 'label' });
-
-  root.append(
-    promptPanel,
-    ...deptPanels,
-    pairPanel,
-    h('section', { class: 'panel' },
-      h('h2', {}, 'Funding shares'),
-      fundNote,
-      ...sliders,
-      suggestNote,
-      h('div', { class: 'dept-buttons' }, suggestBtn, applyBtn),
-      resetBtn,
-    ),
+  } }, 'Apply funding');
+  const applyWhy = why();
+  const suggestWhy = why();
+  const fundNote = h('p', { class: 'why' });
+  const fundBox = formbox('Ref. 5-D / Funding',
+    bottleneck,
+    h('div', { class: 'btn-row' }, applyBtn, suggestBtn, resetBtn),
+    applyWhy,
+    suggestWhy,
+    ...fundRows,
+    fundNote,
   );
+
+  // ----- first-Recruiter prompt + balanced buy (never both on screen) -----
+  const pairBtn = () => {
+    const cost = h('span', { class: 'cost' });
+    const btn = h('button', { class: 'strong', type: 'button', onclick: () => ctx.act(balancedBuy) }, h('span', {}, 'Balanced buy'), cost);
+    return { btn, cost, why: why(), delta: h('p', { class: 'delta' }) };
+  };
+  const prompt = pairBtn();
+  const promptBox = formbox('Req. 5-D/0 / Your first Recruiter',
+    h('p', { class: 'note' }, 'Recruiters hire for you, but each new monkey needs a desk. Buy a Recruiter and a Builder together.'),
+    h('div', { class: 'row2' }, prompt.delta, prompt.btn, prompt.why),
+  );
+  const pair = pairBtn();
+  const pairBox = formbox('Req. 5-D/4 / Balanced buy',
+    h('p', { class: 'why' }, 'One requisition, two lines: +1 Recruiting level and +1 Construction level, signed once.'),
+    h('div', { class: 'row2' }, pair.delta, pair.btn, pair.why),
+  );
+
+  // ----- departments -----
+  const deptEls = {} as Record<DeptId, DeptEls>;
+  const deptBoxes = DEPTS.map((d) => {
+    const e: DeptEls = {
+      level: figure(), stage: figure(), out: figure(),
+      levelDelta: h('p', { class: 'delta' }), levelCost: h('span', { class: 'cost' }), levelWhy: why(),
+      stageDelta: h('p', { class: 'delta' }), stageCost: h('span', { class: 'cost' }), stageWhy: why(),
+      levelBtn: h('button', { type: 'button', onclick: () => ctx.act((s, tt, k) => buyDeptLevel(s, tt, k, d)) }),
+      stageBtn: h('button', { type: 'button', onclick: () => ctx.act((s, tt, k) => buyDeptStage(s, tt, k, d)) }),
+      stageRow: h('div', { class: 'row2' }), finalRow: h('div', { class: 'form-stack tight' }), finalNote: h('p', { class: 'why' }),
+    };
+    e.levelBtn.append(h('span', {}, 'Level up'), e.levelCost);
+    e.stageBtn.append(h('span', {}, 'Next stage'), e.stageCost);
+    e.stageRow.append(e.stageDelta, e.stageBtn, e.stageWhy);
+    e.finalRow.append(stamp('Final stage', 'ok'), e.finalNote);
+    deptEls[d] = e;
+    return formbox(`Ref. ${REF[d]} / ${NAMES[d]}`,
+      h('p', { class: 'why' }, BLURB[d]),
+      field('Level', e.level),
+      field('Stage', e.stage),
+      field(`Output (${UNITS[d]})`, e.out),
+      h('div', { class: 'row2' }, e.levelDelta, e.levelBtn, e.levelWhy),
+      e.stageRow,
+      e.finalRow,
+    );
+  });
+
+  root.append(stack(promptBox, fundBox, ...deptBoxes, pairBox));
 
   function render(): void {
     const s = ctx.state();
 
+    // First Recruiter prompt or balanced buy
     const noRecruiter = s.depts.recruiting.level === 0;
-    if (promptPanel.hidden !== !noRecruiter) promptPanel.hidden = !noRecruiter;
-    const pairCostTotal = f.bananas(N.add(deptLevelCost(s, t, 'recruiting'), deptLevelCost(s, t, 'construction')));
+    promptBox.hidden = !noRecruiter;
+    pairBox.hidden = noRecruiter;
+    const rCost = deptLevelCost(s, t, 'recruiting');
+    const cCost = deptLevelCost(s, t, 'construction');
+    const total = N.add(rCost, cCost);
+    const afterPair = ctx.preview((c) => { afford(c, N.toNumber(total)); balancedBuy(c, t, nullSink); });
     const canPair = ctx.can('balancedBuy', balancedBuy);
-    text(prompt.cost, pairCostTotal);
-    text(pair.cost, pairCostTotal);
-    enable(prompt.btn, canPair);
-    enable(pair.btn, canPair);
+    const pairWhy = canPair ? null : f.shortBy(total, s.bananas) ?? CLOSED;
+    const pairDelta = `Recruiting ${f.change(outOf(s, 'recruiting'), outOf(afterPair, 'recruiting'))} · Construction ${f.change(outOf(s, 'construction'), outOf(afterPair, 'construction'))}`;
+    for (const p of [prompt, pair]) {
+      setCost(p.btn, p.cost, 'Balanced buy', N.toNumber(total));
+      enable(p.btn, canPair);
+      setWhy(p.why, pairWhy);
+      text(p.delta, pairDelta);
+    }
 
+    // Departments
     for (const d of DEPTS) {
       const e = deptEls[d];
       const dep = s.depts[d];
       text(e.level, f.count(dep.level));
-      text(e.stage, `Stage ${dep.stage} of 4`);
-      text(e.cap, f.amount(capability(s, t, d)));
-      text(e.out, f.rate(deptOutput(s, t, d)));
-      text(e.levelCost, f.bananas(deptLevelCost(s, t, d)));
-      enable(e.levelBtn, ctx.can(`buyDeptLevel:${d}`, (st, tt, k) => buyDeptLevel(st, tt, k, d)));
+      text(e.stage, `${dep.stage} of 4`);
+      text(e.out, outOf(s, d));
+
+      const lCost = deptLevelCost(s, t, d);
+      const lAfter = ctx.preview((c) => { afford(c, N.toNumber(lCost)); buyDeptLevel(c, t, nullSink, d); });
+      text(e.levelDelta, `Level ${f.change(f.count(dep.level), f.count(lAfter.depts[d].level))} · Output ${f.change(outOf(s, d), outOf(lAfter, d))}`);
+      setCost(e.levelBtn, e.levelCost, `Level up ${NAMES[d]}`, N.toNumber(lCost));
+      const canLevel = ctx.can(`buyDeptLevel:${d}`, (st, tt, k) => buyDeptLevel(st, tt, k, d));
+      enable(e.levelBtn, canLevel);
+      setWhy(e.levelWhy, canLevel ? null : f.shortBy(lCost, s.bananas) ?? CLOSED);
+
       const sc = deptStageCost(s, t, d);
-      text(e.stageCost, sc === null ? 'Final stage' : `Next stage ${f.bananas(sc)}`);
-      enable(e.stageBtn, sc !== null && ctx.can(`buyDeptStage:${d}`, (st, tt, k) => buyDeptStage(st, tt, k, d)));
-      text(e.note, sc === null ? 'Final stage: this department now self-replicates, so balance drifts. Keep an eye on the meters.' : '');
+      e.stageRow.hidden = sc === null;
+      e.finalRow.hidden = sc !== null;
+      if (sc === null) {
+        text(e.finalNote, 'This department now self-replicates, so balance drifts. Watch the meters.');
+      } else {
+        const sAfter = ctx.preview((c) => { afford(c, N.toNumber(sc)); buyDeptStage(c, t, nullSink, d); });
+        text(e.stageDelta, `Stage ${f.change(String(dep.stage), String(sAfter.depts[d].stage))} · Output ${f.change(outOf(s, d), outOf(sAfter, d))}`);
+        setCost(e.stageBtn, e.stageCost, `Next stage ${NAMES[d]}`, N.toNumber(sc));
+        const canStage = ctx.can(`buyDeptStage:${d}`, (st, tt, k) => buyDeptStage(st, tt, k, d));
+        enable(e.stageBtn, canStage);
+        setWhy(e.stageWhy, canStage ? null : f.shortBy(sc, s.bananas) ?? CLOSED);
+      }
     }
 
     // Funding
@@ -198,31 +214,31 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
       clone = ctx.preview((c) => { setShares(c, t, nullSink, dr); });
       mNew = meters(clone, t);
     }
-    text(fundNote, `Effective output = capability × share × ${f.amount(fundingEffect(t, 1))}. Equal shares (${f.pct(1 / 3)} each) give ${f.amount(fundingEffect(t, 1 / 3))}×.`);
+    text(bottleneck, readinessBottleneck(s, t));
+    text(fundNote, `Effective output = capability × share × ${f.amount(fundingEffect(t, 1))}. Equal shares (${f.pct(1 / 3)} each) give ${f.amount(fundingEffect(t, 1 / 3))}×. Suggested: ${DEPTS.map((d) => `${NAMES[d]} ${f.pct(suggested[d])}`).join(', ')}.`);
     for (const d of DEPTS) {
       const e = fundEls[d];
       const pctVal = Math.round(shown[d] * 100);
       if (e.slider.value !== String(pctVal)) e.slider.value = String(pctVal);
+      e.slider.setAttribute('aria-valuetext', `${pctVal} percent`);
       text(e.share, f.pct(shown[d]));
-      text(e.mult, `${f.amount(fundingEffect(t, shown[d]))}× · suggested ${f.pct(suggested[d])}`);
-      fill(e.barNow, mNow[d]);
-      text(e.wordNow, `${f.pct(mNow[d])} ${meterWord(mNow[d])}`);
-      text(e.outNow, f.rate(deptOutput(s, t, d)));
-      if (e.newRow.hidden !== !draft) e.newRow.hidden = !draft;
-      if (clone) {
-        fill(e.barNew, mNew[d]);
-        text(e.wordNew, `${f.pct(mNew[d])} ${meterWord(mNew[d])}`);
-        text(e.outNew, ` → ${f.rate(deptOutput(clone, t, d))}`);
-      } else {
-        text(e.outNew, '');
-      }
+      e.now.set(mNow[d], `${NAMES[d]} readiness ${f.meterPct(mNow[d])}, ${f.meterWord(mNow[d])}`);
+      e.nextRow.hidden = !clone;
+      if (clone) e.next.set(mNew[d], `${NAMES[d]} readiness if applied ${f.meterPct(mNew[d])}, ${f.meterWord(mNew[d])}`);
+      const base = `Readiness ${f.meterPct(mNow[d])} ${f.meterWord(mNow[d])}`;
+      text(e.out, clone
+        ? `${base} → ${f.meterPct(mNew[d])} ${f.meterWord(mNew[d])} · Output ${f.change(outOf(s, d), outOf(clone, d))}`
+        : `${base} · Output ${outOf(s, d)}`);
     }
     const differs = draft !== null && DEPTS.some((d) => Math.abs((draft as Shares)[d] - now[d]) > 1e-9);
     const key = draft ? `setShares:${DEPTS.map((d) => (draft as Shares)[d].toFixed(6)).join(':')}` : 'setShares:none';
-    enable(applyBtn, differs && ctx.can(key, (st, tt, k) => setShares(st, tt, k, draft as Shares)));
-    enable(suggestBtn, DEPTS.some((d) => Math.abs(suggested[d] - shown[d]) > 1e-9));
-    if (resetBtn.hidden !== !draft) resetBtn.hidden = !draft;
-    text(suggestNote, draft ? 'Previewing: nothing changes until you press Apply.' : 'Move a slider to preview its effect on all three meters.');
+    const canApply = differs && ctx.can(key, (st, tt, k) => setShares(st, tt, k, draft as Shares));
+    enable(applyBtn, canApply);
+    setWhy(applyWhy, canApply ? null : !draft ? 'Move a slider to preview a new split.' : !differs ? 'The draft matches the current funding.' : CLOSED);
+    const canSuggest = DEPTS.some((d) => Math.abs(suggested[d] - shown[d]) > 1e-9);
+    enable(suggestBtn, canSuggest);
+    setWhy(suggestWhy, canSuggest ? null : 'Already on the suggested split.');
+    resetBtn.hidden = !draft;
   }
 
   return render;

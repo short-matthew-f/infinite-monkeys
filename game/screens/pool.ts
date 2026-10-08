@@ -1,11 +1,12 @@
-// Typing Pool: typing vs editing bars per tier, plus the tier allocation
-// (current vs suggested vs a draft split, with a before/after preview).
+// Typing Pool: typing vs editing per tier, plus the Editor allocation (current vs suggested vs a
+// draft split, with a before → after preview). Contents of a paper sheet.
 import {
   N,
   applySuggestedAllocation,
   certifyTiers,
   editingPool,
   editorInChiefSplit,
+  finiteBottleneck,
   findRates,
   nullSink,
   recordPreview,
@@ -13,133 +14,143 @@ import {
   suggestTierAllocation,
   type Certification,
   type GameState,
-  type Num,
 } from '../../core/index.js';
 import type { Ctx, Screen } from '../ctx.js';
-import { h, text, enable, fill } from '../ui/dom.js';
+import { h, text, enable } from '../ui/dom.js';
 import * as f from '../ui/format.js';
+import { dial, field, figure, formbox, ledger, setWhy, stack, stamp, why } from '../ui/forms.js';
 import './pool.css';
 
-const LAMPS = 10;
 const name = (id: string): string => id.charAt(0).toUpperCase() + id.slice(1);
-const income = (x: Num | number): string => `🍌 ${f.amount(x)}/s`;
-const hasAny = (d: Record<string, number>): boolean => Object.values(d).some((v) => v > 0);
 
 function certNow(s: GameState, ctx: Ctx): Certification {
   return certifyTiers(s, ctx.t, editingPool(s, ctx.t), s.tierAllocation);
 }
 
+/** Splits `total` into whole parts proportional to `raw` (largest remainder), so the parts always sum to `total`. */
+function distribute(raw: number[], total: number): number[] {
+  const sum = raw.reduce((a, x) => a + x, 0);
+  const share = raw.map((x) => (sum > 0 ? (x / sum) * total : total / raw.length));
+  const out = share.map(Math.floor);
+  let left = total - out.reduce((a, x) => a + x, 0);
+  const order = share.map((x, i) => ({ i, r: x - Math.floor(x) })).sort((a, b) => b.r - a.r);
+  for (const { i } of order) {
+    if (left <= 0) break;
+    out[i] = (out[i] ?? 0) + 1;
+    left--;
+  }
+  return out;
+}
+
 function mount(root: HTMLElement, ctx: Ctx): () => void {
   const { t } = ctx;
-  /** Draft weights (0..100 per discovered tier), or null when the player isn't editing. */
+  /** Draft split as whole percents over the discovered tiers (sums to 100), or null when the player isn't editing. */
   let draft: Record<string, number> | null = null;
 
-  // ---------- bars ----------
-  const rows = t.tiers.map((tier) => {
-    const title = h('h3', {}, name(tier.id));
-    const inc = h('span', { class: 'pool-income' });
-    const okBar = h('span', { class: 'pool-ok' });
-    const wasteBar = h('span', { class: 'pool-waste' });
-    const bar = h('div', { class: 'pool-bar', role: 'img' }, okBar, wasteBar);
-    const typing = h('b');
-    const editing = h('b');
-    const waste = h('span', { class: 'pool-warn' });
-    const line = h('p', { class: 'pool-line' }, 'Typing ', typing, ' · Certified ', editing);
-    const discBar = h('span', { class: 'pool-disc' });
-    const discTrack = h('div', { class: 'pool-bar', role: 'img' }, discBar);
-    const discLine = h('p', { class: 'pool-line' });
-    const lockedBlock = h('div', { class: 'pool-hide' }, h('p', { class: 'label' }, 'Not yet discovered'), discTrack, discLine);
-    const openBlock = h('div', { class: 'pool-hide' }, bar, line, waste);
-    const el = h('div', { class: 'pool-row' }, h('div', { class: 'pool-head' }, title, inc), openBlock, lockedBlock);
-    return { tier, el, inc, okBar, wasteBar, bar, typing, editing, waste, openBlock, lockedBlock, discBar, discTrack, discLine };
-  });
+  const discoveredIds = (s: GameState): string[] => t.tiers.filter((x) => s.tiers[x.id]?.discovered).map((x) => x.id);
+  /** The live split as whole percents over the discovered tiers. */
+  const currentPercents = (s: GameState): Record<string, number> => {
+    const ids = discoveredIds(s);
+    const parts = distribute(ids.map((id) => s.tierAllocation[id] ?? 0), 100);
+    return Object.fromEntries(ids.map((id, i) => [id, parts[i] ?? 0]));
+  };
 
-  const poolV = h('span', { class: 'value' });
-  const demandV = h('span', { class: 'value' });
-  const idleV = h('span', { class: 'value' });
-  const discardedV = h('span', { class: 'value' });
-  const totalV = h('span', { class: 'value' });
-  const lamps = Array.from({ length: LAMPS }, () => h('span'));
-  const lampNote = h('p', { class: 'pool-line' });
-  const poolNote = h('p', { class: 'pool-line' });
+  // ---------- bottleneck dials ----------
+  const busyDial = dial('Editors busy');
+  const keptDial = dial('Finds kept');
+  const bottleneck = h('p', { class: 'note' });
+  const dialsBox = formbox('Ref. 7-T / Bottleneck',
+    h('div', { class: 'gauges' }, busyDial.el, keptDial.el),
+    bottleneck,
+  );
 
   // ---------- allocation ----------
   const aRows = t.tiers.map((tier) => {
-    const input = h('input', { class: 'pool-slider', type: 'range', min: 0, max: 100, step: 1, 'aria-label': `${name(tier.id)} share of Editors` });
-    const info = h('p', { class: 'pool-line' });
-    const el = h('div', { class: 'pool-row' }, h('div', { class: 'pool-head' }, h('h3', {}, name(tier.id))), input, info);
+    const share = h('span', { class: 'big' });
+    const input = h('input', { type: 'range', min: 0, max: 100, step: 1, 'aria-label': `${name(tier.id)} share of Editors` });
+    const info = h('p', { class: 'why' });
+    const el = h('div', { class: 'pool-alloc' }, field(name(tier.id), share), input, info);
     input.addEventListener('input', () => {
+      const s = ctx.state();
       if (!draft) {
-        // First edit starts a draft from the live split, and counts as a preview view.
-        draft = currentWeights(ctx.state());
-        recordPreview(ctx.state(), ctx.sink, 'allocation', 'tiers');
+        draft = currentPercents(s);
+        recordPreview(s, ctx.sink, 'allocation', 'tiers');
       }
-      draft[tier.id] = Number(input.value);
+      const ids = discoveredIds(s);
+      const v = Number(input.value);
+      const others = ids.filter((x) => x !== tier.id);
+      const parts = distribute(others.map((x) => draft?.[x] ?? 0), 100 - v);
+      const next: Record<string, number> = { [tier.id]: v };
+      others.forEach((x, i) => { next[x] = parts[i] ?? 0; });
+      draft = next;
       render();
     });
-    return { tier, el, input, info };
+    return { tier, el, input, share, info };
   });
 
-  function currentWeights(s: GameState): Record<string, number> {
-    const w: Record<string, number> = {};
-    for (const tier of t.tiers) w[tier.id] = Math.round((s.tierAllocation[tier.id] ?? 0) * 100);
-    return w;
-  }
-  function discoveredIds(s: GameState): string[] {
-    return t.tiers.filter((x) => s.tiers[x.id]?.discovered).map((x) => x.id);
-  }
-  /** Draft weights over discovered tiers as fractions summing to 1; null if all zero. */
-  function draftSplit(s: GameState): Record<string, number> | null {
+  const singleNote = h('p', { class: 'note' });
+  const useSuggested = h('button', { type: 'button', onclick: () => { draft = null; ctx.act(applySuggestedAllocation); render(); } }, 'Use suggested');
+  const useWhy = why();
+  const applyBtn = h('button', { class: 'strong', type: 'button', onclick: () => {
+    const next = splitOf(ctx.state());
+    if (!next) return;
+    if (ctx.act((s, tt, k) => setTierAllocation(s, tt, k, next))) draft = null;
+    render();
+  } }, 'Apply split');
+  const applyWhy = why();
+  const resetBtn = h('button', { class: 'quiet', type: 'button', onclick: () => { draft = null; render(); } }, 'Discard draft');
+  const incomeDelta = h('p', { class: 'delta' });
+  const flowDelta = h('p', { class: 'delta' });
+  const preview = h('div', { class: 'pool-preview' }, incomeDelta, flowDelta);
+  const allocControls = h('div', { class: 'form-stack' },
+    ...aRows.map((r) => r.el),
+    preview,
+    h('div', { class: 'btn-row' }, applyBtn, useSuggested, resetBtn),
+    applyWhy,
+    useWhy,
+  );
+  const allocBox = formbox('Req. 7-T / Editor allocation', singleNote, allocControls);
+
+  /** Draft as fractions over discovered tiers, or null. */
+  function splitOf(s: GameState): Record<string, number> | null {
     if (!draft) return null;
     const ids = discoveredIds(s);
     const sum = ids.reduce((a, id) => a + (draft?.[id] ?? 0), 0);
     if (sum <= 0) return null;
-    const out: Record<string, number> = {};
-    for (const id of ids) out[id] = (draft[id] ?? 0) / sum;
-    return out;
+    return Object.fromEntries(ids.map((id) => [id, (draft?.[id] ?? 0) / sum]));
   }
 
-  const suggestedNote = h('p', { class: 'label' }, 'Suggested: maximizes bananas');
-  const singleNote = h('p', { class: 'pool-line pool-hide' });
-  const useSuggested = h('button', { onclick: () => { draft = null; ctx.act(applySuggestedAllocation); render(); } }, 'Use suggested');
-  const applyBtn = h('button', { class: 'primary', onclick: () => {
-    const next = draftSplit(ctx.state());
-    if (!next) return;
-    if (ctx.act((s, tt, k) => setTierAllocation(s, tt, k, next))) draft = null;
-    render();
-  } }, 'Apply');
-  const resetBtn = h('button', { class: 'quiet', onclick: () => { draft = null; render(); } }, 'Discard draft');
-  const nowInc = h('span', { class: 'value' });
-  const draftInc = h('span', { class: 'value' });
-  const deltaNote = h('p', { class: 'pool-line' });
-  const compare = h('div', { class: 'pool-hide' },
-    h('div', { class: 'pool-compare' },
-      h('div', {}, h('span', { class: 'label' }, 'Income now'), nowInc),
-      h('div', {}, h('span', { class: 'label' }, 'Income with draft'), draftInc),
-    ),
-    deltaNote,
-  );
-  const controls = h('div', { class: 'pool-hide' }, ...aRows.map((r) => r.el), suggestedNote, compare,
-    h('div', { class: 'pool-actions' }, useSuggested, applyBtn, resetBtn));
+  // ---------- tiers ----------
+  const rows = t.tiers.map((tier, i) => {
+    const inc = figure();
+    const bar = ledger(`${name(tier.id)} certified`);
+    const typing = h('b');
+    const editing = h('b');
+    const waste = h('p', { class: 'why alert' });
+    const line = h('p', { class: 'delta' }, 'Typing ', typing, ' · Certified ', editing);
+    const open = h('div', { class: 'form-stack tight' }, field('Income', inc), bar.el, line, waste);
+    const discBar = ledger(`${name(tier.id)} discovery`, 'gold');
+    const discLine = h('p', { class: 'delta' });
+    const locked = h('div', { class: 'form-stack tight' }, h('p', {}, stamp('Under review', 'plain')), discBar.el, discLine);
+    const el = formbox(`Ref. 7-T/${i + 1} / ${name(tier.id)}`, open, locked);
+    return { tier, el, inc, bar, typing, editing, waste, open, locked, discBar, discLine };
+  });
 
-  root.append(
-    h('section', { class: 'panel' },
-      h('h2', {}, 'Typing vs editing'),
-      h('div', { class: 'pool-stats' },
-        h('div', {}, h('span', { class: 'label' }, 'Editing pool'), poolV),
-        h('div', {}, h('span', { class: 'label' }, 'Review demand'), demandV),
-        h('div', {}, h('span', { class: 'label' }, 'Idle review capacity'), idleV),
-        h('div', {}, h('span', { class: 'label' }, 'Discarded finds'), discardedV),
-        h('div', {}, h('span', { class: 'label' }, 'Certified income'), totalV),
-      ),
-      h('span', { class: 'label' }, 'Editors at work (unlit = idle)'),
-      h('div', { class: 'pool-lamps', role: 'img', 'aria-label': 'Editor utilisation' }, ...lamps),
-      lampNote,
-      poolNote,
-    ),
-    h('section', { class: 'panel' }, h('h2', {}, 'Tiers'), ...rows.map((r) => r.el)),
-    h('section', { class: 'panel' }, h('h2', {}, 'Allocation'), singleNote, controls),
+  // ---------- figures ----------
+  const poolV = figure();
+  const demandV = figure();
+  const idleV = figure();
+  const discardedV = figure();
+  const totalV = figure();
+  const figures = formbox('Ref. 7-T/9 / Figures',
+    field('Editing pool', poolV),
+    field('Review demand', demandV),
+    field('Idle capacity', idleV),
+    field('Discarded finds', discardedV),
+    field('Certified income', totalV),
   );
+
+  root.append(stack(dialsBox, allocBox, ...rows.map((r) => r.el), figures));
 
   function render(): void {
     const s = ctx.state();
@@ -149,96 +160,98 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
     const cert = certNow(s, ctx);
     const suggested = suggestTierAllocation(s, t);
     const discovered = discoveredIds(s);
+    const hasPool = N.gt(pool, N.zero);
 
-    // Summary
+    // Figures and dials
     text(poolV, f.rate(pool));
     text(demandV, f.rate(cert.demand));
     text(idleV, f.rate(cert.idle));
     text(discardedV, f.rate(cert.discarded));
-    text(totalV, income(cert.income));
-    const idleFrac = N.gt(pool, N.zero) ? Math.min(1, N.ratio(cert.idle, pool)) : 0;
-    const lit = Math.round((1 - idleFrac) * LAMPS);
-    lamps.forEach((l, i) => l.classList.toggle('lit', i < lit && N.gt(pool, N.zero)));
-    const idle = N.gt(cert.idle, N.zero);
+    text(totalV, `${f.rate(cert.income)}`);
+    const busy = hasPool ? Math.min(1, N.ratio(cert.demand, pool)) : 0;
+    const findsTotal = Object.values(finds).reduce((a, x) => N.add(a, x), N.zero);
+    const keptTotal = Object.values(cert.certified).reduce((a, x) => N.add(a, x), N.zero);
+    const kept = N.gt(findsTotal, N.zero) ? Math.min(1, N.ratio(keptTotal, findsTotal)) : 0;
+    busyDial.set(busy, f.meterWord(busy), `Editors busy: ${f.meterPct(busy)}, ${f.meterWord(busy)}`);
+    keptDial.set(kept, f.meterWord(kept), `Finds kept: ${f.meterPct(kept)}, ${f.meterWord(kept)}`);
     const discarding = N.gt(cert.discarded, N.zero);
-    text(lampNote, idle ? `○ Idle: ${f.pct(idleFrac)} of review capacity has nothing to review. Typing is the bottleneck.` : '● All review capacity is in use.');
-    text(poolNote, discarding ? `▲ Discarding ${f.rate(cert.discarded)} of submissions. Editing is the bottleneck.` : 'No submissions discarded.');
-    poolNote.classList.toggle('pool-warn', discarding);
+    const idle = N.gt(cert.idle, N.zero);
+    const limiter = finiteBottleneck(s, t);
+    text(bottleneck, limiter === 'editing'
+      ? `Bottleneck: Editing. ${discarding ? `${f.rate(cert.discarded)} of submissions are being discarded.` : 'Review capacity is fully committed.'}`
+      : `Bottleneck: Typing. ${idle ? `${f.pct(hasPool ? Math.min(1, N.ratio(cert.idle, pool)) : 0)} of review capacity has nothing to review.` : 'Editors are waiting on submissions.'}`);
 
-    // Per-tier bars
+    // Per-tier ledgers
     for (const r of rows) {
       const id = r.tier.id;
       const ts = s.tiers[id];
       const isOpen = !!ts?.discovered;
       const isLocked = !!ts && !ts.discovered && ts.discoverable;
       r.el.hidden = !isOpen && !isLocked;
-      r.openBlock.hidden = !isOpen;
-      r.lockedBlock.hidden = !isLocked;
+      r.open.hidden = !isOpen;
+      r.locked.hidden = !isLocked;
       if (isOpen) {
         const fr = finds[id] ?? N.zero;
         const c = cert.certified[id] ?? N.zero;
         const lost = N.sub(fr, c);
         const hasFinds = N.gt(fr, N.zero);
-        fill(r.okBar, hasFinds ? N.ratio(c, fr) : 0);
-        fill(r.wasteBar, hasFinds ? N.ratio(lost, fr) : 0);
+        const okFrac = hasFinds ? N.ratio(c, fr) : 0;
+        const lostFrac = hasFinds ? N.ratio(lost, fr) : 0;
+        r.bar.set(okFrac, `${f.pct(okFrac)} of ${name(id)} finds certified`, lostFrac);
         text(r.typing, f.rate(fr));
         text(r.editing, f.rate(c));
-        const wasting = N.gt(lost, N.zero) && N.ratio(lost, fr) > 0.0005;
-        text(r.waste, wasting ? `▲ Discarded ${f.rate(lost)} (${f.pct(N.ratio(lost, fr))})` : '');
-        text(r.inc, income(N.mul(c, r.tier.value)));
-        r.bar.setAttribute('aria-label', `${name(id)}: ${hasFinds ? f.pct(N.ratio(c, fr)) : '0%'} certified`);
+        const wasting = N.gt(lost, N.zero) && lostFrac > 0.0005;
+        text(r.waste, wasting ? `Discarded ${f.rate(lost)} (${f.pct(lostFrac)}). Editing is the bottleneck.` : '');
+        r.waste.hidden = !wasting;
+        text(r.inc, `${f.rate(N.mul(c, r.tier.value))}`);
       } else if (isLocked) {
         const acc = Math.min(1, ts?.acc ?? 0);
-        fill(r.discBar, acc);
+        r.discBar.set(Math.min(acc, 0.99), `${name(id)} discovery ${f.meterPct(acc)}`);
         const d = eic.discovery[id] ?? N.zero;
-        text(r.discLine, `Editor-in-Chief review ${f.pct(acc)} · ${f.rate(d)} certified toward discovery`);
-        text(r.inc, '');
-        r.discTrack.setAttribute('aria-label', `${name(id)} discovery ${f.pct(acc)}`);
+        text(r.discLine, `Editor-in-Chief review ${f.meterPct(acc)} · ${f.rate(d)} certified toward discovery`);
       }
     }
 
     // Allocation
     const multi = discovered.length > 1;
-    controls.hidden = !multi;
+    allocControls.hidden = !multi;
     singleNote.hidden = multi;
+    allocBox.hidden = discovered.length === 0;
     if (!multi) {
       const only = discovered[0];
-      text(singleNote, only ? `Only ${name(only)} is discovered, so every Editor reviews it. Discover more tiers to split Editors.` : 'No tiers discovered.');
+      text(singleNote, only ? `Only ${name(only)} is discovered, so every Editor reviews it. Discover more tiers to split Editors.` : '');
       draft = null;
       return;
     }
-    const cur = currentWeights(s);
-    const split = draftSplit(s);
+    const cur = currentPercents(s);
+    const split = splitOf(s);
     for (const r of aRows) {
       const id = r.tier.id;
       const on = discovered.includes(id);
       r.el.hidden = !on;
       if (!on) continue;
-      const w = draft ? (draft[id] ?? 0) : cur[id] ?? 0;
-      if (r.input.value !== String(w) && document.activeElement !== r.input) r.input.value = String(w);
-      else if (draft && r.input.value !== String(w)) r.input.value = String(w);
-      const share = draft ? (split?.[id] ?? 0) : (s.tierAllocation[id] ?? 0);
-      text(r.info, draft ? `Draft ${f.pct(share)} · Current ${f.pct(s.tierAllocation[id] ?? 0)} · Suggested ${f.pct(suggested[id] ?? 0)}` : `Current ${f.pct(s.tierAllocation[id] ?? 0)} · Suggested ${f.pct(suggested[id] ?? 0)}`);
+      // Slider = share. The label and slider always read the same whole percent.
+      const v = draft ? (draft[id] ?? 0) : (cur[id] ?? 0);
+      if (r.input.value !== String(v)) r.input.value = String(v);
+      r.input.setAttribute('aria-valuetext', `${v} percent of Editors`);
+      text(r.share, `${v}%`);
+      text(r.info, `Current ${cur[id] ?? 0}% · Suggested ${f.pct(suggested[id] ?? 0)}`);
     }
     const same = discovered.every((id) => f.pct(s.tierAllocation[id] ?? 0) === f.pct(suggested[id] ?? 0));
-    enable(useSuggested, !same && ctx.can('applySuggestedAllocation', applySuggestedAllocation));
-    enable(resetBtn, !!draft);
+    const canSuggest = !same && ctx.can('applySuggestedAllocation', applySuggestedAllocation);
+    enable(useSuggested, canSuggest);
+    setWhy(useWhy, canSuggest ? null : same ? 'Already on the suggested split.' : 'Closed after Infinity.');
     resetBtn.hidden = !draft;
-    compare.hidden = !draft;
-    enable(applyBtn, !!split && ctx.can('setTierAllocation', (cs, tt, k) => setTierAllocation(cs, tt, k, split)));
-    if (draft) {
-      text(nowInc, income(cert.income));
-      if (split) {
-        const c = ctx.preview((cs) => { setTierAllocation(cs, t, nullSink, split); });
-        const after = certifyTiers(c, t, editingPool(c, t), c.tierAllocation);
-        text(draftInc, income(after.income));
-        const diff = N.sub(after.income, cert.income);
-        const verdict = N.gt(diff, N.zero) ? `▲ Gain ${income(diff)}` : N.lt(diff, N.zero) ? `▼ Loss ${income(N.sub(N.zero, diff))}` : '＝ No change in income';
-        text(deltaNote, `${verdict}. Idle ${f.rate(after.idle)}, discarded ${f.rate(after.discarded)}.`);
-      } else {
-        text(draftInc, '—');
-        text(deltaNote, 'Give at least one tier a share.');
-      }
+    preview.hidden = !draft;
+    const differs = !!draft && discovered.some((id) => (draft?.[id] ?? 0) !== (cur[id] ?? 0));
+    const canApply = !!split && differs && ctx.can('setTierAllocation', (cs, tt, k) => setTierAllocation(cs, tt, k, split));
+    enable(applyBtn, canApply);
+    setWhy(applyWhy, canApply ? null : !draft ? 'Move a slider to draft a new split.' : !split ? 'Give at least one tier a share.' : !differs ? 'The draft matches the current split.' : 'Closed after Infinity.');
+    if (draft && split) {
+      const c = ctx.preview((cs) => { setTierAllocation(cs, t, nullSink, split); });
+      const after = certNow(c, ctx);
+      text(incomeDelta, `Certified income ${f.change(f.rate(cert.income), f.rate(after.income))}`);
+      text(flowDelta, `Idle ${f.change(f.rate(cert.idle), f.rate(after.idle))} · Discarded ${f.change(f.rate(cert.discarded), f.rate(after.discarded))}`);
     }
   }
 

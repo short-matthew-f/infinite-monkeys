@@ -1,0 +1,253 @@
+/* Form primitives for screens inside a paper sheet (.sheet-pane).
+   Locked materials (design/STYLE.md): typed headers, dotted-leader fields, brass-bezel
+   dials, hatched ledger bars, double-ruled stamps, lifted-lip buttons.
+   Tokens come from game/style.css; the derived ones below get light and dark values. */
+
+.sheet-pane {
+  --edge: #fffaf0;
+  --rule: color-mix(in srgb, var(--walnut) 55%, var(--paper));
+  --ctl: var(--walnut);
+  --btn: var(--paper);
+  --on-ctl: var(--paper);
+  --lift-sh: color-mix(in srgb, var(--ink) 30%, transparent);
+  --soft-sh: color-mix(in srgb, var(--ink) 18%, transparent);
+  --stamp: color-mix(in srgb, var(--alert) 68%, var(--ink));
+  --stamp-ok: color-mix(in srgb, var(--olive) 72%, var(--ink));
+  --box: color-mix(in srgb, var(--paper-shade) 38%, var(--sheet, var(--paper)));
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .sheet-pane {
+    --edge: #d8ccb4;
+    --ctl: color-mix(in srgb, var(--mustard) 80%, var(--paper));
+    --btn: var(--paper-shade);
+    --on-ctl: var(--ink);
+    --lift-sh: color-mix(in srgb, #000 55%, transparent);
+    --soft-sh: color-mix(in srgb, #000 40%, transparent);
+    --stamp: color-mix(in srgb, var(--alert) 80%, var(--ink));
+    --stamp-ok: var(--olive);
+  }
+}
+:root[data-theme='dark'] .sheet-pane {
+  --edge: #d8ccb4;
+  --ctl: color-mix(in srgb, var(--mustard) 80%, var(--paper));
+  --btn: var(--paper-shade);
+  --on-ctl: var(--ink);
+  --lift-sh: color-mix(in srgb, #000 55%, transparent);
+  --soft-sh: color-mix(in srgb, #000 40%, transparent);
+  --stamp: color-mix(in srgb, var(--alert) 80%, var(--ink));
+  --stamp-ok: var(--olive);
+}
+
+.sheet-pane [hidden] { display: none !important; }
+.sheet-pane { color: var(--ink); }
+.sheet-pane p { margin: 0; }
+.form-stack { display: grid; gap: 14px; }
+.sheet-pane .form-stack.tight { gap: 6px; }
+
+/* ---------- boxed form section with a typed header ---------- */
+.sheet-pane .formbox {
+  border: 1.5px solid var(--rule);
+  background: var(--box);
+  padding: 8px 10px 10px;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.sheet-pane .typed {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font: 400 0.76rem/1.3 var(--font-type);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  margin: 0;
+}
+.sheet-pane .typed::after { content: ''; flex: 1 1 12px; border-bottom: 1.5px dotted var(--concrete); transform: translateY(-3px); }
+
+/* ---------- dotted-leader fields ---------- */
+.sheet-pane .field { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.sheet-pane .field .lead { flex: 1 1 12px; border-bottom: 1.5px dotted var(--concrete); transform: translateY(-4px); min-width: 12px; }
+.sheet-pane .lab { font: 700 0.8rem var(--font-type); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink); margin: 0; }
+.sheet-pane .big { font: 600 1.2rem/1.1 var(--font-mono); font-variant-numeric: tabular-nums; text-align: right; overflow-wrap: anywhere; }
+.sheet-pane .big small { font: 400 0.85rem var(--font-body); }
+.sheet-pane .note { font: 400 0.9rem/1.35 var(--font-body); }
+.sheet-pane .delta { font: 400 0.82rem/1.35 var(--font-type); color: var(--ink); }
+.sheet-pane .why { font: 400 0.82rem/1.35 var(--font-type); color: var(--ink-muted); }
+.sheet-pane .why.alert { color: var(--stamp); font-weight: 700; }
+.sheet-pane .row2 { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; }
+.sheet-pane .row2 > div { display: grid; gap: 2px; min-width: 0; }
+.sheet-pane .row2 .why { grid-column: 1 / -1; }
+.sheet-pane .name { font: 700 1.05rem var(--font-display); letter-spacing: 0.06em; text-transform: uppercase; }
+.sheet-pane .bn { display: inline-block; width: 18px; height: 14px; flex: none; }
+.sheet-pane .bn svg { width: 100%; height: 100%; display: block; }
+
+/* ---------- ledger bars: hatched fill, brass end-cap, ruled in tenths ---------- */
+.sheet-pane .ledger {
+  display: flex;
+  height: 14px;
+  padding: 1px;
+  border: 1.5px solid var(--ctl);
+  background: var(--sheet, var(--paper)) linear-gradient(90deg, transparent calc(100% - 1.5px), var(--rule) 0) 0 0 / 10% 100%;
+  min-width: 0;
+}
+.sheet-pane .ledger > i {
+  display: block;
+  flex: none;
+  width: var(--fill, 0%);
+  background: repeating-linear-gradient(135deg, var(--olive) 0 5px, color-mix(in srgb, var(--olive) 62%, var(--edge)) 5px 8px);
+  border-right: 3px solid var(--mustard);
+}
+.sheet-pane .ledger > i[style*='--fill: 0%'] { border-right-width: 0; }
+.sheet-pane .ledger-gold > i {
+  background: repeating-linear-gradient(135deg, var(--mustard) 0 5px, color-mix(in srgb, var(--mustard) 62%, var(--edge)) 5px 8px);
+  border-right-color: var(--walnut);
+}
+.sheet-pane .ledger > b {
+  display: block;
+  flex: none;
+  width: var(--fill, 0%);
+  background: repeating-linear-gradient(45deg, var(--alert) 0 3px, transparent 3px 7px);
+  border-left: 2px solid var(--alert);
+}
+.sheet-pane .ledger > b[style*='--fill: 0%'] { border-left-width: 0; }
+
+/* ---------- desk slots (Personnel) ---------- */
+.sheet-pane .slots { display: flex; gap: 4px; min-width: 0; }
+.sheet-pane .slots > i {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 18px;
+  border-radius: 2px;
+  border: 1.5px dashed var(--ink-muted);
+  background: repeating-linear-gradient(135deg, transparent 0 4px, color-mix(in srgb, var(--concrete) 22%, transparent) 4px 6px);
+}
+.sheet-pane .slots > i.on {
+  border: 1.5px solid var(--screen);
+  background: linear-gradient(var(--walnut) 0 28%, color-mix(in srgb, var(--walnut) 80%, var(--screen)) 28%);
+  box-shadow: 0 1.5px 0 var(--lift-sh);
+}
+
+/* ---------- brass-bezel dials ---------- */
+.sheet-pane .gauges { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.sheet-pane .gauge { text-align: center; min-width: 0; }
+.sheet-pane .gauge-face { display: block; }
+.sheet-pane .gauge svg { width: 100%; height: auto; max-width: 132px; filter: drop-shadow(0 2px 0 var(--lift-sh)); }
+.sheet-pane .gauge .gv { font: 700 0.82rem var(--font-type); letter-spacing: 0.08em; text-transform: uppercase; }
+
+/* ---------- double-ruled stamps (a word is always part of the signal) ---------- */
+.sheet-pane .stamp {
+  display: inline-block;
+  border: 3px double currentColor;
+  color: var(--stamp);
+  font: 700 0.9rem/1.25 var(--font-display);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 1px 8px;
+  transform: rotate(-4deg);
+  border-radius: 2px;
+  white-space: nowrap;
+}
+.sheet-pane .stamp-ok { color: var(--stamp-ok); }
+.sheet-pane .stamp-plain { color: var(--ink-muted); border-style: double; }
+
+/* ---------- lifted-lip buttons ---------- */
+.sheet-pane button {
+  font: 700 0.98rem var(--font-display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 6px 14px;
+  background: var(--btn);
+  color: var(--ink);
+  border: 2px solid var(--ctl);
+  border-radius: 3px 3px 10px 3px;
+  box-shadow: 0 3px 0 var(--ctl), 0 5px 6px var(--soft-sh);
+  margin-bottom: 3px;
+  cursor: pointer;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  line-height: 1.15;
+  transition: transform 70ms, box-shadow 70ms;
+  touch-action: manipulation;
+}
+.sheet-pane button .cost { display: inline-flex; align-items: center; gap: 5px; font: 600 0.88rem var(--font-mono); letter-spacing: 0; text-transform: none; }
+.sheet-pane button:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 var(--ctl); }
+.sheet-pane button:focus-visible, .sheet-pane input:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+.sheet-pane button:disabled {
+  opacity: 1;
+  border: 2px dashed var(--ink-muted);
+  background: transparent;
+  color: var(--ink-muted);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+/* strong: the screen's committing button (Apply, Fund research). Walnut fill, not tangerine. */
+.sheet-pane button.strong { background: var(--ctl); color: var(--on-ctl); }
+.sheet-pane button.strong:disabled { background: transparent; color: var(--ink-muted); }
+.sheet-pane button.quiet { background: transparent; box-shadow: none; border-color: var(--rule); margin-bottom: 0; font-size: 0.9rem; min-height: 44px; }
+.sheet-pane button.quiet:active:not(:disabled) { transform: translateY(1px); background: var(--box); }
+.sheet-pane button.wide { width: 100%; }
+.sheet-pane .btn-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr)); gap: 8px; align-items: start; }
+.sheet-pane .btn-row > button { width: 100%; }
+
+/* The curved tangerine primary (Hire monkey) */
+.sheet-pane .hirebox { display: grid; gap: 4px; justify-items: center; text-align: center; }
+.sheet-pane button.hire {
+  --d: 6px;
+  position: relative;
+  overflow: hidden;
+  width: min(100%, 320px);
+  min-height: 56px;
+  margin-bottom: 8px;
+  padding: 2px 18px;
+  font: 700 1.35rem var(--font-display);
+  letter-spacing: 0.1em;
+  background: var(--tangerine);
+  color: var(--screen);
+  border: 4px solid var(--mustard);
+  border-radius: 44px 44px 30px 30px / 40px 40px 26px 26px;
+  box-shadow: 0 0 0 2px var(--ctl), 0 var(--d) 0 var(--ctl), 0 calc(var(--d) + 4px) 8px var(--soft-sh);
+  transition: transform 90ms, box-shadow 90ms;
+}
+.sheet-pane button.hire::before { content: ''; position: absolute; left: 22%; right: 22%; top: 5px; height: 8px; border-radius: 50%; background: var(--glow); opacity: 0.5; pointer-events: none; }
+.sheet-pane button.hire:active:not(:disabled) { transform: translateY(5px); --d: 1px; box-shadow: 0 0 0 2px var(--ctl), 0 var(--d) 0 var(--ctl); }
+.sheet-pane button.hire:disabled { background: var(--concrete); color: var(--screen); border: 4px solid var(--paper-shade); box-shadow: 0 0 0 2px var(--ink-muted); }
+.sheet-pane button.hire > span { position: relative; }
+.sheet-pane .hire-cooldown { position: absolute; inset: 0 auto 0 0; width: var(--fill, 0%); background: rgb(0 0 0 / 0.25); }
+
+/* ---------- sliders ---------- */
+.sheet-pane input[type='range'] { width: 100%; min-height: 44px; margin: 0; accent-color: var(--tangerine); }
+.sheet-pane input[type='range']::-webkit-slider-thumb { width: 30px; height: 30px; }
+.sheet-pane input[type='range']::-moz-range-thumb { width: 30px; height: 30px; }
+
+/* ---------- the guarded Declare control ---------- */
+.sheet-pane .guard { display: grid; gap: 10px; }
+.sheet-pane .guard-cover {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 3px double var(--stamp);
+  background: color-mix(in srgb, var(--alert) 8%, var(--box));
+}
+.sheet-pane .guard-cover ul { margin: 0; padding-left: 1.1rem; font: 400 0.88rem/1.4 var(--font-body); }
+.sheet-pane .guard-cover h4 { margin: 0; font: 700 0.8rem var(--font-type); letter-spacing: 0.1em; text-transform: uppercase; color: var(--stamp); }
+.sheet-pane button.lift { min-height: 48px; }
+.sheet-pane button.switch {
+  min-height: 56px;
+  width: 100%;
+  font-size: 1.3rem;
+  background: var(--stamp);
+  color: var(--paper);
+  border-color: var(--stamp);
+  box-shadow: 0 4px 0 color-mix(in srgb, var(--stamp) 55%, var(--screen)), 0 6px 8px var(--soft-sh);
+}
+.sheet-pane button.switch:active:not(:disabled) { box-shadow: 0 1px 0 color-mix(in srgb, var(--stamp) 55%, var(--screen)); transform: translateY(3px); }
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet-pane button, .sheet-pane button.hire { transition: none; }
+}

@@ -1,27 +1,5 @@
-.pool-row { display: grid; gap: 4px; padding-bottom: 10px; border-bottom: 1px dashed var(--concrete); }
-.pool-row:last-child { border-bottom: 0; padding-bottom: 0; }
-.pool-row[hidden], .pool-hide[hidden] { display: none; }
-.pool-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
-.pool-head h3 { font-size: 1.05rem; color: var(--ink); }
-.pool-income { font: 600 0.95rem var(--font-mono); }
-.pool-bar { display: flex; height: 18px; background: var(--paper); border: 1px solid var(--concrete); overflow: hidden; }
-.pool-bar > span { display: block; height: 100%; width: var(--fill, 0%); }
-.pool-ok { background: var(--phosphor-green); }
-.pool-waste {
-  background: repeating-linear-gradient(45deg, var(--alert) 0 4px, transparent 4px 8px);
-  border-left: 2px solid var(--alert);
-}
-.pool-disc { background: var(--mustard); }
-.pool-line { margin: 0; font-size: 0.9rem; overflow-wrap: anywhere; }
-.pool-line b { font-family: var(--font-mono); font-weight: 600; }
-.pool-warn { color: var(--alert); font-weight: 600; }
-.pool-lamps { display: flex; gap: 4px; }
-.pool-lamps > span { flex: 1 1 0; height: 14px; border: 1px solid var(--concrete); background: transparent; }
-.pool-lamps > span.lit { background: var(--phosphor-amber); border-color: var(--phosphor-amber); }
-.pool-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.pool-stats > div { display: grid; min-width: 0; }
-.pool-slider { width: 100%; height: 44px; margin: 0; accent-color: var(--tangerine); }
-.pool-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.pool-actions button { flex: 1 1 auto; }
-.pool-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.pool-compare > div { display: grid; min-width: 0; }
+/* Typing Pool: layout beyond game/ui/forms.css. */
+.sheet-pane .pool-alloc { display: grid; gap: 2px; }
+.sheet-pane .pool-preview { display: grid; gap: 2px; }
+.sheet-pane .form-stack.tight { gap: 6px; }
+.sheet-pane .delta b { font-family: var(--font-mono); font-weight: 600; }

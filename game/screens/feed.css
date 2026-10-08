@@ -30,7 +30,7 @@
   color: var(--ink);
 }
 .feed-tick.is-human .feed-strip { border-left: 4px solid var(--mustard); }
-.feed-count { flex: none; font: 500 0.8rem var(--font-display); letter-spacing: 0.1em; text-transform: uppercase; color: var(--paper); }
+.feed-count { flex: none; font: 500 0.8rem var(--font-display); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink); }
 .feed-count::after { content: ' \25BE'; }
 .feed-tick[aria-expanded='true'] .feed-count::after { content: ' \25B4'; }
 

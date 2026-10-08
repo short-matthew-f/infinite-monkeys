@@ -1,20 +1,3 @@
-.dept-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; }
-.dept-stats > div { display: grid; min-width: 0; }
-.dept-buttons { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 8px; }
-.dept-buttons button { min-width: 0; }
-.dept-prompt { background: var(--glow); border: 2px solid var(--mustard); color: #2b2622; }
-.dept-prompt h2 { color: #2b2622; }
-.dept-prompt p { margin: 0; }
-.dept-prompt[hidden], .meter-row[hidden], button[hidden] { display: none; }
-
-.fund-row { display: grid; gap: 6px; padding-top: 8px; border-top: 1px solid var(--concrete); }
-.fund-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
-.fund-name { font: 700 1.05rem var(--font-display); text-transform: uppercase; letter-spacing: 0.06em; }
-.fund-slider { width: 100%; min-height: 44px; margin: 0; accent-color: var(--tangerine); }
-.fund-slider::-webkit-slider-thumb { width: 32px; height: 32px; }
-.fund-slider::-moz-range-thumb { width: 32px; height: 32px; }
-
-.meter-row { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr) 7rem; align-items: center; gap: 8px; }
-.meter { display: block; height: 14px; background: var(--paper); border: 1px solid var(--concrete); }
-.meter-fill { display: block; height: 100%; width: var(--fill, 0%); background: var(--olive); }
-.meter-word { font: 600 0.85rem var(--font-mono); text-align: right; }
+/* Departments: layout beyond game/ui/forms.css. */
+.sheet-pane .fund-row { display: grid; gap: 4px; padding-top: 8px; border-top: 1.5px dotted var(--concrete); }
+.sheet-pane .fund-meter, .sheet-pane .fund-next { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr); align-items: center; gap: 8px; }

@@ -32,6 +32,8 @@ interface Entry {
   tick: number;
   text: string;
   human: boolean;
+  /** Milestones, discoveries, the Permit and Declare. Only these are announced to screen readers. */
+  notable: boolean;
 }
 
 function currentStage(ctx: Ctx): FeedStage {
@@ -65,8 +67,11 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
   };
   let nextAmbientTick = nextAmbientAfter();
 
-  const push = (tick: number, line: string, human = false) => {
-    history.unshift({ tick, text: line, human });
+  /** Text waiting for the live region: the latest notable line since the last render. */
+  let announce: string | null = null;
+  const push = (tick: number, line: string, human = false, notable = false) => {
+    history.unshift({ tick, text: line, human, notable });
+    if (notable) announce = line;
     if (history.length > HISTORY_MAX) history.length = HISTORY_MAX;
     dirty = true;
   };
@@ -89,21 +94,21 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
         else pending.upgrades++;
         break;
       case 'tierDiscovered':
-        push(e.tick, tierLine(e.tier));
+        push(e.tick, tierLine(e.tier), false, true);
         break;
       case 'stageReached': {
         const line = STAGE_LINES[e.stage];
-        if (line) push(e.tick, line); // 'aleph0' is covered by infinityDeclared
+        if (line) push(e.tick, line, false, true); // 'aleph0' is covered by infinityDeclared
         break;
       }
       case 'permitStamped':
-        push(e.tick, PERMIT_LINE);
+        push(e.tick, PERMIT_LINE, false, true);
         break;
       case 'infinityDeclared':
-        push(e.tick, DECLARED_LINE);
+        push(e.tick, DECLARED_LINE, false, true);
         break;
       case 'titleFlipped':
-        push(e.tick, titleLine(e.from, e.to));
+        push(e.tick, titleLine(e.from, e.to), false, true);
         break;
       case 'fundingChanged':
         throttled('funding', e.tick, FUNDING_LINE);
@@ -200,7 +205,6 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
     printedTop = e;
     text(lineEl, e.text);
     tick.classList.toggle('is-human', e.human);
-    text(live, e.text);
     // Restart the print-in animation, then pan the line if it overflows the strip.
     lineEl.classList.remove('is-panning');
     clip.classList.remove('is-printing');
@@ -238,6 +242,11 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
       nextAmbientTick = nextAmbientAfter();
     }
 
+    if (announce !== null) {
+      // Events, not ticker text: the strip changes often, the live region only for notable lines.
+      text(live, announce);
+      announce = null;
+    }
     if (dirty) {
       dirty = false;
       const top = history[0];

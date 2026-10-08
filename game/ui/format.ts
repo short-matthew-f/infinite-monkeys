@@ -52,3 +52,36 @@ export function duration(seconds: number): string {
   const m = Math.floor(s / 60);
   return `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ''}`;
 }
+
+/** Plain-text banana amount for sentences, e.g. "1.2K bananas". */
+export function bananaText(x: Num | number): string {
+  const v = toNum(x);
+  return `${count(v)} ${Math.floor(v) === 1 ? 'banana' : 'bananas'}`;
+}
+
+/** "Need 40 more bananas" when the balance is short of the cost, else null. Compares only; never prices anything. */
+export function shortBy(cost: Num | number, balance: Num | number): string | null {
+  const c = toNum(cost);
+  const b = toNum(balance);
+  return b < c ? `Need ${bananaText(Math.ceil(c - b))} more` : null;
+}
+
+/** One vocabulary for a 0..1 meter, used on every screen: Full, Nearly, Partial, Low, Idle. */
+export function meterWord(v: number): string {
+  if (v >= 1 - 1e-9) return 'Full';
+  if (v >= 0.75) return 'Nearly';
+  if (v >= 0.4) return 'Partial';
+  if (v > 0) return 'Low';
+  return 'Idle';
+}
+
+/** Percent that never rounds up to 100% unless the meter is actually full. */
+export function meterPct(v: number): string {
+  if (v >= 1 - 1e-9) return '100%';
+  return `${Math.min(99, Math.floor(v * 100))}%`;
+}
+
+/** A change shown as "before → after". */
+export function change(before: string, after: string): string {
+  return `${before} → ${after}`;
+}
