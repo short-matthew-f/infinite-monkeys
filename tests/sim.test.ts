@@ -6,7 +6,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { prototypeTuning as T } from '../content/prototype.js';
 import { BOTS, clone, playFinite, type FiniteRun } from '../sim/bot.js';
 import { evaluateFirstDecision, type FirstDecision } from '../sim/hotel.js';
-import { longestDeadGap, rebalancingEpisodes } from '../sim/metrics.js';
+import { longestDeadGap } from '../sim/metrics.js';
 import { nullSink, run, type GameState } from '../core/index.js';
 
 let casual: FiniteRun;
@@ -38,10 +38,13 @@ describe('finite segment (casual bot)', () => {
     expect(longestDeadGap(casual.log, T, casual.log.declaredTick!, { countRebalances: true })).toBeLessThanOrEqual(120);
   });
 
-  it('makes 2 to 3 rebalancing decisions during Readiness (proposed episode definition)', () => {
-    const n = rebalancingEpisodes(casual.log);
-    expect(n).toBeGreaterThanOrEqual(2);
-    expect(n).toBeLessThanOrEqual(3);
+  // The shipped game runs the quarterly budget: the heads set funding shares, so the free-shares
+  // rebalancing metric (2 to 3 Readiness rebalances) no longer applies. Its decisions are the
+  // quarterly reviews; see sim/budget-report.ts for the classic comparison.
+  it('signs a budget at every quarterly review and never misses one', () => {
+    // One signature per quarter: the budget opens, then a review at every quarter end until the ceremony.
+    const quarters = Math.floor((casual.declaredSeconds! - casual.log.reviews[0]!.tick * T.tickSeconds) / T.budget!.quarterSeconds) + 1;
+    expect(casual.log.reviews.length).toBeGreaterThanOrEqual(quarters);
   });
 
   it('other bots also reach infinity', () => {

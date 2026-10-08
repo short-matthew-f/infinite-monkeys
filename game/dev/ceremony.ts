@@ -2,7 +2,7 @@
 // Open /infinite-monkeys/dev/ceremony.html?scenario=q2|first|mid[&live=1]. window.__h exposes the pieces
 // for Playwright (scripts in the session scratchpad drive it).
 import { DEPTS, N, buyDeptLevel, buyDesk, createState, nullSink, run, signBudget, suggestBudget, tapHire, type EventSink, type GameEvent, type GameState } from '../../core/index.js';
-import { prototypeBudgetTuning as t } from '../../content/prototype.js';
+import { prototypeTuning as t } from '../../content/prototype.js';
 import { createCtx } from '../ctx.js';
 import { Ceremony } from '../world/ceremony.js';
 

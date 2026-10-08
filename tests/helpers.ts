@@ -1,4 +1,4 @@
-import { prototypeTuning } from '../content/prototype.js';
+import { classicTuning, prototypeTuning } from '../content/prototype.js';
 import {
   createState,
   declareInfinity,
@@ -6,9 +6,12 @@ import {
   run,
   type GameEvent,
   type GameState,
+  type Tuning,
 } from '../core/index.js';
 
 export const T = prototypeTuning;
+/** The economy without the quarterly budget, for the free funding shares it still supports. */
+export const TC = classicTuning;
 
 export function collector() {
   const events: GameEvent[] = [];
@@ -22,8 +25,8 @@ export function ofType<K extends GameEvent['type']>(events: GameEvent[], type: K
 }
 
 /** A late-Phase-1 operation with balanced departments at stage 4 and enough scale. */
-export function lateFiniteState(seed = 1): GameState {
-  const s = createState(T, seed);
+export function lateFiniteState(seed = 1, t: Tuning = T): GameState {
+  const s = createState(t, seed);
   s.monkeys = N.of(100_000);
   s.desks = N.of(100_000);
   s.depts.recruiting = { level: 100, stage: 4, rep: 1 };

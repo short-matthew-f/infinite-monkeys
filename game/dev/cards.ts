@@ -1,7 +1,7 @@
 // Dev-only harness for the requisition memo and the water-cooler card.
 // Not referenced by game/index.html. Open /infinite-monkeys/dev/cards.html in `npm run dev`.
 import { N, buyDeptLevel, createState, nullSink, run, signBudget, type GameState } from '../../core/index.js';
-import { prototypeBudgetTuning as t } from '../../content/prototype.js';
+import { prototypeTuning as t } from '../../content/prototype.js';
 import { createCtx } from '../ctx.js';
 import { Cooler } from '../world/cooler.js';
 import { MemoView } from '../world/memo.js';

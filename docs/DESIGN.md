@@ -652,7 +652,7 @@ Recorded so they aren't reintroduced.
 | 47 | Whimsy is always present, from the first desk (Matt, Oct 7 2026) | Charm carries the early game | Straight-faced early game (amends #15 and §1 pillar 5: absurdity still rises with height, but the floor is never joyless) |
 | 48 | Roomy means space between spaces, not ceiling height (Matt, Oct 7 2026) | Zones breathe; ceilings can stay low until the ceremony | Tall rooms |
 | 49 | Adopted: the building of floors is the map; each room opens full screen with an exit door; no panning (Matt, Oct 8 2026; mockup `design/explorations/tower/`; game port in progress) | Clear organisation, wings and heads, quarterly rhythm | Pannable pop-up floor with two zoom levels (#46 stays until adopted) |
-| 50 | Proposed: a quarterly budget with discretionary income replaces the free funding slider (§13; behind a tuning switch) | Make the budget count; leftover goes back into the budget | Free shares (today); lines as locked operating funding only |
+| 50 | Adopted (Matt, Oct 8 2026): a quarterly budget with discretionary income replaces the free funding slider (§13) | Make the budget count; leftover goes back into the budget | Free shares (today); lines as locked operating funding only |
 
 ### Open
 
@@ -676,15 +676,15 @@ Recorded so they aren't reintroduced.
 
 ---
 
-## 13. Quarterly Budget (proposed, behind a tuning switch)
+## 13. Quarterly Budget (adopted Oct 8 2026)
 
-Status: in `core/` behind `Tuning.budget` (`prototypeBudgetTuning`), and
-playable in the game as a trial. The Directory's "Quarterly budget (trial)"
-switches to a separate save slot that runs the budget tuning. Classic play
-still runs `prototypeTuning` and is unchanged. Game pieces: the roof
+Status: the game. `prototypeTuning` includes the budget; `classicTuning` is the
+old free-shares economy, kept for tests and comparison sims
+(`sim/budget-report.ts`). Saves from the classic game load as is: the budget
+opens on the next tick, with a review waiting. Game pieces: the roof
 quarter-clock and department account plates (`game/world/tower.ts`), the
 quarter-end ceremony (`ceremony.ts`), requisition memos (`memo.ts`) and the
-water cooler (`cooler.ts`, both modes). Mockup: `design/explorations/tower/`.
+water cooler (`cooler.ts`). Mockup: `design/explorations/tower/`.
 
 **Why.** Free funding shares were a solved knob: "Suggested" was nearly always
 right, so the player pressed it whenever something drifted (Matt: "everything

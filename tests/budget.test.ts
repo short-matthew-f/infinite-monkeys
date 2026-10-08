@@ -1,8 +1,8 @@
-// The quarterly budget (DESIGN.md §13, proposed). Runs on prototypeBudgetTuning only;
+// The quarterly budget (DESIGN.md §13, proposed). Runs on prototypeTuning only;
 // the shipped tuning has no budget and every other test covers that path.
 
 import { describe, expect, it } from 'vitest';
-import { prototypeBudgetTuning as TB, prototypeTuning as T } from '../content/prototype.js';
+import { prototypeTuning as TB, classicTuning as T } from '../content/prototype.js';
 import {
   buyDeptLevel,
   createState,

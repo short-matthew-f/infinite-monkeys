@@ -2,7 +2,7 @@
 // the quarterly budget (DESIGN.md §13) against today's free funding shares,
 // with the same bots and metrics.
 
-import { prototypeBudgetTuning as TB, prototypeTuning as T } from '../content/prototype.js';
+import { prototypeTuning as TB, classicTuning as T } from '../content/prototype.js';
 import { BOTS, playFinite, type FiniteRun } from './bot.js';
 import { longestDeadGap } from './metrics.js';
 import type { BudgetDef, GameEvent, Tuning } from '../core/index.js';
@@ -41,7 +41,7 @@ const bot = (process.argv[2] ?? 'casual') as keyof typeof BOTS;
 const mode = process.argv[3] ?? 'grid';
 console.log(`# ${bot} bot, ${mode}\n`);
 row('today (free shares)', T, bot);
-row('budget (prototypeBudgetTuning)', TB, bot);
+row('budget (prototypeTuning)', TB, bot);
 if (mode === 'grid') for (const q of [90, 120, 180, 240]) for (const d of [0.3, 0.5, 0.7]) row(`q=${q}s disc=${d}`, variant({ quarterSeconds: q, suggestedDiscretionary: d }), bot);
 if (mode === 'sweep') for (const sw of [1, 0.5, 0]) row(`sweep=${sw}`, variant({ sweepShare: sw }), bot);
 if (mode === 'caps') for (const [e, r] of [[0.5, 0.5], [0.5, 0.8], [0.35, 0.5], [0.35, 0.8], [0.35, 1], [0.2, 0.8]] as const) row(`editing cap ${e}, at stage 4 ${r}`, variant({ editingShareCap: e, readinessEditingShareCap: r }), bot);

@@ -1,6 +1,6 @@
 import { registerSW } from 'virtual:pwa-register';
 import { DEPTS, N, activeBudget, catchUp, certifyTiers, createState, deptLevelCost, editingPool, quarterSecondsLeft, type DeptId, type EventSink, type GameEvent, type GameState } from '../core/index.js';
-import { prototypeBudgetTuning, prototypeTuning } from '../content/prototype.js';
+import { prototypeTuning } from '../content/prototype.js';
 import { createCtx } from './ctx.js';
 import { startLoop } from './loop.js';
 import { Ceremony } from './world/ceremony.js';
@@ -32,11 +32,7 @@ const ROOMS: Room[] = [
   { id: 'director', name: "Director's Office", form: 'Form 9-R', disc: 5, screen: readiness },
 ];
 
-// The tuning is a per-save choice made before anything else reads it. Classic and the
-// quarterly-budget trial keep separate save slots, so switching never destroys either.
-const mode = persist.getMode();
-const t = mode === 'budget' ? prototypeBudgetTuning : prototypeTuning;
-const budgetOn = !!t.budget;
+const t = prototypeTuning;
 
 const SAVE_EVERY_MS = 5000;
 const FEED_H = 40;
@@ -63,7 +59,8 @@ function newSeed(): number {
   return crypto.getRandomValues(new Uint32Array(1))[0] ?? 1;
 }
 
-const rec = await persist.load(mode);
+await persist.migrate();
+const rec = await persist.load();
 let state: GameState = rec ? rec.state : createState(t, newSeed());
 const returning = !!rec;
 
@@ -81,7 +78,7 @@ let resetting = false;
 async function save(): Promise<void> {
   if (resetting) return;
   try {
-    await persist.save(state, mode);
+    await persist.save(state);
     if (saveFailed) $('save-fail').hidden = true;
     saveFailed = false;
     text($('save-status'), `Saved ${new Date().toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`);
@@ -100,9 +97,8 @@ $('save-retry').addEventListener('click', () => void save());
 
 // ---------- the building ----------
 
-// Budget trial header (before it is measured): marker, Wallet label, and a reserved line for the pot.
-if (budgetOn) {
-  $('trial').hidden = false;
+// Budget header (before it is measured): Wallet label, and a reserved line for the pot.
+{
   document.querySelector('.readout')!.classList.add('budget');
   $('r-ban-lb').textContent = 'Wallet';
   $('r-ban').parentElement!.setAttribute('aria-label', 'Wallet: bananas to spend on manual purchases');
@@ -119,7 +115,7 @@ let props = floorProps(state, t);
 const tower = new Tower($('map'));
 tower.apply(props);
 
-/** Opens the quarter-end ceremony (budget trial): the roof quarter-clock calls this. */
+/** Opens the quarter-end ceremony : the roof quarter-clock calls this. */
 function openReview(): void {
   const b = state.budget;
   if (!b?.reviewDue) {
@@ -133,7 +129,7 @@ function openReview(): void {
 }
 tower.onReview = openReview;
 
-/** What the building shows of the budget; null in classic play and before the budget opens. */
+/** What the building shows of the budget; null before the budget opens. */
 function budgetView(): BudgetView | null {
   const b = activeBudget(state, t);
   if (!t.budget || !b) return null;
@@ -152,7 +148,7 @@ tower.setBudget(budgetView());
 const rooms = new RoomView(stage, ctx, () => props);
 rooms.register(ROOMS);
 
-// Budget trial: the quarter-end ceremony and the heads' memos. The water cooler runs in both modes.
+// The quarter-end ceremony and the heads' memos. The water cooler runs in both modes.
 const ceremony = new Ceremony(stage, ctx);
 ceremony.onClose = () => (dirty = true);
 const memo = new MemoView(stage, ctx);
@@ -242,21 +238,9 @@ document.addEventListener('keydown', (e) => {
   if (!dir.hidden) { closeDir(); dirbtn.focus(); }
 });
 
-// Mode switch: not destructive. The other mode's save stays in its own slot.
-const switchTo = mode === 'budget' ? 'classic' : 'budget';
-$('mode-why').textContent = mode === 'budget'
-  ? 'You are in the budget trial: department money comes from a budget you sign each quarter. Going back switches to your classic Bureau. This trial save is kept.'
-  : 'Try the quarterly budget: department money comes from a budget you sign each quarter. It starts its own save. Your classic Bureau is kept exactly as it is.';
-$('mode-switch').textContent = mode === 'budget' ? 'Back to the classic Bureau' : 'Quarterly budget (trial)';
-$('mode-switch').addEventListener('click', async () => {
-  await save();
-  persist.setMode(switchTo);
-  resetting = true; // the page is going away; don't let pagehide re-save over the switch
-  location.reload();
-});
-$('reset-why').textContent = `This erases every monkey, desk, banana and discovery in the ${mode === 'budget' ? 'budget trial' : 'classic'} save on this device. ${mode === 'budget' ? 'Your classic Bureau is kept.' : 'Your budget-trial save is kept.'} It can't be undone.`;
+$('reset-why').textContent = "This erases every monkey, desk, banana and discovery in the save on this device. It can't be undone.";
 
-// Reset is destructive: it asks first (MOBILE-UX rule 1). It erases only the active mode's slot.
+// Reset is destructive: it asks first (MOBILE-UX rule 1). 
 $('reset').addEventListener('click', () => {
   $('reset-confirm').hidden = false;
   $('reset-no').focus();
@@ -267,9 +251,9 @@ $('reset-no').addEventListener('click', () => {
 });
 $('reset-yes').addEventListener('click', async () => {
   resetting = true;
-  await persist.clear(mode);
+  await persist.clear();
   try {
-    for (const k of Object.keys(localStorage)) if (k.startsWith('im:') && k !== 'im:mode') localStorage.removeItem(k);
+    for (const k of Object.keys(localStorage)) if (k.startsWith('im:')) localStorage.removeItem(k);
   } catch {}
   location.reload();
 });
@@ -317,12 +301,10 @@ function say(msg: string): void {
 
 function renderHeader(): void {
   text($('r-ban'), f.count(state.bananas));
-  if (budgetOn) {
-    const pot = state.budget?.pot;
-    const show = !!pot && N.gt(pot, N.zero);
-    $('r-pot').hidden = !show;
-    if (show) text($('r-pot-v'), f.count(pot!));
-  }
+  const pot = state.budget?.pot;
+  const show = !!pot && N.gt(pot, N.zero);
+  $('r-pot').hidden = !show;
+  if (show) text($('r-pot-v'), f.count(pot!));
   text($('r-inc'), f.rate(certifyTiers(state, t, editingPool(state, t), state.tierAllocation).income));
   // After 'tall', the finish line needs a headcount: show it as progress toward the Permit's minimum.
   const goal = state.milestonesReached.includes('tall') && state.phase === 'finite';
@@ -346,7 +328,7 @@ startLoop(() => state, t, sink, () => {
   renderFeed();
   props = floorProps(state, t);
   tower.apply(props);
-  if (budgetOn) tower.setBudget(budgetView());
+  tower.setBudget(budgetView());
   rooms.render();
   if (ceremony.isOpen) ceremony.render();
   memo.render();
@@ -368,7 +350,6 @@ if (import.meta.env.DEV) {
       run: (seconds: number) => catchUp(state, t, sink, seconds),
       open: openRoom,
       openReview,
-      mode,
       t,
     },
   });

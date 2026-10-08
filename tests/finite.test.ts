@@ -14,7 +14,7 @@ import {
   setShares,
   tapHire,
 } from '../core/index.js';
-import { collector, lateFiniteState, ofType, secs, T } from './helpers.js';
+import { collector, lateFiniteState, ofType, secs, T, TC } from './helpers.js';
 
 describe('the finite climb', () => {
   it('desk costs grow ×1.15 per purchase', () => {
@@ -50,12 +50,13 @@ describe('the finite climb', () => {
     }
   });
 
-  it('funding reallocation is free, validated, and recorded', () => {
+  // Free funding shares exist only without the quarterly budget (classic tuning); with it, the heads set shares.
+  it('funding reallocation is free, validated, and recorded (classic tuning)', () => {
     const { events, sink } = collector();
-    const s = lateFiniteState();
+    const s = lateFiniteState(1, TC);
     const bananas = s.bananas;
-    expect(setShares(s, T, sink, { recruiting: 0.5, construction: 0.5, editing: 0.5 })).toBe(false);
-    expect(setShares(s, T, sink, { recruiting: 0.5, construction: 0.3, editing: 0.2 })).toBe(true);
+    expect(setShares(s, TC, sink, { recruiting: 0.5, construction: 0.5, editing: 0.5 })).toBe(false);
+    expect(setShares(s, TC, sink, { recruiting: 0.5, construction: 0.3, editing: 0.2 })).toBe(true);
     expect(s.bananas).toBe(bananas);
     expect(ofType(events, 'fundingChanged')).toHaveLength(1);
   });
@@ -92,15 +93,15 @@ describe('the finite climb', () => {
     expect(ofType(events, 'permitStamped')).toHaveLength(1);
   });
 
-  it('breaking balance resets the Stability Window', () => {
+  it('breaking balance resets the Stability Window (classic tuning, where shares are free)', () => {
     const { sink } = collector();
-    const s = lateFiniteState();
-    run(s, T, sink, secs(30));
-    setShares(s, T, sink, { recruiting: 0.6, construction: 0.2, editing: 0.2 });
-    run(s, T, sink, 1);
+    const s = lateFiniteState(1, TC);
+    run(s, TC, sink, secs(30));
+    setShares(s, TC, sink, { recruiting: 0.6, construction: 0.2, editing: 0.2 });
+    run(s, TC, sink, 1);
     expect(s.stability.heldTicks).toBe(0);
-    setShares(s, T, sink, { recruiting: 1 / 3, construction: 1 / 3, editing: 1 / 3 });
-    run(s, T, sink, secs(45));
+    setShares(s, TC, sink, { recruiting: 1 / 3, construction: 1 / 3, editing: 1 / 3 });
+    run(s, TC, sink, secs(45));
     expect(s.stability.permit).toBe(false);
   });
 

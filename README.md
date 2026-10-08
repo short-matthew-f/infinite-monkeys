@@ -36,7 +36,9 @@ If `tsx`'s CLI is blocked in your environment, run the report with
 
 ## Status
 
-- **75 tests run green:** 54 unit, 21 sim assertions.
+- **93 tests run green**, unit and sim assertions (`npm run check`).
+- **The quarterly budget is the game** (Oct 8 2026). `prototypeTuning` includes
+  it; `classicTuning` keeps the free-shares economy for tests and comparison sims.
 - **Green does not mean every acceptance criterion is met.** The dead-gap
   target (F2) is unmet and marked `it.fails`, so the suite turns red when
   it's fixed and the marker must come off.
@@ -68,6 +70,22 @@ never reimplement them.
 - **Suggested funding.** Editing gets enough to cover review demand plus
   headroom, capped at 50%. The rest balances Recruiting against
   Construction. A department with no capability gets no share.
+- **Quarterly budget** (DESIGN.md §13). It opens with the first department.
+  Income splits live by four signed lines (Recruiting, Construction, Editing,
+  Discretionary; at least 10% Discretionary). Department lines fill
+  department accounts, and each department buys its own levels. Discretionary
+  is the wallet (`bananas`) for everything bought by hand.
+  - A quarter lasts 180 s. At quarter end the unspent wallet is swept into
+    the pot and a review opens; signing (`signBudget`) splits the pot by the
+    new lines. An unsigned review closes at the next quarter end on the old
+    lines. Nothing waits for the player.
+  - The heads set funding shares (`headShares`: the suggested-funding rule
+    with Editing capped at 35%, 80% once every department is at stage 4).
+    `setShares` is refused.
+  - Requisitions: mid-quarter, the short department's head asks for 3 levels
+    at 80% of list price, paid from the wallet. It expires after 45 s.
+  - `previewQuarter` plays the quarter out on a clone for the review's
+    forecast. At the ceremony, accounts and the pot return to the wallet.
 - **Common research.** Faster typewriters (×1.25 typing, cost ×2.5 per
   level). Review research is implemented but not offered (F4).
 - **Readiness.** Meters = (stage / 4) × pace × scale. Recruiting and
@@ -125,28 +143,28 @@ never reimplement them.
 ```
 # Finite phase
 
-casual  declare 25.2 min | office 0.3 min building 1.7 min tall 7.5 min all-stage-4 19.2 min
-        longest dead gap 350 s purchases only, 190 s counting rebalances | Readiness rebalances: 0 at Y=10%, 3 episodes
-hard    declare 24.6 min | office 0.2 min building 1.3 min tall 7.4 min all-stage-4 18.8 min
-        longest dead gap 348 s purchases only, 184 s counting rebalances | Readiness rebalances: 0 at Y=10%, 3 episodes
-idler   declare 24.7 min | office 0.5 min building 1.9 min tall 7.8 min all-stage-4 19.3 min
-        longest dead gap 310 s purchases only, 180 s counting rebalances | Readiness rebalances: 0 at Y=10%, 2 episodes
+casual  declare 25.5 min | office 0.3 min building 1.8 min tall 6.9 min all-stage-4 21.0 min
+        longest dead gap 270 s purchases only, 270 s counting rebalances | Readiness rebalances: 0 at Y=10%, 0 episodes
+hard    declare 25.5 min | office 0.2 min building 1.6 min tall 7.2 min all-stage-4 20.8 min
+        longest dead gap 284 s purchases only, 284 s counting rebalances | Readiness rebalances: 0 at Y=10%, 0 episodes
+idler   declare 27.0 min | office 0.4 min building 2.5 min tall 8.3 min all-stage-4 22.2 min
+        longest dead gap 290 s purchases only, 290 s counting rebalances | Readiness rebalances: 0 at Y=10%, 0 episodes
 
 # First hotel decision (casual)
 
-bank 59 s of income; banana-rush target 450 s of income
+bank 120 s of income; banana-rush target 450 s of income
 
 Four fixed policies following the suggested split and funding (not a search).
 
 choice      banana rush  epic first  expansion first  completed  payoff  Greek Commission  forgone (s of income)
-ordinary          363 s           —                —          —       —                 —  —
-immediate         331 s           —                —      182 s   149 s                 —  72
-permanent         536 s       452 s                —      452 s     0 s                 —  192
-expansion         495 s       645 s            483 s      443 s    40 s             645 s  120
+ordinary          308 s           —                —          —       —                 —  —
+immediate         276 s           —                —      182 s    94 s                 —  72
+permanent         481 s       452 s                —      452 s     0 s                 —  192
+expansion         407 s       645 s            483 s      443 s    40 s             645 s  120
 
 preview vs actual completion:
-  immediate  preview 191 s actual 182 s
-  permanent  preview 461 s actual 452 s
+  immediate  preview 201 s actual 182 s
+  permanent  preview 471 s actual 452 s
   expansion  preview 446 s actual 443 s
 
 # Candidate: cheaper first hotel upgrade, across arrival balances (×1.5)
@@ -160,41 +178,42 @@ first upgrade (s of income) | bank at arrival (s of income) → ordinary / immed
 # Suggested idle funding: 90% vs 100% Editing (reference share fixed at 90%; current: 100%)
 
 choice      completed (90% / 100%)   banana rush (90% / 100%)   expansion first (90% / 100%)
-ordinary    — / —                    401 s / 363 s              — / —
-immediate   200 s / 182 s            365 s / 331 s              — / —
-permanent   500 s / 452 s            593 s / 536 s              — / —
-expansion   490 s / 443 s            544 s / 495 s              530 s / 483 s
+ordinary    — / —                    340 s / 308 s              — / —
+immediate   200 s / 182 s            304 s / 276 s              — / —
+permanent   500 s / 452 s            532 s / 481 s              — / —
+expansion   490 s / 443 s            450 s / 407 s              530 s / 483 s
 
 # Immediate vs ordinary under banana rush: sensitivity
 
 upgrade cost (s of income) × payout multiplier → ordinary / immediate (seconds to target)
- 300 s   ×1.5: 228 s / 196 s ✓   ×2: 228 s / 182 s ✓   ×3: 228 s / 182 s ✓
- 600 s   ×1.5: 498 s / 466 s ✓   ×2: 498 s / 433 s ✓   ×3: 498 s / 368 s ✓
- 900 s   ×1.5: 768 s / 736 s ✓   ×2: 768 s / 703 s ✓   ×3: 768 s / 638 s ✓
+ 300 s   ×1.5: 173 s / 182 s   ×2: 173 s / 182 s   ×3: 173 s / 182 s
+ 600 s   ×1.5: 443 s / 411 s ✓   ×2: 443 s / 378 s ✓   ×3: 443 s / 314 s ✓
+ 900 s   ×1.5: 713 s / 681 s ✓   ×2: 713 s / 648 s ✓   ×3: 713 s / 584 s ✓
 ```
 
 ## §10 results
 
 | Assertion | Result |
 |---|---|
-| Casual declares in 25–35 min | ✅ 25.2 min |
+| Casual declares in 25–35 min | ✅ 25.5 min |
 | All Commissions complete before deadline | ✅ 182 s, 452 s, 443 s |
 | Every Commission diverts from home, own split | ✅ |
-| Commission previews within 10% of actual | ✅ 191/182, 461/452, 446/443 |
+| Commission previews within 10% of actual | ✅ 201/182 (9.5%, near the limit), 471/452, 446/443 |
 | Custom allocation preview matches actual | ✅ within 1 s |
-| Immediate beats ordinary under banana rush | ✅ 331 s vs 363 s |
+| Immediate beats ordinary under banana rush | ✅ 276 s vs 308 s |
 | Permanent reaches the epic first; Expansion later via Greek | ✅ 452 s vs 645 s |
 | Expansion wins expansion first | ✅ 483 s |
 | Permanent and Expansion have a banana-rush sacrifice | ✅ |
 | Greek has a practical payoff | ✅ Greek Commission at 645 s |
 | All three pay off within 3 min | ✅ 149 s, 0 s, 40 s |
-| No dead gap over 2 min | ❌ known failure, ~190 s (F2) |
-| 2–3 rebalancing decisions in Readiness | ✅ 3 (episode definition) |
+| No dead gap over 2 min | ❌ known failure, ~270 s (F2) |
+| 2–3 rebalancing decisions in Readiness | Retired: the heads set shares under the budget; decisions are quarterly reviews (signs every one) |
 
 ## Open findings
 
-- **F2. Mid-game dead gap** of ~190 s between staggered stage unlocks
-  (counting Readiness rebalancing as action). Kept visible; the UI should
+- **F2. Mid-game dead gap** of ~270 s under the budget (it was ~190 s with
+  free shares, counting Readiness rebalancing as action, which no longer
+  exists). Kept visible; the UI should
   show whether players read it as understandable waiting or confusion
   before another mechanic is added.
 - **F3. Arrival balance varies with tuning.** Immediate's advantage at

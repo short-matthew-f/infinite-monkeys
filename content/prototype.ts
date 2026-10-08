@@ -3,7 +3,9 @@
 
 import type { Tuning } from '../core/tuning.js';
 
-export const prototypeTuning: Tuning = {
+// The economy without the quarterly budget: free funding shares the player sets
+// at any time. Kept for tests and sims of that mode; the game runs prototypeTuning.
+export const classicTuning: Tuning = {
   tickSeconds: 0.1,
   typingSpeed: 5,
   editorInChiefCapacity: 2,
@@ -99,10 +101,9 @@ export const prototypeTuning: Tuning = {
   offlineCapSeconds: 4 * 3600,
 };
 
-// Proposed (DESIGN.md §13): the quarterly budget. Same tuning plus budget
-// lines; the shipped game still runs `prototypeTuning` until it's adopted.
-export const prototypeBudgetTuning: Tuning = {
-  ...prototypeTuning,
+// The shipped tuning: the classic economy plus the quarterly budget (DESIGN.md §13).
+export const prototypeTuning: Tuning = {
+  ...classicTuning,
   budget: { quarterSeconds: 180, suggestedDiscretionary: 0.7, minDiscretionary: 0.1, sweepShare: 1, editingShareCap: 0.35, readinessEditingShareCap: 0.8,
     requisitions: { levels: 3, priceFactor: 0.8, openSeconds: 45, cooldownSeconds: 40 } },
 };
