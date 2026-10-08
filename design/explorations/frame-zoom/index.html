@@ -58,9 +58,6 @@
   --ctl: color-mix(in srgb, var(--mustard) 80%, var(--sheet)); --ctl-hdr: var(--edge);
 }
 
-@property --tx { syntax: '<length>'; inherits: true; initial-value: 0px; }
-@property --ty { syntax: '<length>'; inherits: true; initial-value: 0px; }
-@property --s { syntax: '<number>'; inherits: true; initial-value: 1; }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { height: 100%; margin: 0; overflow: hidden; }
 body { background: var(--table); color: var(--ink); font: 16px/1.45 var(--font-body); overscroll-behavior: none; position: relative; }
@@ -75,13 +72,16 @@ h1, h2, h3 { font-family: var(--font-display); text-transform: uppercase; letter
 @media (min-width: 391px) { .stage { box-shadow: 0 0 0 1px var(--concrete); } }
 .cam {
   position: absolute; left: 0; top: 0; width: 780px; height: 1530px;
-  --tx: -95px; --ty: -734px; --s: 1.04;
-  transform: translate3d(var(--tx), var(--ty), 0) scale(var(--s)); transform-origin: 0 0;
-  /* the camera zoom is the three registered numbers easing together, so counter-scaled labels stay in step */
-  transition: --tx 860ms cubic-bezier(.5, .02, .2, 1), --ty 860ms cubic-bezier(.5, .02, .2, 1), --s 860ms cubic-bezier(.5, .02, .2, 1), opacity 140ms;
+  transform: translate3d(-95px, -734px, 0) scale(1.04); transform-origin: 0 0;
+  /* Performance: the camera is a single transform on one layer. Nothing inside reads camera values,
+     so moving it never restyles the floor. While it moves, the layer is GPU-promoted and ambient
+     animation pauses; when it settles, promotion drops so the floor re-rasters crisp at the new zoom. */
+  transition: opacity 140ms;
   touch-action: none;
 }
-.cam.dragging { transition: opacity 140ms; will-change: transform; }
+.cam.flying { transition: transform 860ms cubic-bezier(.5, .02, .2, 1), opacity 140ms; }
+.cam.moving { will-change: transform; }
+body.moving #map *, body.moving #map *::before, body.moving #map *::after { animation-play-state: paused !important; }
 #map { position: absolute; left: 0; top: 0; width: 780px; height: 1530px; display: block; overflow: visible; }
 .hot { position: absolute; background: transparent; border: 0; padding: 0; margin: 0; cursor: pointer; border-radius: 10px; }
 .hot:focus-visible { outline: 3px dashed var(--focus); outline-offset: -4px; box-shadow: none; }
@@ -324,14 +324,14 @@ body.hidden-pause, body.hidden-pause * { animation-play-state: paused !important
   min-height: 44px; padding: 5px 16px 5px 8px; background: var(--sheet); color: var(--ink); border: 2.5px solid var(--ctl); border-radius: 4px 4px 14px 4px;
   font: 700 1.06rem var(--font-display); letter-spacing: .07em; text-transform: uppercase;
   box-shadow: 0 3px 0 var(--ctl), 0 7px 10px var(--soft-sh);
-  transform-origin: 0 0; transform: scale(calc(1 / var(--s))) translate(-50%, -100%);
-  opacity: clamp(0, calc((.76 - var(--s)) * 8), 1);
+  transform: translate(-50%, -100%); opacity: 0; transition: opacity 180ms;
 }
 .chip::after { content: ''; position: absolute; right: -2.5px; bottom: -2.5px; width: 13px; height: 13px; background: linear-gradient(135deg, var(--edge) 50%, var(--ctl) 51%); border-radius: 0 0 11px 0; }
 .chip .start { position: absolute; right: -4px; top: -13px; background: var(--tangerine); color: var(--screen); font: 700 .72rem var(--font-display); letter-spacing: .1em; padding: 0 7px; border: 2px solid var(--screen); transform: rotate(3deg); }
 .hired .chip .start { display: none; }
 body.plan .chip { pointer-events: auto; cursor: pointer; }
-body.plan .chip:active { transform: scale(calc(1 / var(--s))) translate(-50%, calc(-100% + 2px)); }
+body.plan .chip:active { transform: translate(-50%, calc(-100% + 2px)); }
+.chips { position: absolute; inset: 0; pointer-events: none; z-index: 4; }
 .sheet-open .chip { opacity: 0; }
 .planbtn {
   position: absolute; z-index: 25; left: 8px; top: calc(var(--hdr, 98px) + 8px); min-height: 44px; min-width: 44px; display: flex; align-items: center; gap: 7px; padding: 4px 13px 4px 9px;
@@ -547,10 +547,12 @@ body.plan .ewrap.in { transform: translate(190px, 0) rotate(3deg); opacity: 0; v
     <button class="hot" data-zone="pool" style="left:216px;top:518px;width:348px;height:434px" aria-label="Typing Pool: typing versus editing"></button>
     <button class="hot" data-zone="departments" style="left:66px;top:146px;width:246px;height:171px" aria-label="Departments: Recruiting, Construction, Editing"></button>
     <button class="hot" data-zone="director" style="left:468px;top:146px;width:246px;height:171px" aria-label="Director's Office: readiness, permit, declare"></button>
-    <div class="chip" data-chip="departments" style="left:189px;top:154px" aria-hidden="true"><span class="disc" style="width:24px;height:24px;font-size:.85rem">3</span>Departments</div>
-    <div class="chip" data-chip="director" style="left:591px;top:154px" aria-hidden="true"><span class="disc" style="width:24px;height:24px;font-size:.85rem">4</span>Director</div>
-    <div class="chip" data-chip="pool" style="left:390px;top:529px" aria-hidden="true"><span class="disc" style="width:24px;height:24px;font-size:.85rem">2</span>Typing Pool</div>
-    <div class="chip" data-chip="personnel" style="left:390px;top:1129px" aria-hidden="true"><span class="disc" style="width:24px;height:24px;font-size:.85rem">1</span>Personnel<span class="start">Start here</span></div>
+  </div>
+  <div class="chips" id="chips">
+    <div class="chip" data-chip="departments" data-wx="189" data-wy="154" aria-hidden="true"><span class="disc" style="width:24px;height:24px;font-size:.85rem">3</span>Departments</div>
+    <div class="chip" data-chip="director" data-wx="591" data-wy="154" aria-hidden="true"><span class="disc" style="width:24px;height:24px;font-size:.85rem">4</span>Director</div>
+    <div class="chip" data-chip="pool" data-wx="390" data-wy="529" aria-hidden="true"><span class="disc" style="width:24px;height:24px;font-size:.85rem">2</span>Typing Pool</div>
+    <div class="chip" data-chip="personnel" data-wx="390" data-wy="1129" aria-hidden="true"><span class="disc" style="width:24px;height:24px;font-size:.85rem">1</span>Personnel<span class="start">Start here</span></div>
   </div>
 
   <header class="hdr">
@@ -934,13 +936,13 @@ function build() {
   const defs = `<defs><radialGradient id="halo"><stop offset="0" style="stop-color:var(--glow);stop-opacity:.95"/><stop offset=".55" style="stop-color:var(--glow);stop-opacity:.45"/><stop offset="1" style="stop-color:var(--glow);stop-opacity:0"/></radialGradient>` +
     `<filter id="paperfx" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".8" numOctaves="2" seed="7" result="n"/><feColorMatrix in="n" type="saturate" values="0"/></filter>` +
     `<filter id="soft" x="-20%" y="-20%" width="140%" height="160%"><feGaussianBlur stdDeviation="2.6"/></filter><filter id="soft2" x="-10%" y="-10%" width="125%" height="130%"><feGaussianBlur stdDeviation="6"/></filter>` +
-    `<pattern id="dotp" width="40" height="40" patternUnits="userSpaceOnUse"><circle cx="20" cy="20" r="1.5" class="dots"/></pattern>` +
+    `<pattern id="grainp" width="160" height="160" patternUnits="userSpaceOnUse"><image width="160" height="160" href="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' seed='7'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E"/></pattern><pattern id="dotp" width="40" height="40" patternUnits="userSpaceOnUse"><circle cx="20" cy="20" r="1.5" class="dots"/></pattern>` +
     `<clipPath id="glassclip">${[30, 124, 218, 492, 586, 680].map(x => `<rect x="${x + 5}" y="22" width="60" height="62"/>`).join('')}</clipPath></defs>`;
   let s = defs;
   const WHH = 1400;
   /* sheet on the table */
   s += `<rect class="table-shadow" x="-4" y="104" width="796" height="${WHH + 10}" rx="6"/><rect class="floor-edge" x="0" y="106" width="780" height="${WHH}" rx="4"/><rect class="floor" x="0" y="100" width="780" height="${WHH}" rx="4"/>`;
-  s += `<rect class="grain" x="0" y="100" width="780" height="${WHH}" filter="url(#paperfx)"/><rect x="0" y="100" width="780" height="${WHH}" fill="url(#dotp)"/><rect class="floor-rim" x="1" y="101" width="778" height="${WHH - 2}" rx="4"/>`;
+  s += `<rect class="grain" x="0" y="100" width="780" height="${WHH}" fill="url(#grainp)"/><rect x="0" y="100" width="780" height="${WHH}" fill="url(#dotp)"/><rect class="floor-rim" x="1" y="101" width="778" height="${WHH - 2}" rx="4"/>`;
   s += `<path class="crease-hi" d="M6 446.5H774M6 1086.5H774"/><path class="crease" d="M6 445.5H774M6 1085.5H774"/>`;
   s += [[10, 106, -35], [770, 106, 35], [10, 1494, 35], [770, 1494, -35]].map(([x, y, a]) => `<rect class="tape" x="${x - 11}" y="${y - 5}" width="22" height="10" transform="rotate(${a} ${x} ${y})"/>`).join('');
   /* flat things on the floor: runner rug, nook rug, entrance mat, the mail-cart route */
@@ -1181,12 +1183,26 @@ function cull() {
   const m = 8 / cs, x0 = -cx / cs - m, x1 = (VW - cx) / cs + m, y0 = (HDRH - cy) / cs - m, y1 = (VH - cy) / cs + m;
   for (const a of areas) { const b = a.box, off = b[2] < x0 || b[0] > x1 || b[3] < y0 || b[1] > y1; if (off !== a.off) { a.off = off; a.el.classList.toggle('offscreen', off); } }
 }
-function put(x, y, s) { cx = x; cy = y; cs = s; cam.style.setProperty('--tx', x + 'px'); cam.style.setProperty('--ty', y + 'px'); cam.style.setProperty('--s', s); cull(); }
+const chipEls = [...document.querySelectorAll('.chip')].map(el => ({ el, wx: +el.dataset.wx, wy: +el.dataset.wy }));
+/* floor-plan labels live in screen space: four cheap writes, done only when the camera isn't mid-flight */
+function placeChips() {
+  const o = mode === 'plan' ? Math.max(0, Math.min(1, (.76 - cs) * 8)) : 0;
+  for (const c of chipEls) { c.el.style.left = (c.wx * cs + cx) + 'px'; c.el.style.top = (c.wy * cs + cy) + 'px'; c.el.style.opacity = o; }
+}
+function put(x, y, s, flight = false) { cx = x; cy = y; cs = s; cam.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${s})`; if (!flight) placeChips(); cull(); }
+function startMove() { cam.classList.remove('flying'); cam.classList.add('dragging', 'moving'); body.classList.add('moving'); }
+function endMove() { cam.classList.remove('dragging', 'moving'); body.classList.remove('moving'); placeChips(); }
 /* a change of zoom level: eased together (tx, ty, s) or, with reduced motion, a snap behind a brief fade */
 function go([x, y, s]) {
   flying = true; clearTimeout(go.f); go.f = setTimeout(() => (flying = false), reduce.matches ? 200 : 900);
   if (reduce.matches) { cam.classList.add('fade'); clearTimeout(go.t); go.t = setTimeout(() => { put(x, y, s); requestAnimationFrame(() => cam.classList.remove('fade')); }, 150); }
-  else put(x, y, s);
+  else {
+    // compositor-only flight: promote the layer, pause ambient motion, hide labels, then settle crisp
+    for (const c of chipEls) c.el.style.opacity = 0;
+    cam.classList.add('flying', 'moving'); body.classList.add('moving');
+    put(x, y, s, true);
+    clearTimeout(go.e); go.e = setTimeout(() => { cam.classList.remove('flying', 'moving'); body.classList.remove('moving'); placeChips(); }, 880);
+  }
 }
 const pb = $('#planbtn');
 function setMode(m) {
@@ -1332,13 +1348,13 @@ let dragMoved = false, coasting = false;
     ptrs.set(e.pointerId, [e.clientX, e.clientY]);
     if (ptrs.size === 2) {                                      // second finger: pinch
       cancelAnimationFrame(raf); coasting = false; down = false;
-      const [lx, ly, ls] = live(), p = pair(); cam.classList.add('dragging'); put(lx, ly, ls);
+      const [lx, ly, ls] = live(), p = pair(); startMove(); put(lx, ly, ls);
       pinch = { d0: p.d, s0: ls, wx: (p.mx - lx) / ls, wy: (p.my - ly) / ls, mx: p.mx, my: p.my, from: mode, start: [cx, cy, cs] };
       dragMoved = true; return;
     }
     if (ptrs.size > 2 || mode === 'plan' || flying) return;
     cancelAnimationFrame(raf); const wasCoast = coasting; coasting = false;
-    const [lx, ly] = live(); put(lx, ly, PLAY_S); cam.classList.add('dragging');
+    const [lx, ly] = live(); put(lx, ly, PLAY_S); startMove();
     down = true; moved = false; sx = e.clientX; sy = e.clientY; ox = lx; oy = ly; hist = [[performance.now(), lx, ly]];
     if (wasCoast) dragMoved = true;
   });
@@ -1360,18 +1376,18 @@ let dragMoved = false, coasting = false;
     const had = ptrs.delete(e.pointerId);
     if (pinch) {
       if (ptrs.size >= 2) return;
-      const p = pinch; pinch = null; cam.classList.remove('dragging'); hush(); userMoved = true;
+      const p = pinch; pinch = null; endMove(); hush(); userMoved = true;
       if (cs < Math.sqrt(planS() * PLAY_S)) { lastPlay = p.from === 'play' ? p.start : lastPlay; toPlan(true); }
       else if (p.from === 'plan') flyPlay(nearestZone(p.wx, p.wy));
       else { lastPlay = camAt(p.wx, p.wy, p.mx, p.my); go(lastPlay); }
       return;
     }
     if (!down) return; down = false;
-    if (!moved) { cam.classList.remove('dragging'); if (dragMoved) setTimeout(() => (dragMoved = false), 80); return; }
+    if (!moved) { endMove(); if (dragMoved) setTimeout(() => (dragMoved = false), 80); return; }
     dragMoved = true; setTimeout(() => (dragMoved = false), 120);
     const a = hist[0], b = hist[hist.length - 1], dt = Math.max(1, b[0] - a[0]);
     let vx = (b[1] - a[1]) / dt, vy = (b[2] - a[2]) / dt;
-    if (performance.now() - b[0] > 90 || reduce.matches) { cam.classList.remove('dragging'); lastPlay = [cx, cy, cs]; return; }
+    if (performance.now() - b[0] > 90 || reduce.matches) { endMove(); lastPlay = [cx, cy, cs]; return; }
     coasting = true; let last = performance.now();
     const step = t => {
       const d = Math.min(32, t - last); last = t;
@@ -1379,7 +1395,7 @@ let dragMoved = false, coasting = false;
       let nx = cx + vx * d, ny = cy + vy * d; const [qx, qy] = clampFree(nx, ny, PLAY_S);
       if (qx !== nx) vx = 0; if (qy !== ny) vy = 0;
       put(qx, qy, PLAY_S);
-      if (Math.hypot(vx, vy) > .03 && coasting) raf = requestAnimationFrame(step); else { coasting = false; lastPlay = [cx, cy, cs]; cam.classList.remove('dragging'); setTimeout(() => (dragMoved = false), 80); }
+      if (Math.hypot(vx, vy) > .03 && coasting) raf = requestAnimationFrame(step); else { coasting = false; lastPlay = [cx, cy, cs]; endMove(); setTimeout(() => (dragMoved = false), 80); }
     };
     raf = requestAnimationFrame(step);
   };

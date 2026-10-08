@@ -69,7 +69,7 @@ and each reports findings labelled by evidence level (MOBILE-UX rule 25).
 | **Game readability** | Sonnet | Can a player tell what's happening and what's tappable, and does the art show game state truthfully? Three-second test |
 | **IP line** | Haiku | Against the guide's don't-list: no TVA look-alikes, clocks or hourglass mascots, timeline language, or show props |
 | **Accessibility** | Haiku | Contrast computed from tokens; color never alone; reduced-motion keeps meaning; 44 px targets; labels on interactive art |
-| **Performance** | Haiku | DOM node count, file size, number of concurrent animations, JS-driven per-frame work, horizontal overflow |
+| **Performance** | Haiku | Runs `scripts/perf.mjs` (≥ 55 fps at 4× throttle for idle, pan, and zoom); DOM node count; concurrent animations; the performance rules in `design/STYLE.md` |
 | **Variety** | Haiku | No two characters on screen identical; behaviours out of sync; deterministic per index |
 
 Taste lenses use Sonnet because whimsy and coherence are where quality matters
@@ -105,5 +105,6 @@ build with a "what to look for" guide.
   390 × 844 in light, dark, and reduced motion, three animation frames, and one
   shot after each click. It also prints the DOM node count, horizontal overflow,
   and page errors. It uses the system Chrome.
+- `scripts/perf.mjs <page.html> [--click=<selector>]…`: frame rate at phone-like CPU (4× throttle) for idle, a drag-pan, and each click.
 - `design/explorations/`: direction mockups (outside the Vite build, so never deployed).
 - `design/STYLE.md`: the chosen style sheet (written after gate 1).

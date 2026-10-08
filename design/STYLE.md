@@ -43,7 +43,34 @@ The chosen direction for all game art (gate 1 passed Oct 7, 2026). Read with
 - **Room sheets** cap at 40% of screen height; the camera frames the room above.
 - **Reference:** `design/explorations/popup-r3/`.
 
-## Open
+## First screen: two zoom levels (Matt, Oct 8 2026)
 
-- **First-screen composition.** Round 2 was roomy but showed one area; round 3
-  shows all four but feels cramped and shrinks the monkeys. Needs Matt's call.
+- **Play view** (default): roomy, monkeys 55–64 px, centred on what needs the
+  player next. **Floor-plan view**: pinch out or tap "Floor plan" to see the
+  whole floor with paper room tags; tap a room to fly back in.
+- **Reference:** `design/explorations/frame-zoom/`.
+- Still to fix from the framing review: first load must show that four rooms
+  exist (open on the floor plan, then fly to Personnel, or edge signposts);
+  floor-plan tags beside rooms, not over their signs; opening a sheet frames
+  the room above it instead of zooming out; the Floor plan button must not sit
+  over room content.
+
+## Performance rules (measured: zoom 40 → 59 fps, pan 37 → 58 fps at 4× CPU throttle)
+
+Matt felt lag zooming on his phone. The cause was the camera, not the art.
+Every world view must follow these:
+
+1. **The camera is one plain `transform`** on one element. Never animate
+   inherited CSS custom properties (`@property … inherits: true`) or anything
+   descendants read: that restyles every node in the world on every frame.
+2. **Fly with a CSS `transform` transition** (compositor thread). Promote the
+   layer (`will-change: transform`) only while moving, then drop it so the
+   world re-rasters crisp at the new zoom.
+3. **Pause ambient animation while the camera moves** (`body.moving`), and
+   pause animations for areas outside the view at rest.
+4. **Labels that must stay screen-sized live in a screen-space overlay**,
+   positioned by JS when the camera settles. Never counter-scale inside the world.
+5. **No live SVG filters over large areas.** Paper grain is a pre-rendered
+   tiled texture; small blur shadows are fine.
+6. **Check with `node scripts/perf.mjs <page> --click=<zoom control>`.** Target:
+   ≥ 55 fps with no frame over 50 ms at 4× throttle. It's a proxy: confirm on a phone.
