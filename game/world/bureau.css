@@ -399,39 +399,37 @@ body.hidden-pause, body.hidden-pause * { animation-play-state: paused !important
 .drow .nm { font: 700 1.05rem var(--font-display); letter-spacing: .06em; text-transform: uppercase; }
 .stamp { display: inline-block; border: 3px double var(--stamp); color: var(--stamp); font: 700 .9rem var(--font-display); letter-spacing: .16em; padding: 1px 8px; transform: rotate(-4deg); border-radius: 2px; }
 
-/* ---------- Ernest: peeks over his card from the bottom-right aisle, never over what he teaches ---------- */
-.ewrap { position: absolute; z-index: 35; right: 8px; bottom: 10px; width: min(214px, calc(100vw - 16px)); pointer-events: none; display: flex; flex-direction: column; align-items: flex-end;
-  transform: translate(56px, 0) rotate(2deg); opacity: 0; visibility: hidden; transform-origin: 100% 100%;
+/* ---------- Ernest: a card docked on the bottom edge. The building and the open room end above it (--dock-h),
+   so he never covers what he is teaching. His head sits inside the card, to the left of the words. ---------- */
+.ewrap { position: absolute; z-index: 35; left: 8px; right: 8px; bottom: calc(6px + env(safe-area-inset-bottom) + var(--memo-h, 0px)); max-width: 544px; margin: 0 auto; pointer-events: none;
+  transform: translate(0, 24px); opacity: 0; visibility: hidden; transform-origin: 50% 100%;
   transition: transform 560ms cubic-bezier(.3, .8, .25, 1), opacity 420ms ease-out, visibility 0s 560ms; }
-/* Reels about the lower floors perch at the top of the building and point down, so the floor they teach stays tappable. */
-.ewrap.top { bottom: auto; top: calc(var(--hdr, 138px) + 6px); width: min(196px, calc(100vw - 16px)); transform: translate(0, -22px); transform-origin: 100% 0; }
-.ewrap.top .efig { width: 84px; height: 78px; margin: 0 6px -14px 0; --aim: -34deg; }
-.ewrap.top .reel { display: none; }
-.ewrap.top .ernest p.say { font-size: .875rem; margin: 2px 0 4px; }
 .ewrap.in { transform: none; opacity: 1; visibility: visible; transition-delay: 0s; }
-.ewrap.docked { bottom: auto; top: calc(var(--hdr, 138px) - var(--feed) + 62px); width: 148px; padding-top: 50px; }
-.efig { width: 104px; height: 97px; margin: 0 4px -16px 0; pointer-events: none; position: relative; z-index: 0; }
-/* docked: only the head and pencil peek over the corner of the card */
-.ewrap.docked .efig { position: absolute; right: 2px; top: 0; width: 72px; height: 64px; margin: 0; }
-.efig .arm { transform-origin: 74px 78px; transform: rotate(var(--aim, 0deg)); }
 .ernest {
-  position: relative; z-index: 1; pointer-events: auto; width: 100%; padding: 8px 10px 8px 12px;
-  background: var(--sheet); color: var(--ink); border: 2px solid var(--edge); border-radius: 4px;
+  position: relative; z-index: 1; pointer-events: auto; width: 100%; display: grid; grid-template-columns: 56px minmax(0, 1fr); column-gap: 8px; align-items: start;
+  padding: 8px 10px 8px 8px; background: var(--sheet); color: var(--ink); border: 2px solid var(--edge); border-radius: 4px;
   box-shadow: 0 2px 0 var(--lift-sh), 4px 8px 14px var(--soft-sh);
 }
 .ernest::before { content: ''; position: absolute; inset: 3px; border: 1px solid var(--rule); pointer-events: none; }
-.ernest .reel { white-space: nowrap; overflow: hidden; font: 400 .64rem var(--font-type); letter-spacing: .02em; text-transform: uppercase; color: var(--ink-muted); margin: 0; }
+.efig { grid-column: 1; grid-row: 1 / span 3; width: 56px; height: 50px; margin: 2px 0 0; pointer-events: none; position: relative; z-index: 0; --aim: 0deg; }
+.efig .arm { transform-origin: 74px 78px; transform: rotate(var(--aim, 0deg)); }
+.ernest > :not(.efig) { grid-column: 2; min-width: 0; }
+.ernest .reel { display: none; }
 .ernest h2 { font-size: 1.1rem; color: var(--head); line-height: 1.05; }
 .ernest p.say { margin: 3px 0 6px; font-size: .9rem; line-height: 1.3; }
-.ernest .acts { display: flex; flex-direction: column; gap: 2px; }
-.ernest .go, .ewrap.docked .ok { min-height: 44px; width: 100%; display: block; padding: 0 12px; background: var(--walnut); color: var(--on-walnut); border: 2px solid var(--ctl); border-radius: 3px 3px 10px 3px; font: 700 .98rem var(--font-display); letter-spacing: .1em; text-transform: uppercase; cursor: pointer; box-shadow: 0 3px 0 var(--ctl); }
+.ernest .acts { display: flex; gap: 8px; }
+.ernest .go, .ewrap.docked .ok { flex: 1.4 1 0; min-height: 44px; min-width: 0; display: block; padding: 0 8px; background: var(--walnut); color: var(--on-walnut); border: 2px solid var(--ctl); border-radius: 3px 3px 10px 3px; font: 700 .9rem var(--font-display); letter-spacing: .08em; text-transform: uppercase; cursor: pointer; box-shadow: 0 3px 0 var(--ctl); }
 .ernest .go:active, .ewrap.docked .ok:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--ctl); }
 .ernest .go[hidden] { display: none; }
-.ernest .ok { min-height: 44px; width: 100%; background: none; border: 0; color: var(--ink-muted); font: 400 .875rem var(--font-type); letter-spacing: .02em; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
-.ewrap.docked .reel, .ewrap.docked h2 { display: none; }
-.ewrap.docked .ernest { padding: 7px 8px; }
-.ewrap.docked .ok { text-decoration: none; font-size: .875rem; letter-spacing: .04em; padding: 0 4px; }
-.ewrap.docked p.say { margin: 0 0 6px; font-size: .875rem; font-weight: 600; }
+.ernest .ok { flex: 1 1 0; min-height: 44px; min-width: 0; background: none; border: 0; color: var(--ink-muted); font: 400 .875rem var(--font-type); letter-spacing: .02em; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+/* docked (his own room is open): the same card, with the one button */
+.ewrap.docked h2 { display: none; }
+.ewrap.docked .ok { text-decoration: none; letter-spacing: .06em; padding: 0 4px; }
+.ewrap.docked p.say { margin: 0; font-weight: 600; grid-row: 1; align-self: center; }
+.ewrap.docked .ernest { grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; }
+.ewrap.docked .efig { width: 44px; height: 40px; grid-row: 1; }
+.ewrap.docked .acts { grid-column: 3; grid-row: 1; }
+.ewrap.docked .ok { flex: none; min-width: 108px; }
 @keyframes boil { 0% { transform: rotate(-.8deg); } 33% { transform: rotate(.7deg) translateY(-.6px); } 66% { transform: rotate(0); } }
 .boil { animation: boil .9s steps(1) infinite; transform-origin: 90% 90%; }
 .ewrap:not(.in) .boil { animation-play-state: paused; }

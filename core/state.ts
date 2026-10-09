@@ -88,6 +88,7 @@ export interface BudgetState {
   /** A review is open: the pot waits and the lines can be signed. */
   reviewDue: boolean;
   /** Reviews that closed unsigned (the quarter ran on the previous lines). */
+  /** Old saves only: reviews that closed unsigned before reviews waited for the player. */
   missedReviews: number;
   /** Running totals for the current quarter. */
   stats: QuarterReport;

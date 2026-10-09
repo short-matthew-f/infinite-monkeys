@@ -1,6 +1,6 @@
 // Ernest, Orientation Officer: nine Orientation Reels, each teaching one rule
-// the first time it matters. He leans in from the corner with a short card,
-// docks to a strip while his own room is open, and steps back otherwise.
+// the first time it matters. He appears as a short card on the bottom edge; the
+// building and any open room end above it, so he never covers what he teaches.
 //
 // Rules of the system:
 //  - A reel fires on a false-to-true transition seen during this session. Triggers
@@ -15,6 +15,7 @@ import { N, certifyTiers, deskCost, discoveredTiers, editingPool, findRates, buy
 import type { Ctx } from '../ctx.js';
 import * as f from '../ui/format.js';
 import { progress } from './progress.js';
+import { reserveDock } from './dock.js';
 
 interface Reel {
   id: string;
@@ -61,8 +62,6 @@ const BY_ID = new Map(REELS.map((r) => [r.id, r]));
 const MAX_QUEUE = 2;
 /** A quiet beat after a card is dismissed, so the next one doesn't chase the last. */
 const PAUSE_SECONDS = 6;
-/** Rooms on the lower floors: for these his card sits at the top of the building, clear of what he points to. */
-const LOWER_FLOORS = new Set(['personnel', 'pool']);
 
 export class Ernest {
   /** Set by main: open a room. */
@@ -95,6 +94,10 @@ export class Ernest {
     this.go = q('.go');
     this.ok = q('.ok');
     this.fig = wrap.querySelector('.efig');
+    // His head lives inside the card, beside the words (the markup has it above the card).
+    if (this.fig) this.card.prepend(this.fig);
+    // His card sits on the bottom edge and the building ends above it: tell the page whenever its height changes.
+    new ResizeObserver(() => reserveDock()).observe(wrap);
     this.ok.addEventListener('click', () => this.finish(false));
     this.go.addEventListener('click', () => this.finish(true));
   }
@@ -199,15 +202,14 @@ export class Ernest {
       this.lastSay = text;
     }
     this.wrap.classList.toggle('docked', docked);
-    // He never covers what he teaches: reels about the bottom floors perch at the top and point down.
-    this.wrap.classList.toggle('top', !docked && LOWER_FLOORS.has(r.room));
     this.go.hidden = docked;
-    this.fig?.setAttribute('viewBox', docked ? '50 8 86 76' : '0 0 138 128');
+    this.fig?.setAttribute('viewBox', '50 8 86 76');
     if (!this.shown) {
       this.shown = true;
       // Reel 1 is replayed on every load until acted on; the rest are one-shot.
       if (r.id !== 'first-hire') progress.markReel(r.id);
       this.wrap.classList.add('in');
+      reserveDock();
     }
   }
 
@@ -235,5 +237,6 @@ export class Ernest {
     if (!this.shown) return;
     this.shown = false;
     this.wrap.classList.remove('in', 'docked');
+    reserveDock();
   }
 }

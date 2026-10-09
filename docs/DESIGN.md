@@ -704,9 +704,14 @@ rhythm.
 - At quarter end the unspent wallet (`sweepShare` of it) is swept into the
   pot, and a review opens. Signing splits the pot by the new lines. To save
   for a stage, sign a high discretionary share.
-- Nothing waits for the player. A review left unsigned for a whole quarter
-  closes on the previous lines (`missedReviews`). Offline catch-up runs the
-  same ticks.
+- The quarter clock waits for the player. When a quarter ends the review
+  opens and the clock stops; the next quarter starts at signing. Meanwhile
+  the Bureau keeps working on the signed lines (income banks, departments
+  buy levels); only the pot waits, and no requests are filed. Time away
+  therefore closes at most one quarter. (Earlier builds closed unsigned
+  reviews on the old lines, which piled up dozens of quarters overnight;
+  `missedReviews` remains for those saves.) Offline catch-up runs the same
+  ticks.
 - The heads coordinate how hard each department works: funding shares follow
   `headShares` every tick, and `setShares` is refused in this mode. That's the
   `suggestShares` rule with the budget's own Editing cap (`editingShareCap`,

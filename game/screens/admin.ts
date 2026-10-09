@@ -7,12 +7,12 @@
 //   this quarter    <- budget.stats.requests and budget.stats.requisitions
 // Facts only. The Foreman's amenities are listed under Facilities. Countdowns are plain text,
 // never a live region (MOBILE-UX rule 24).
-import { N, moraleMult, projectDef, type GameState, type Tuning } from '../../core/index.js';
+import { DEPTS, N, moraleMult, projectDef, type GameState, type QuarterReport, type Tuning } from '../../core/index.js';
 import type { Ctx, Screen } from '../ctx.js';
 import { h } from '../ui/dom.js';
 import * as f from '../ui/format.js';
 import { formbox, stack } from '../ui/forms.js';
-import { HEAD_NAMES, OFFICE_NAMES, aboutTime, fadeMultOf, officeOf, projectFact, projectTitle, type OfficeId } from '../world/projects.js';
+import { DEPT_LABEL, HEAD_NAMES, OFFICE_NAMES, aboutTime, fadeMultOf, officeOf, projectFact, projectTitle, type OfficeId } from '../world/projects.js';
 import './admin.css';
 
 interface Row {
@@ -77,6 +77,24 @@ function owned(id: OfficeId, s: GameState, t: Tuning): Row[] {
   return rows;
 }
 
+/** The last closed quarter as plain facts: the route back to the review's report once it is signed. */
+function lastReport(r: QuarterReport | null | undefined): Row[] {
+  if (!r) return [];
+  const n = (x: number, one: string, many = `${one}s`) => `${f.count(x)} ${x === 1 ? one : many}`;
+  const levels = DEPTS.reduce((a, d) => a + r.autoLevels[d], 0);
+  const q = r.requisitions;
+  const rows: Row[] = [
+    { title: `Q${r.quarter} income`, fact: `Over ${f.duration(r.seconds)}.`, tag: f.bananas(r.income) },
+    { title: 'Levels bought by departments', fact: levels > 0 ? DEPTS.filter((d) => r.autoLevels[d] > 0).map((d) => `${DEPT_LABEL[d]} +${f.count(r.autoLevels[d])}`).join(', ') + '.' : 'None bought from their accounts.', tag: f.count(levels) },
+    { title: 'Staff and desks', fact: `${n(r.hires + r.manualHires, 'monkey')} seated (${f.count(r.manualHires)} by hand); ${n(r.desksBuilt + r.desksBought, 'desk')} added (${f.count(r.desksBought)} bought).` },
+    { title: 'Finds', fact: `${f.count(r.certifiedFinds)} certified, ${f.count(r.discardedFinds)} discarded.` },
+    { title: 'Wallet and pot', fact: `${f.bananas(r.walletSpent)} spent from the wallet; ${f.bananas(r.swept)} swept to the pot${r.auditFound > 0 ? `; audits found ${f.bananas(r.auditFound)}` : ''}.` },
+    { title: 'Requests', fact: q.offered ? `${f.count(q.offered)} filed: ${f.count(q.granted)} accepted, ${f.count(q.declined)} declined, ${f.count(q.expired)} expired.` : 'None filed.' },
+  ];
+  if (r.ranOnOldLines) rows.push({ title: 'Review left unsigned', fact: 'This quarter ran on the previous lines.' });
+  return rows;
+}
+
 /** This quarter's requests from this office's heads, newest first. */
 function requests(id: OfficeId, s: GameState, t: Tuning): Row[] {
   const rows: Row[] = [];
@@ -104,15 +122,17 @@ function office(id: OfficeId): Screen {
       const ownedBox = h('div', {});
       const reqBox = h('div', {});
       const tally = h('p', { class: 'ofc-tally' });
+      const reportBox = h('div', {});
       root.append(
         stack(
           formbox(`${FORM[id]} / ${OFFICE_NAMES[id]}`, note),
+          ...(id === 'accounting' ? [formbox(`${FORM[id]} / Last quarter's report`, reportBox)] : []),
           formbox(`${FORM[id]} / In effect`, effectBox),
           formbox(`${FORM[id]} / ${id === 'facilities' ? 'Built and owned' : 'Owned upgrades'}`, ownedBox),
           formbox(`${FORM[id]} / This quarter's requests`, reqBox, tally),
         ),
       );
-      const keys = ['', '', '', ''];
+      const keys = ['', '', '', '', ''];
       const fill = (box: HTMLElement, i: number, rows: Row[], empty: string) => {
         const k = JSON.stringify(rows);
         if (k === keys[i]) return;
@@ -124,6 +144,7 @@ function office(id: OfficeId): Screen {
         fill(effectBox, 0, inEffect(id, s, t), 'Nothing running right now.');
         fill(ownedBox, 1, owned(id, s, t), 'None yet.');
         fill(reqBox, 2, requests(id, s, t), 'No requests from this office yet this quarter.');
+        if (id === 'accounting') fill(reportBox, 4, lastReport(s.budget?.lastReport), 'No quarter has closed yet. The report appears here after the first one.');
         const st = s.budget?.stats;
         if (st) {
           const r = st.requisitions;

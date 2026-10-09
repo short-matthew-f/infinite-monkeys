@@ -3,6 +3,7 @@ import { DEPTS, N, activeBudget, catchUp, certifyTiers, createState, deptLevelCo
 import { prototypeTuning } from '../content/prototype.js';
 import { createCtx } from './ctx.js';
 import { startLoop } from './loop.js';
+import { AwayCard, awaySnap } from './away.js';
 import { Ceremony } from './world/ceremony.js';
 import { Cooler } from './world/cooler.js';
 import { MemoView } from './world/memo.js';
@@ -15,7 +16,7 @@ import { readiness } from './screens/readiness.js';
 import { research } from './screens/research.js';
 import { accounting, facilities, training } from './screens/admin.js';
 import { Payoffs } from './world/payoff.js';
-import { OFFICE_IDS } from './world/projects.js';
+import { HEAD_NAMES, OFFICE_IDS, projectTitle } from './world/projects.js';
 import { text } from './ui/dom.js';
 import * as f from './ui/format.js';
 import { cueCandidates } from './world/advisor.js';
@@ -87,7 +88,17 @@ const ctx = createCtx(() => state, t, sink, onEvent, () => {
 
 // The feed subscribes before offline catch-up runs, so time away reaches the ticker.
 const renderFeed = feed.mount($('feed'), ctx);
-if (rec) catchUp(state, t, sink, (Date.now() - rec.savedAt) / 1000);
+// Long gaps (a reload, a backgrounded tab) are summarised on a card: snapshot, catch up, hand the snapshot to the card.
+let awayCard: AwayCard | null = null;
+const earlyAway: { before: ReturnType<typeof awaySnap>; gone: number; ticks: number }[] = [];
+function catchUpAway(s: GameState, tn: typeof t, sk: EventSink, gone: number): number {
+  const before = awaySnap(s);
+  const ticks = catchUp(s, tn, sk, gone);
+  if (awayCard) awayCard.record(before, gone, ticks);
+  else earlyAway.push({ before, gone, ticks });
+  return ticks;
+}
+if (rec) catchUpAway(state, t, sink, Math.max(0, (Date.now() - rec.savedAt) / 1000));
 
 // ---------- saving ----------
 
@@ -156,7 +167,8 @@ function budgetView(): BudgetView | null {
     const price = deptLevelCost(state, t, d);
     accounts[d] = { frac: N.ratio(b.accounts[d], price), balance: f.count(b.accounts[d]), price: f.count(price) };
   }
-  const secondsLeft = quarterSecondsLeft(state, t);
+  // A waiting review stops the quarter clock: show the full quarter, never a countdown.
+  const secondsLeft = b.reviewDue ? t.budget.quarterSeconds : quarterSecondsLeft(state, t);
   return { quarter: b.quarter, secondsLeft, frac: secondsLeft / t.budget.quarterSeconds, reviewDue: b.reviewDue, accounts };
 }
 tower.setBudget(budgetView());
@@ -170,6 +182,10 @@ rooms.register(ROOMS);
 const ceremony = new Ceremony(stage, ctx);
 ceremony.onClose = () => (dirty = true);
 const memo = new MemoView(stage, ctx);
+awayCard = new AwayCard(stage, t, () => state);
+awayCard.bind({ busy: () => ceremony.isOpen, openReview });
+awayCard.onClose = () => (dirty = true);
+for (const a of earlyAway.splice(0)) awayCard.record(a.before, a.gone, a.ticks);
 const payoffs = new Payoffs(stage, ctx, {
   room: () => (rooms.current ? { id: rooms.current.id, el: rooms.el } : null),
   busy: () => ceremony.isOpen,
@@ -255,6 +271,36 @@ dirbtn.addEventListener('click', () => {
   dirbtn.setAttribute('aria-expanded', String(opening));
   if (opening) for (const b of dir.querySelectorAll<HTMLElement>('[data-room]')) b.querySelector('.hn')!.textContent = roomHint(b.dataset.room!);
 });
+/** The Directory's "Needs you" rows: whatever is waiting on the Director, each with a route to it. */
+const dirTasks = $('dirtasks');
+let tasksKey = '';
+function renderTasks(): void {
+  const b = state.budget;
+  const items: { task: string; mark: string; name: string; hint: string }[] = [];
+  if (b?.reviewDue) items.push({ task: 'review', mark: '!', name: 'Quarterly review', hint: `Q${b.quarter} is ready to sign.` });
+  const q = b?.requisition;
+  if (q && document.querySelector('.memo-dock:not([hidden])')) items.push({ task: 'memo', mark: '!', name: 'Open request', hint: `${HEAD_NAMES[q.from]}: ${q.kind === 'levels' ? 'department levels' : projectTitle(q.kind)}.` });
+  if (b?.lastReport) items.push({ task: 'report', mark: '§', name: "Last quarter's report", hint: `Q${b.lastReport.quarter}, filed in the Accounting Office.` });
+  const key = JSON.stringify(items);
+  if (key === tasksKey) return;
+  tasksKey = key;
+  $('dirtasks-box').hidden = !items.length;
+  dirTasks.innerHTML = items.map((i) => `<li><button data-task="${i.task}"><span class="disc" aria-hidden="true">${i.mark}</span><span class="nm">${i.name}<span class="hn">${i.hint}</span></span></button></li>`).join('');
+}
+dirTasks.addEventListener('click', (e) => {
+  const task = (e.target as HTMLElement).closest<HTMLElement>('[data-task]')?.dataset.task;
+  if (task === 'review') openReview();
+  else if (task === 'report') openRoom('accounting');
+  else if (task === 'memo') {
+    // The memo is a docked paper tab (memo.ts); open it unless it already is.
+    closeDir();
+    const tab = document.querySelector<HTMLButtonElement>('.memo-dock:not([hidden]) .memo-tab');
+    if (tab) {
+      if (tab.getAttribute('aria-expanded') !== 'true') tab.click();
+      tab.focus({ preventScroll: true });
+    }
+  }
+});
 $('dirlist').addEventListener('click', (e) => {
   const b = (e.target as HTMLElement).closest<HTMLElement>('[data-room]');
   if (b) openRoom(b.dataset.room!);
@@ -264,7 +310,7 @@ document.addEventListener('pointerdown', (e) => {
 });
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
-  if (ceremony.isOpen) return; // the ceremony handles its own Escape
+  if (ceremony.isOpen || awayCard?.isOpen) return; // the ceremony and the away card handle their own Escape
   // Escape leaves an open room even when focus has left it (e.g. a button that just disabled itself).
   if (rooms.current) {
     if (!rooms.el.contains(document.activeElement)) rooms.close();
@@ -366,16 +412,18 @@ startLoop(() => state, t, sink, () => {
   tower.setBudget(budgetView());
   rooms.render();
   if (ceremony.isOpen) ceremony.render();
+  awayCard?.render();
   memo.render();
+  renderTasks();
   document.body.classList.toggle('has-memo', !!document.querySelector('.memo-dock:not([hidden])'));
   buildDir();
   payoffs.render();
   // The cooler waits for rooms, the ceremony, a payoff, Ernest's card, and the clock's own "Review ready" tag (it shares the roof).
-  cooler.suppressed = !!rooms.current || ceremony.isOpen || payoffs.active || ernest.showing || !!state.budget?.reviewDue;
+  cooler.suppressed = awayCard?.isOpen || !!rooms.current || ceremony.isOpen || payoffs.active || ernest.showing || !!state.budget?.reviewDue;
   cooler.render();
   ernest.update(rooms.current?.id ?? null);
   updateCue();
-});
+}, catchUpAway);
 
 // Dev-only console hook for testing at later game states. Stripped from production builds.
 if (import.meta.env.DEV) {
@@ -387,6 +435,7 @@ if (import.meta.env.DEV) {
         dirty = true;
       },
       run: (seconds: number) => catchUp(state, t, sink, seconds),
+      away: (seconds: number) => catchUpAway(state, t, sink, seconds),
       emit: (e: GameEvent) => sink(e),
       open: openRoom,
       openReview,

@@ -10,9 +10,10 @@
 // is coordinated by the heads themselves (the funding shares follow
 // headShares every tick), so the free funding slider is gone in this mode.
 //
-// Nothing here waits for the player: a review left unsigned closes at the next
-// quarter end and the quarter runs on the previous lines, so offline catch-up
-// and live play take the same path.
+// The quarter clock waits for the player: when a quarter ends the review
+// opens and the next quarter starts at signing, so time away closes at most
+// one quarter. The Bureau keeps working on the signed lines while it waits.
+// Offline catch-up and live play still take the same path.
 
 import { N, type Num } from './num.js';
 import type { BudgetLines, EventSink, QuarterReport } from './events.js';
@@ -129,10 +130,11 @@ export function suggestBudget(s: GameState, t: Tuning): BudgetLines {
   };
 }
 
-/** Seconds left in the current quarter (0 while a review is open counts the running quarter). */
+/** Seconds left in the current quarter. While a review waits the clock is stopped at a full quarter: the next one starts at signing. */
 export function quarterSecondsLeft(s: GameState, t: Tuning): number {
   const b = s.budget;
   if (!b || !t.budget) return 0;
+  if (b.reviewDue) return t.budget.quarterSeconds;
   return Math.max(0, t.budget.quarterSeconds - (s.tick - b.quarterStartTick) * t.tickSeconds);
 }
 
@@ -184,25 +186,23 @@ export function autoBuy(s: GameState, t: Tuning, b: BudgetState, sink: EventSink
   }
 }
 
-/** Closes the quarter if it's over: report, sweep the wallet into the pot, open the review. */
+/**
+ * Closes the quarter if it's over: report, sweep the wallet into the pot,
+ * open the review. The clock then waits for the signature (quarters never
+ * pile up while the player is away); the Bureau keeps working on the signed
+ * lines meanwhile, and only the pot waits.
+ */
 export function maybeEndQuarter(s: GameState, t: Tuning, b: BudgetState, sink: EventSink): void {
-  if (!t.budget || s.tick - b.quarterStartTick < secondsToTicks(t, t.budget.quarterSeconds)) return;
-  // A review left open for a whole quarter closes on the lines already signed.
-  const missedReview = b.reviewDue;
-  if (missedReview) {
-    distribute(s, b, b.pot, b.lines);
-    b.pot = N.zero;
-    b.missedReviews++;
-  }
+  if (!t.budget || b.reviewDue || s.tick - b.quarterStartTick < secondsToTicks(t, t.budget.quarterSeconds)) return;
   if (b.requisition) closeRequisition(s, b, sink, 'expired');
   b.stats.seconds = (s.tick - b.quarterStartTick) * t.tickSeconds;
-  b.stats.ranOnOldLines = missedReview;
+  b.stats.ranOnOldLines = false;
   const swept = N.mul(s.bananas, t.budget.sweepShare);
   b.stats.swept = N.toNumber(swept);
   b.pot = N.add(b.pot, swept);
   s.bananas = N.sub(s.bananas, swept);
   b.lastReport = b.stats;
-  sink({ type: 'quarterEnded', tick: s.tick, report: b.stats, pot: N.toNumber(b.pot), missedReview });
+  sink({ type: 'quarterEnded', tick: s.tick, report: b.stats, pot: N.toNumber(b.pot), missedReview: false });
   b.quarter++;
   b.quarterStartTick = s.tick;
   b.reviewDue = true;
@@ -219,6 +219,9 @@ export function signBudget(s: GameState, t: Tuning, sink: EventSink, next: Budge
   b.pot = N.zero;
   b.lines = { ...next };
   b.reviewDue = false;
+  // The quarter starts at signing; anything banked while the review waited is left out of its report.
+  b.quarterStartTick = s.tick;
+  b.stats = emptyReport(b.quarter);
   sink({ type: 'budgetSigned', tick: s.tick, quarter: b.quarter, previous, next: { ...next }, pot: N.toNumber(pot) });
   return true;
 }
@@ -234,9 +237,9 @@ export function signBudget(s: GameState, t: Tuning, sink: EventSink, next: Budge
 //   (pizza parties, audits, managers...), priced as a share of a quarter's
 //   reference wallet income so they stay meaningful as the Bureau grows.
 // The price is quoted when the memo is filed. Accepting pays from the
-// wallet; declining costs nothing. Unanswered memos expire, and nothing
-// waits for the player. Which request comes next is drawn from the gameplay
-// stream, so live play and catch-up agree.
+// wallet; declining costs nothing. Unanswered memos expire, and none is
+// filed while a review waits. Which request comes next is drawn from the
+// gameplay stream, so live play and catch-up agree.
 
 /** The department whose head would file a level requisition now. */
 export function requisitionDept(s: GameState, t: Tuning): DeptId {
@@ -294,6 +297,8 @@ export function maybeRequisition(s: GameState, t: Tuning, b: BudgetState, sink: 
     if (s.tick >= b.requisition.expiresTick) closeRequisition(s, b, sink, 'expired');
     return;
   }
+  // No requests while a review waits.
+  if (b.reviewDue) return;
   if (s.tick - b.lastRequisitionTick < secondsToTicks(t, r.cooldownSeconds)) return;
   // Don't file one that couldn't stay open for its full window this quarter.
   const quarterEnd = b.quarterStartTick + secondsToTicks(t, t.budget!.quarterSeconds);

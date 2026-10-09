@@ -1,7 +1,7 @@
 /* Room view: a room opens full screen. Scene band on top, the room's form below, an exit door top-left.
    The transition is opacity and transform only. */
 .room {
-  position: absolute; left: 0; right: 0; top: calc(var(--hdr, 138px) - var(--feed, 40px)); bottom: 0; z-index: 20;
+  position: absolute; left: 0; right: 0; top: calc(var(--hdr, 138px) - var(--feed, 40px)); bottom: var(--dock-h, 0px); z-index: 20;
   display: flex; flex-direction: column; background: var(--sheet); color: var(--ink);
   opacity: 0; transform: translateY(14px) scale(.985); transform-origin: 50% 100%;
   transition: transform 260ms cubic-bezier(.3, .8, .25, 1), opacity 200ms;

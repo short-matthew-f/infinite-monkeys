@@ -20,6 +20,13 @@ export interface FloorProps {
   tutorial: boolean;
   /** Readiness meters from core (0..1). The building patches these in place. */
   meters: Record<'recruiting' | 'construction' | 'editing', number>;
+  /** Unfloored values for presentation bands (present.ts). Absent in tests and previews. */
+  raw?: {
+    /** Desks minus monkeys, unfloored (a desk is free to hire into at 1). */
+    free: number;
+    /** Review demand / review pool (core's finiteBottleneck compares these); null outside the finite phase. */
+    pressure: number | null;
+  };
   /** What limits income right now (core's finiteBottleneck), or null outside the finite phase. */
   bottleneck: 'typing' | 'editing' | null;
   /** The support offices, once the budget has opened (absent before). */

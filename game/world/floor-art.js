@@ -540,8 +540,9 @@ function personnelSVG(n) {
   s += `<rect class="ring" x="108" y="963" width="254" height="174" rx="8"/></g>`;
   // entrance: door, mat, umbrella stand, plant, and the candidate waiting when a desk is free
   s += `<g class="area" id="a-entrance" transform="translate(62 260)">`;
-  s += T(-25, -110, pbox({ x: 205, yb: 1300, w: 60, h: 96, d: 9, c: 'concrete', extra: `<rect x="212" y="1212" width="46" height="88" fill="var(--glow)" stroke="var(--edge)" stroke-width="1.2"/><polygon points="212,1212 212,1300 192,1307 192,1206" fill="var(--olive)" stroke="var(--edge)" stroke-width="1.2"/><circle cx="196" cy="1256" r="2" class="brass"/><path d="M222 1226h26M222 1232h20" stroke="var(--concrete)" stroke-width="1.2"/>` }));
-  s += `<text class="sg sm" x="210" y="1215">Entrance</text>`;
+  s += T(-25, -110, pbox({ x: 205, yb: 1300, w: 60, h: 96, d: 9, c: 'concrete', extra: `<rect x="212" y="1212" width="46" height="88" fill="var(--glow)" stroke="var(--edge)" stroke-width="1.2"/><polygon points="212,1212 212,1300 192,1307 192,1206" fill="var(--olive)" stroke="var(--edge)" stroke-width="1.2"/><circle cx="196" cy="1256" r="2" class="brass"/><path d="M222 1226h26M222 1232h20" stroke="var(--concrete)" stroke-width="1.2"/>` }) +
+    // the sign hangs over the door (it used to sit under the floor line, outside the scene)
+    `<rect x="165" y="1170" width="80" height="25" rx="2.5" class="brass"/><text class="sg" x="205" y="1188" style="font-size:17px;letter-spacing:.06em">Entrance</text>`);
   s += umbrellaStand(282, 1190) + ficus(30, 1204, 1.15);
   if (n.tutorial && n.candidate) s += nextCue(300, 1090);
   s += `<g data-cand id="candpos" style="transform:translate(300px,1210px)"><g id="cand" class="cand">${stand(Object.assign({}, CANDIDATE, { H: 58, bw: 24 }), { hl: [-9, -26], hr: [12, -22], xr: '', front: `<rect x="10" y="-26" width="22" height="16" rx="2" fill="var(--walnut)" stroke="var(--edge)" stroke-width="1.2"/><path d="M16 -26v-4h10v4" fill="none" stroke="var(--edge)" stroke-width="1.6"/><rect x="19" y="-20" width="4" height="4" class="brass"/>` })}</g></g>`;

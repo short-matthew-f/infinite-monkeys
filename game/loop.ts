@@ -7,14 +7,15 @@ import { catchUp, step, type EventSink, type GameState, type Tuning } from '../c
 /** Longest real time one frame may simulate tick by tick. */
 const MAX_FRAME_SECONDS = 1;
 
-export function startLoop(getState: () => GameState, t: Tuning, sink: EventSink, render: () => void): void {
+/** `catchUpFn` lets the caller observe long gaps (the "while you were away" card); it defaults to core's catchUp. */
+export function startLoop(getState: () => GameState, t: Tuning, sink: EventSink, render: () => void, catchUpFn: typeof catchUp = catchUp): void {
   let last = performance.now();
   let acc = 0;
   const frame = (now: number) => {
     const dt = (now - last) / 1000;
     last = now;
     const s = getState();
-    if (dt > MAX_FRAME_SECONDS) catchUp(s, t, sink, dt);
+    if (dt > MAX_FRAME_SECONDS) catchUpFn(s, t, sink, dt);
     else acc += Math.max(0, dt);
     while (acc >= t.tickSeconds) {
       step(s, t, sink);

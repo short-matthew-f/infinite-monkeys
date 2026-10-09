@@ -1,5 +1,5 @@
-// The requisition memo: a department head's mid-quarter request, docked at the
-// bottom-left as a paper tab that opens into a small card. Every number comes
+// The requisition memo: a department head's mid-quarter request, docked on the
+// bottom edge as a paper strip that opens upward into a small card. Every number comes
 // from core (requisitionPrice, levelsListPrice, quarterSecondsLeft); the memo
 // states the need and the price and never advises.
 import {
@@ -20,6 +20,7 @@ import { enable, h, text } from '../ui/dom.js';
 import * as f from '../ui/format.js';
 import { afford } from '../ui/forms.js';
 import { DEPT_LABEL, HEAD_NAMES, OFFICE_SHORT, fadeMultOf, projectFact, projectTitle } from './projects.js';
+import { reserveDock } from './dock.js';
 import './memo.css';
 
 /** The word on the tab: a department, or a support office. */
@@ -190,11 +191,20 @@ export class MemoView {
     this.shownKey = null;
     this.expanded = false;
     this.dock.hidden = true;
+    this.syncDock();
     this.dock.classList.remove('filing', 'open', 'arrive');
     this.card.hidden = true;
     this.card.classList.remove('done');
     this.stamp.hidden = true;
     this.tab.setAttribute('aria-expanded', 'false');
+  }
+
+  /** The strip sits on the bottom edge: Ernest's card stacks above it and the building ends above both. */
+  private syncDock(): void {
+    const root = document.documentElement;
+    if (this.dock.hidden) root.style.removeProperty('--memo-h');
+    else root.style.setProperty('--memo-h', `${this.tab.offsetHeight + 8}px`);
+    reserveDock();
   }
 
   private announce(msg: string): void {
@@ -299,6 +309,7 @@ export class MemoView {
       this.expanded = false;
       this.frozen = null;
       this.dock.hidden = false;
+      this.syncDock();
       this.dock.classList.remove('filing');
       this.dock.classList.remove('arrive');
       void this.dock.offsetWidth;

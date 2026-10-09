@@ -1,25 +1,26 @@
-/* Requisition memo: a paper tab bottom-left that opens into a small card.
+/* Requisition memo: a paper strip docked on the bottom edge (the building and rooms end above it) that opens upward into a small card.
    Material vocabulary per design/STYLE.md: cut rims, two-tier shadows, typed headers, double-ruled stamp. */
 .memo-dock {
-  position: absolute; z-index: 38; left: 8px; bottom: calc(6px + env(safe-area-inset-bottom));
-  display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
-  width: min(300px, calc(100% - 16px)); pointer-events: none; transform-origin: 0 100%;
+  position: absolute; z-index: 38; left: 8px; right: 8px; bottom: calc(6px + env(safe-area-inset-bottom)); max-width: 544px; margin: 0 auto;
+  display: flex; flex-direction: column; align-items: stretch; gap: 8px; pointer-events: none; transform-origin: 50% 100%;
 }
 .memo-dock[hidden] { display: none; }
 .memo-dock > * { pointer-events: auto; }
 .memo-dock.arrive { animation: memoin .6s cubic-bezier(.3, .8, .25, 1.15) both; }
 .memo-dock.filing { animation: memoout .34s cubic-bezier(.5, 0, .8, .4) both; pointer-events: none; }
 .memo-dock.filing > * { pointer-events: none; }
-@keyframes memoin { from { transform: translate(-120px, 20px) rotate(-8deg); opacity: 0; } to { transform: none; opacity: 1; } }
-@keyframes memoout { to { transform: translate(-40px, 90px) rotate(-5deg); opacity: 0; } }
+@keyframes memoin { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes memoout { to { transform: translateY(70px); opacity: 0; } }
 
 .memo-tab {
-  position: relative; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; max-height: 44px; padding: 0 12px 0 8px;
+  position: relative; display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px; max-height: 44px; padding: 0 12px 0 8px; text-align: left;
   background: var(--sheet); color: var(--ink); border: 2px solid var(--edge); border-radius: 4px 12px 4px 4px;
   box-shadow: 0 3px 0 var(--lift-sh), 4px 8px 14px var(--soft-sh); cursor: pointer;
   font: 700 .95rem/1 var(--font-display); letter-spacing: .1em; text-transform: uppercase;
 }
 .memo-tab::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 4px; background: var(--alert); }
+.memo-tab::after { content: 'Read'; margin-left: auto; font: 700 .875rem/1 var(--font-display); letter-spacing: .1em; color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+.memo-tab[aria-expanded='true']::after { content: 'Close'; }
 .memo-tab:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--lift-sh), 2px 4px 8px var(--soft-sh); }
 .memo-tab svg { width: 30px; height: 21px; flex: none; animation: memobob 2.4s ease-in-out infinite; }
 .memo-tab[aria-expanded='true'] { background: color-mix(in srgb, var(--mustard) 22%, var(--sheet)); }
@@ -42,10 +43,10 @@
 .memo-rows dt { font: 400 .875rem var(--font-type); text-transform: uppercase; letter-spacing: .04em; color: var(--ink); align-self: baseline; }
 .memo-rows dd { margin: 0; text-align: right; display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: baseline; align-self: baseline; font-variant-numeric: tabular-nums; }
 .memo-v { font: 700 1.05rem var(--font-body); }
-.memo-list { margin-left: 8px; font: 400 .875rem var(--font-type); color: var(--ink-muted); }
+.memo-list { margin-left: 8px; font: 400 .875rem var(--font-type); color: var(--ink); }
 .memo-bar { height: 10px; border: 1.5px solid var(--walnut); background: var(--sheet); position: relative; }
 .memo-bar > i { position: absolute; inset: 1px auto 1px 1px; max-width: calc(100% - 2px); background: repeating-linear-gradient(135deg, var(--olive) 0 5px, color-mix(in srgb, var(--olive) 62%, var(--edge)) 5px 8px); border-right: 3px solid var(--mustard); }
-.memo-why { font: 400 .875rem var(--font-type); color: var(--ink-muted); margin-top: 8px !important; }
+.memo-why { font: 400 .875rem var(--font-type); color: var(--ink); margin-top: 8px !important; }
 .memo-why[hidden] { display: none; }
 .memo-acts { display: grid; grid-template-columns: 1.4fr 1fr; gap: 8px; margin-top: 10px; }
 .memo-btn {
@@ -66,7 +67,7 @@
 .memo-stamp[hidden] { display: none; }
 .memo-stamp.hit { animation: memostamp .32s cubic-bezier(.2, 1.4, .4, 1) both; }
 @keyframes memostamp { from { transform: rotate(-9deg) scale(2.4); opacity: 0; } to { transform: rotate(-9deg) scale(1); opacity: 1; } }
-.memo-card.done > :not(.memo-stamp) { opacity: .35; }
+/* the stamp lands on the memo as written: the words stay at full strength (dimming them dropped them under 4.5:1) */
 .memo-card.done .memo-acts { visibility: hidden; }
 
 .memo-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
@@ -75,5 +76,3 @@
   .memo-dock.arrive, .memo-dock.filing, .memo-card, .memo-tab svg, .memo-stamp.hit { animation: none !important; }
   .memo-dock.filing { opacity: 0; transition: opacity .12s; }
 }
-/* the tab sits over the bottom-left of a room's form: leave room to scroll the last lines clear of it */
-body.has-memo .sbody { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }

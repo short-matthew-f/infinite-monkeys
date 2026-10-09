@@ -12,7 +12,7 @@
 //   forecast       <- previewQuarter(); it runs a whole quarter on a clone, so it is debounced
 //   signing        <- signBudget() through ctx.act
 // Slides state facts only. They never say what to buy or which lines to sign.
-import { DEPTS, N, certifyTiers, editingPool, previewQuarter, projectDef, quarterSecondsLeft, signBudget, suggestBudget, validLines, type BudgetLines, type DeptId, type GameEvent, type QuarterReport, type Tuning, type GameState, type QuarterPreview } from '../../core/index.js';
+import { DEPTS, N, certifyTiers, editingPool, previewQuarter, projectDef, signBudget, suggestBudget, validLines, type BudgetLines, type DeptId, type GameEvent, type QuarterReport, type Tuning, type GameState, type QuarterPreview } from '../../core/index.js';
 import type { Ctx } from '../ctx.js';
 import { attr, text } from '../ui/dom.js';
 import { bananas, count, rate } from '../ui/format.js';
@@ -350,10 +350,9 @@ export class Ceremony {
     if (!b.reviewDue) return this.ended('This review has already been signed.');
     if (this.step !== 'budget') return;
     this.paintPot(s);
-    const left = Math.ceil(quarterSecondsLeft(s, this.ctx.t));
-    if (left !== this.clockShown) {
-      this.clockShown = left;
-      text(this.ref('clock'), `Quarter ends in ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}. A review left unsigned closes then, and the quarter runs on the previous lines.`);
+    if (this.clockShown !== 0) {
+      this.clockShown = 0;
+      text(this.ref('clock'), 'The next quarter starts when you sign. Until then the Bureau runs on the current lines.');
     }
     if (this.forecastT === 0 && s.tick - this.forecastTick >= FORECAST_REFRESH_TICKS) this.queueForecast(0);
   }
@@ -506,7 +505,6 @@ export class Ceremony {
     if (r && (r.ranOnOldLines || (this.lastEnd && this.lastEnd.quarter === r.quarter && this.lastEnd.missed))) {
       return `Q${r.quarter} ran on the previous lines: its review was left unsigned and closed at quarter end.`;
     }
-    if (b.missedReviews > 0) return `${b.missedReviews} ${plural(b.missedReviews, 'review has', 'reviews have')} closed unsigned so far, and those quarters ran on the previous lines.`;
     return '';
   }
 

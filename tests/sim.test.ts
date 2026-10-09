@@ -42,9 +42,14 @@ describe('finite segment (casual bot)', () => {
   // rebalancing metric (2 to 3 Readiness rebalances) no longer applies. Its decisions are the
   // quarterly reviews; see sim/budget-report.ts for the classic comparison.
   it('signs a budget at every quarterly review and never misses one', () => {
-    // One signature per quarter: the budget opens, then a review at every quarter end until the ceremony.
-    const quarters = Math.floor((casual.declaredSeconds! - casual.log.reviews[0]!.tick * T.tickSeconds) / T.budget!.quarterSeconds) + 1;
-    expect(casual.log.reviews.length).toBeGreaterThanOrEqual(quarters);
+    // The clock waits at each review and restarts at signing, so signatures come a quarter apart.
+    const r = casual.log.reviews;
+    expect(r.length).toBeGreaterThanOrEqual(5);
+    for (let i = 1; i < r.length; i++) {
+      const gap = (r[i]!.tick - r[i - 1]!.tick) * T.tickSeconds;
+      expect(gap).toBeGreaterThanOrEqual(T.budget!.quarterSeconds);
+      expect(gap).toBeLessThanOrEqual(T.budget!.quarterSeconds + 30);
+    }
   });
 
   it('other bots also reach infinity', () => {

@@ -6,7 +6,7 @@
 // The markup is built once. Each floor's art is replaced only when its picture
 // changes; small live numbers are patched in place. Every number comes from
 // core (floorProps) and is never computed here.
-import { DEPTS, N, finiteBottleneck, meters, moraleMult, type GameState, type Tuning } from '../../core/index.js';
+import { DEPTS, N, certifyTiers, editingPool, finiteBottleneck, meters, moraleMult, type GameState, type Tuning } from '../../core/index.js';
 import type { FloorProps } from './floor-art.js';
 import { FLOOR_BOX, FLOOR_NAMES, buildTower, deptHint, floorHint, officeHint, patchLive, roofSVG, towerKey, type FloorId } from './tower-art.js';
 import { OFFICE_IDS, OFFICE_SHORT } from './projects.js';
@@ -46,8 +46,19 @@ export function floorProps(s: GameState, t: Tuning): FloorProps {
     tutorial: seated <= 1,
     meters: meters(s, t),
     bottleneck: s.phase === 'finite' ? finiteBottleneck(s, t) : null,
+    raw: {
+      free: N.toNumber(N.sub(s.desks, s.monkeys)),
+      pressure: s.phase === 'finite' ? pressure(s, t) : null,
+    },
     office: s.office ? officeProps(s, t) : undefined,
   };
+}
+
+/** Review demand over the review pool, the two numbers core's finiteBottleneck compares. Drawing bands only. */
+function pressure(s: GameState, t: Tuning): number {
+  const pool = editingPool(s, t);
+  const demand = certifyTiers(s, t, pool, s.tierAllocation).demand;
+  return N.lte(pool, N.zero) ? (N.gt(demand, N.zero) ? 1e9 : 0) : N.ratio(demand, pool);
 }
 
 /** The support offices on the building: morale from core's moraleMult, amenities from the owned counts. */
@@ -108,6 +119,11 @@ export class Tower {
   private clockQ: SVGTextElement;
   private clockTag: HTMLElement;
   private clockKey = '';
+  /** The scrolling building (short screens). The roof sits above it and never scrolls. */
+  private bldg!: HTMLElement;
+  private born = performance.now();
+  private touched = false;
+  private lastCueRoom = '';
   private acctNote: Partial<Record<(typeof DEPTS)[number], string>> = {};
   private flashes = new Map<string, { n: number; timer: number }>();
   /** Called when the roof clock is tapped (budget trial). */
@@ -127,10 +143,16 @@ export class Tower {
     this.clockQ = this.clock.querySelector('.qnum') as unknown as SVGTextElement;
     this.clockTag = this.clock.querySelector('.qtag') as HTMLElement;
     roof.append(this.clock);
-    const bldg = el('div', 'bldg');
+    const bldg = (this.bldg = el('div', 'bldg'));
+    // Once the player scrolls the building themselves, it is theirs: nothing here moves it again on its own.
+    for (const ev of ['pointerdown', 'wheel', 'keydown'] as const) bldg.addEventListener(ev, () => (this.touched = true), { passive: true });
     this.limitTag = el('span', 'limit-tag', '<span aria-hidden="true">◆</span> Typing is the limit');
     for (const id of ORDER) bldg.append(this.floor(id));
     host.append(roof, bldg);
+    // The window changes height when a dock opens or the phone turns: until the player scrolls it themselves, keep the floor that matters in view.
+    new ResizeObserver(() => {
+      if (!this.touched) this.reveal(this.relevant());
+    }).observe(bldg);
     host.addEventListener('click', (e) => {
       const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button[data-room]');
       if (b) this.onOpen(b.dataset.room as FloorId, b, b.dataset.dept);
@@ -237,7 +259,38 @@ export class Tower {
     this.setAdmin(!!p.office?.on);
     this.labels(p);
     this.setBottleneck(p.bottleneck);
+    // First seconds only: bring the floor that matters (the cued one, else the limit, else the lobby) into view.
+    if (!this.touched && performance.now() - this.born < 2500 && !this.settling) {
+      this.settling = true;
+      requestAnimationFrame(() => {
+        this.settling = false;
+        if (!this.touched) this.reveal(this.relevant());
+      });
+    }
     return rebuilt;
+  }
+
+  private settling = false;
+
+  /** The floor most worth seeing on a short screen: the cue's, else the one that limits income, else the lobby. */
+  private relevant(): FloorId {
+    if (this.cued && this.floors.has(this.cued.room as FloorId)) return this.cued.room as FloorId;
+    if (this.props?.tutorial) return 'personnel';
+    if (this.props?.bottleneck === 'editing') return 'departments';
+    if (this.props?.bottleneck === 'typing') return 'pool';
+    return 'personnel';
+  }
+
+  /** Scrolls the building so a floor sits in the middle of the window (no-op when everything fits). */
+  private reveal(id: FloorId, onlyIfHidden = false): void {
+    const f = this.floors.get(id);
+    const b = this.bldg;
+    if (!f || f.hidden || b.scrollHeight <= b.clientHeight + 1) return;
+    const fr = f.getBoundingClientRect();
+    const br = b.getBoundingClientRect();
+    if (onlyIfHidden && fr.top >= br.top && fr.bottom <= br.bottom) return;
+    const mid = fr.top - br.top + b.scrollTop + fr.height / 2;
+    b.scrollTop = Math.max(0, Math.min(b.scrollHeight - b.clientHeight, mid - b.clientHeight / 2));
   }
 
   /** The Administration floor shows once the budget has opened; the Director's Office moves up a floor. */
@@ -338,6 +391,12 @@ export class Tower {
   /** The next-thing cue: a lit tag and lamp on the cued floor (and wing). */
   setCue(cue: Cue | null): void {
     this.cued = cue;
+    // A new cue on a floor that is scrolled out of view brings it back (not while the player is scrolling).
+    if (cue && cue.room !== this.lastCueRoom && !document.body.classList.contains('room-open')) {
+      const id = cue.room as FloorId;
+      requestAnimationFrame(() => this.reveal(id, this.touched));
+    }
+    this.lastCueRoom = cue?.room ?? '';
     for (const [id, tag] of this.cueEl) {
       const on = !!cue && cue.room === id;
       tag.hidden = !on;

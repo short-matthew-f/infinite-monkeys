@@ -77,13 +77,15 @@ never reimplement them.
   is the wallet (`bananas`) for everything bought by hand.
   - A quarter lasts 180 s. At quarter end the unspent wallet is swept into
     the pot and a review opens; signing (`signBudget`) splits the pot by the
-    new lines. An unsigned review closes at the next quarter end on the old
-    lines. Nothing waits for the player.
+    new lines. The clock stops at an open review and the next quarter starts
+    at signing, so time away closes at most one quarter. While a review
+    waits, the Bureau keeps working on the signed lines; only the pot waits,
+    and no requests are filed.
   - The heads set funding shares (`headShares`: the suggested-funding rule
     with Editing capped at 35%, 80% once every department is at stage 4).
     `setShares` is refused.
   - Requisitions: mid-quarter, the short department's head asks for 3 levels
-    at 80% of list price, paid from the wallet. It expires after 45 s.
+    at 80% of list price, paid from the wallet. It expires after 60 s.
   - `previewQuarter` plays the quarter out on a clone for the review's
     forecast. At the ceremony, accounts and the pot return to the wallet.
 - **Common research.** Faster typewriters (×1.25 typing, cost ×2.5 per

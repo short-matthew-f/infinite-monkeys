@@ -5,6 +5,9 @@ import { describe, expect, it } from 'vitest';
 import { prototypeTuning as TB, classicTuning as T } from '../content/prototype.js';
 import {
   buyDeptLevel,
+  DEPTS,
+  catchUp,
+  quarterSecondsLeft,
   createState,
   declareInfinity,
   declineRequisition,
@@ -101,7 +104,7 @@ describe('quarterly budget', () => {
     const s = opened();
     signBudget(s, TB, nullSink, LINES);
     const { events, sink } = collector();
-    run(s, TB, sink, ticks(Q));
+    run(s, TB, sink, ticks(Q) + 1); // the quarter starts at signing
     const ended = ofType(events, 'quarterEnded');
     expect(ended).toHaveLength(1);
     expect(ended[0]!.report.swept).toBeGreaterThan(0);
@@ -115,18 +118,39 @@ describe('quarterly budget', () => {
     expect(N.toNumber(s.budget!.pot)).toBe(0);
   });
 
-  it('never waits for the player: an unsigned review closes on the previous lines', () => {
+  it('waits for the player: the clock stops at an open review and the Bureau runs on the signed lines', () => {
     const s = opened();
     signBudget(s, TB, nullSink, LINES);
-    run(s, TB, nullSink, ticks(Q)); // review opens
+    run(s, TB, nullSink, ticks(Q) + 1); // review opens
+    const quarter = s.budget!.quarter;
+    const pot = N.toNumber(s.budget!.pot);
+    const levels = DEPTS.reduce((a, d) => a + s.depts[d].level, 0);
     const { events, sink } = collector();
-    run(s, TB, sink, ticks(Q)); // and closes unsigned
-    const ended = ofType(events, 'quarterEnded');
-    expect(ended).toHaveLength(1);
-    expect(ended[0]!.missedReview).toBe(true);
-    expect(s.budget!.lastReport!.ranOnOldLines).toBe(true);
-    expect(s.budget!.missedReviews).toBe(1);
-    expect(s.budget!.lines).toEqual(LINES);
+    run(s, TB, sink, ticks(3 * Q)); // three quarters' worth, unsigned
+    expect(ofType(events, 'quarterEnded')).toHaveLength(0);
+    expect(ofType(events, 'requisitionOpened')).toHaveLength(0);
+    expect(s.budget!.quarter).toBe(quarter);
+    expect(s.budget!.reviewDue).toBe(true);
+    expect(N.toNumber(s.budget!.pot)).toBeCloseTo(pot, 6);
+    expect(quarterSecondsLeft(s, TB)).toBe(Q);
+    // Departments keep buying levels from their accounts meanwhile.
+    expect(DEPTS.reduce((a, d) => a + s.depts[d].level, 0)).toBeGreaterThan(levels);
+    // Signing starts the next quarter's clock.
+    signBudget(s, TB, nullSink, LINES);
+    expect(quarterSecondsLeft(s, TB)).toBe(Q);
+    run(s, TB, nullSink, ticks(Q / 2));
+    expect(quarterSecondsLeft(s, TB)).toBeCloseTo(Q / 2, 6);
+  });
+
+  it('closes at most one quarter during a long time away', () => {
+    const s = opened();
+    signBudget(s, TB, nullSink, LINES);
+    const quarter = s.budget!.quarter;
+    const { events, sink } = collector();
+    catchUp(s, TB, sink, 8 * 3600);
+    expect(ofType(events, 'quarterEnded')).toHaveLength(1);
+    expect(s.budget!.quarter).toBe(quarter + 1);
+    expect(s.budget!.reviewDue).toBe(true);
   });
 
   it('is deterministic: chunked and continuous runs agree (the offline catch-up path)', () => {

@@ -2,7 +2,7 @@
    Performance (design/STYLE.md): ambient animation uses one transform per moving element;
    it pauses while a room is open and under reduced motion; the soft-shadow blur is a flat tint here. */
 .tower {
-  position: absolute; left: 0; right: 0; top: var(--hdr, 138px); bottom: 0;
+  position: absolute; left: 0; right: 0; top: var(--hdr, 138px); bottom: var(--dock-h, 0px);
   display: flex; flex-direction: column; align-items: center;
   padding: 0 10px calc(10px + env(safe-area-inset-bottom));
   transition: visibility 0s;
@@ -13,14 +13,19 @@
   flex: 1 1 0; min-height: 0; width: 100%; max-width: 520px; display: flex; flex-direction: column;
   background: var(--floor); border: 3px solid var(--edge); border-top-width: 0; border-radius: 0 0 4px 4px;
   box-shadow: 0 0 0 1.5px var(--concrete), 0 8px 18px var(--soft-sh);
+  /* On a short screen the floors keep their size and the building scrolls under the pinned roof (see --scene-min). */
+  overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin;
 }
-.flr { position: relative; flex: 1 1 0; min-height: 44px; overflow: hidden; border-top: 3px solid var(--edge); display: flex; flex-direction: column; }
+/* Short screens (a 360 x 640 phone with six floors): never squeeze a scene below a legible size. The floor
+   grows to rail + scene and the building scrolls; the roof band stays put above it. */
+@media (max-height: 700px) { .tower { --scene-min: 96px; } }
+.flr { position: relative; flex: 1 1 0; min-height: max(44px, calc(var(--rail, 26px) + 3px + var(--scene-min, 0px))); overflow: hidden; border-top: 3px solid var(--edge); display: flex; flex-direction: column; }
 /* the scene sits under the label rail, never under a label */
 .flr-view { position: relative; flex: 1 1 0; min-height: 0; }
 .flr:first-child { border-top: 0; }
 /* a soft shade under the ceiling, drawn once in CSS */
 .flr-view::before { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none; box-shadow: inset 0 12px 10px -10px color-mix(in srgb, var(--screen) 55%, transparent); }
-.flr-personnel { flex-grow: 1.5; }
+.flr-personnel { flex-grow: 1.5; min-height: max(44px, calc(var(--rail, 26px) + 3px + var(--scene-min, 0px) * 1.4)); }
 .flr[hidden] { display: none; }
 .flr-art { position: absolute; inset: 0; width: 100%; height: 100%; display: block; overflow: visible; }
 
