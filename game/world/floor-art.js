@@ -291,8 +291,8 @@ export function seatSVG(i, cx, yb, o = {}) {
   const flags = `${s.beh === 'sip' ? `--sa:${sa}deg;` : ''}`;
   const cls = `up seat b-${s.beh} f${s.fur} ${s.shirt}${s.gaze && s.beh !== 'read' && s.beh !== 'doze' && (hash(i) % 2) ? ' g-glance' : ''}${o.vacant ? ' vacant' : ''}${aa}`;
   const bpx = mouthPt;
-  return `<g transform="translate(${cx} ${yb})"><g class="${cls}" data-i="${i}" style="transform-origin:0px 0px;--t:${(.85 + (hash(i + 5) % 30) / 100).toFixed(2)};--d:-${((hash(i + 9) % 40) / 10).toFixed(1)}s;${flags}">` +
-    `<g class="tail">${tailSVG(s.tail, sw, lean)}</g><g class="chr">${chairSVG(s.chair, sw)}</g>${o.vacant ? vchair : ''}${mk}${desk}<g class="tw">${tw}${writing}</g>${o.vacant ? vdesk : ''}<g class="prp">${prop(s.prop, propX, -30)}</g>${page}<g class="hands">${armL}${armR}${stamper}</g></g></g>`;
+  return `<g transform="translate(${cx} ${yb})"><g class="${cls}" data-i="${i}"${o.vx ? ' data-vx' : ''} style="transform-origin:0px 0px;--t:${(.85 + (hash(i + 5) % 30) / 100).toFixed(2)};--d:-${((hash(i + 9) % 40) / 10).toFixed(1)}s;${flags}">` +
+    `<g class="tail">${tailSVG(s.tail, sw, lean)}</g><g class="chr">${chairSVG(s.chair, sw)}</g>${o.vacant || o.vx ? vchair : ''}${mk}${desk}<g class="tw">${tw}${writing}</g>${o.vacant || o.vx ? vdesk : ''}<g class="prp">${prop(s.prop, propX, -30)}</g>${page}<g class="hands">${armL}${armR}${stamper}</g></g></g>`;
 }
 
 /* standing monkey (aisle life): ground at 0,0 */
@@ -330,8 +330,8 @@ const TIER_NAMES = { letters: 'Letters', words: 'Words', phrases: 'Phrases', sen
 const DEPT_IDS = ['recruiting', 'construction', 'editing'];
 // What each room's full-width scene shows: [x, y, w, h] in the room art's own coordinates.
 const ROOM_VIEWS = {
-  personnel: [204, 1342, 400, 308],
-  pool: [214, 706, 352, 282],
+  personnel: [110, 1342, 510, 308],
+  pool: [214, 706, 352, 335],
   departments: [60, 140, 260, 184],
   research: [246, 424, 288, 208],
   director: [462, 140, 260, 184]
@@ -346,7 +346,8 @@ export function normalize(p) {
   const e = Math.max(0, Math.floor(p.editors || 0));
   return {
     seated: Math.min(seated, CAP), desks: Math.min(desks, CAP), crowd: seated > CAP ? 1 : 0,
-    candidate: p.candidate ? 1 : 0, editors: Math.min(ED_CAP, e < 1 ? 0 : e < 4 ? 1 : 2),
+    // only the first-hire pointer follows the candidate; the figure itself is toggled in place (patchLive) so a flipping free desk never redraws the room
+    candidate: p.tutorial && p.candidate ? 1 : 0, editors: Math.min(ED_CAP, e < 1 ? 0 : e < 4 ? 1 : 2),
     tiers: TIER_IDS.map(id => tierState(id)),
     depts: DEPT_IDS.map(dept),
     office: ms.has('office') ? 1 : 0, building: ms.has('building') ? 1 : 0, tall: ms.has('tall') ? 1 : 0,
@@ -442,10 +443,14 @@ export function volume(x, yb, state, id, w = 42, h = 27) {
   const nm = TIER_NAMES[id].toUpperCase(), y = yb - h;
   if (state === 'researching') return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2" fill="none" stroke="var(--edge)" stroke-width="1.4" stroke-dasharray="4 3" opacity=".8"/><path d="M${x + w / 2} ${y + h - 6}v-12m-5 5l5 -6l5 6" fill="none" stroke="var(--edge)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>`;
   if (state === 'discovered') return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2" fill="color-mix(in srgb, var(--olive) 78%, var(--screen))" stroke="var(--edge)" stroke-width="1.3"/><rect x="${x}" y="${y}" width="5" height="${h}" fill="var(--mustard)" stroke="var(--edge)" stroke-width="1"/>` +
-    `<text class="spine-t" x="${x + w / 2 + 2}" y="${y + 8}" style="font-size:6.4px;letter-spacing:.05em">${nm}</text><g transform="rotate(-7 ${x + w / 2 + 2} ${y + 18})"><rect class="stampd" x="${x + 8}" y="${y + 12}" width="${w - 11}" height="10"/><text class="stampt" x="${x + w / 2 + 2.5}" y="${y + 19.6}" style="font-size:5.6px;letter-spacing:.04em;fill:color-mix(in srgb, var(--alert) 55%, var(--edge))">DISCOVERED</text></g>`;
+    `<text class="spine-t" x="${x + w / 2 + 2}" y="${y + 8}" ${nm.length * 3.7 > w - 9 ? `textLength="${w - 9}" lengthAdjust="spacingAndGlyphs"` : ''} style="font-size:6.4px">${nm}</text>` +
+    // a stamp that fits its volume: the word on a roomy cover, a ringed tick on a small one (the Library's plate says "N of M tiers")
+    (w < 36
+      ? `<g transform="rotate(-7 ${x + w / 2 + 2} ${y + 18})"><circle class="stampd" cx="${x + w / 2 + 2.5}" cy="${y + 18}" r="6.4"/><path d="M${x + w / 2 - 1} ${y + 18}l2.6 2.8l4.6 -5.6" fill="none" stroke="var(--alert)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></g>`
+      : `<g transform="rotate(-7 ${x + w / 2 + 2} ${y + 18})"><rect class="stampd" x="${x + 8}" y="${y + 12}" width="${w - 11}" height="10"/><text class="stampt" x="${x + w / 2 + 2.5}" y="${y + 19.6}" textLength="${w - 15}" lengthAdjust="spacingAndGlyphs" style="font-size:5.6px;fill:color-mix(in srgb, var(--alert) 55%, var(--edge))">DISCOVERED</text></g>`);
   // locked: a closed volume wrapped in chain with a brass padlock
   return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2" fill="color-mix(in srgb, var(--concrete) 78%, var(--screen))" stroke="var(--edge)" stroke-width="1.3"/><rect x="${x}" y="${y}" width="5" height="${h}" fill="var(--concrete)" stroke="var(--edge)" stroke-width="1"/>` +
-    `<text class="spine-t" x="${x + w / 2 + 2}" y="${y + 8}" style="font-size:6.4px;letter-spacing:.05em">${nm}</text><path d="M${x + 4} ${y + h - 4}L${x + w - 2} ${y + 10}M${x + 4} ${y + 10}L${x + w - 2} ${y + h - 4}" stroke="var(--edge)" stroke-width="2.4" stroke-dasharray="3 2"/>` +
+    `<text class="spine-t" x="${x + w / 2 + 2}" y="${y + 8}" ${nm.length * 3.7 > w - 9 ? `textLength="${w - 9}" lengthAdjust="spacingAndGlyphs"` : ''} style="font-size:6.4px">${nm}</text><path d="M${x + 4} ${y + h - 4}L${x + w - 2} ${y + 10}M${x + 4} ${y + 10}L${x + w - 2} ${y + h - 4}" stroke="var(--edge)" stroke-width="2.4" stroke-dasharray="3 2"/>` +
     `<path d="M${x + w / 2 - 2} ${y + 14}v-3a3.6 3.6 0 0 1 7.2 0v3" fill="none" stroke="var(--screen)" stroke-width="1.6"/><rect class="brass" x="${x + w / 2 - 4.6}" y="${y + 13.6}" width="11" height="8" rx="1.4"/>`;
 }
 function librarySVG(n) {
@@ -539,7 +544,7 @@ function personnelSVG(n) {
   s += `<text class="sg sm" x="210" y="1215">Entrance</text>`;
   s += umbrellaStand(282, 1190) + ficus(30, 1204, 1.15);
   if (n.tutorial && n.candidate) s += nextCue(300, 1090);
-  if (n.candidate) s += `<g id="candpos" style="transform:translate(300px,1210px)"><g id="cand" class="cand">${stand(Object.assign({}, CANDIDATE, { H: 58, bw: 24 }), { hl: [-9, -26], hr: [12, -22], xr: '', front: `<rect x="10" y="-26" width="22" height="16" rx="2" fill="var(--walnut)" stroke="var(--edge)" stroke-width="1.2"/><path d="M16 -26v-4h10v4" fill="none" stroke="var(--edge)" stroke-width="1.6"/><rect x="19" y="-20" width="4" height="4" class="brass"/>` })}</g></g>`;
+  s += `<g data-cand id="candpos" style="transform:translate(300px,1210px)"><g id="cand" class="cand">${stand(Object.assign({}, CANDIDATE, { H: 58, bw: 24 }), { hl: [-9, -26], hr: [12, -22], xr: '', front: `<rect x="10" y="-26" width="22" height="16" rx="2" fill="var(--walnut)" stroke="var(--edge)" stroke-width="1.2"/><path d="M16 -26v-4h10v4" fill="none" stroke="var(--edge)" stroke-width="1.6"/><rect x="19" y="-20" width="4" height="4" class="brass"/>` })}</g></g>`;
   s += T(-100, -98, T(556, 1288, stand({ fur: 0, H: 58, bw: 28, tw: 1.15, hr: 12.5, ears: 'round', view: 'l', gaze: [-1, .7], eyes: 'heavy', mouth: 'flat', head: 'glassesR', tail: true, shirt: 'sk-shade' }, { hl: [-14, -34], hr: [-4, -34], front: `<g class="rpage" style="transform-origin:-18px -44px"><rect class="page" x="-28" y="-52" width="20" height="24" rx="1" transform="rotate(-6 -18 -40)"/><path d="M-24 -46h12M-24 -42h12M-24 -38h8" stroke="var(--concrete)" stroke-width="1" transform="rotate(-6 -18 -40)"/></g>` })) +
     pbox({ x: 500, yb: 1296, w: 112, h: 16, d: 10, c: 'walnut', extra: `<rect x="504" y="1268" width="104" height="8" fill="var(--paper-shade)" stroke="var(--edge)" stroke-width="1"/>` }) +
     pbox({ x: 664, yb: 1296, w: 46, h: 62, d: 9, c: 'mustard', extra: `<rect x="676" y="1246" width="22" height="4" rx="2" class="ink"/><rect class="page" x="684" y="1238" width="14" height="12" transform="rotate(12 690 1244)"/><rect x="672" y="1262" width="30" height="20" fill="var(--edge)" stroke="var(--screen)" stroke-width=".9"/><path d="M676 1268h22M676 1273h14" stroke="var(--concrete)" stroke-width="1"/>` }));

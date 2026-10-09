@@ -24,6 +24,7 @@ import { Ernest } from './world/ernest.js';
 import { progress } from './world/progress.js';
 import { RoomView, type Room } from './world/room.js';
 import { Tower, directorFloor, floorProps, type BudgetView } from './world/tower.js';
+import { Presenter } from './world/present.js';
 import { floorHint, officeHint } from './world/tower-art.js';
 
 // The place is the interface: each floor of the building opens its room, full screen.
@@ -76,7 +77,13 @@ upgradeSave(state);
 const returning = !!rec;
 
 let dirty = true;
-const ctx = createCtx(() => state, t, sink, onEvent, () => (dirty = true));
+// What the building displays from jittery quantities (free desks, the bottleneck, full meters): steadied here, never rebuilt per flip.
+const presenter = new Presenter();
+const view = (snap = false) => presenter.view(floorProps(state, t), state.tick, snap);
+const ctx = createCtx(() => state, t, sink, onEvent, () => {
+  dirty = true;
+  presenter.snap(); // the player acted: show the true values at once
+});
 
 // The feed subscribes before offline catch-up runs, so time away reaches the ticker.
 const renderFeed = feed.mount($('feed'), ctx);
@@ -122,7 +129,7 @@ const setHdr = () => document.documentElement.style.setProperty('--hdr', `${inse
 setHdr();
 addEventListener('resize', setHdr);
 
-let props = floorProps(state, t);
+let props = view(true);
 const tower = new Tower($('map'));
 tower.apply(props);
 
@@ -167,7 +174,7 @@ const payoffs = new Payoffs(stage, ctx, {
   room: () => (rooms.current ? { id: rooms.current.id, el: rooms.el } : null),
   busy: () => ceremony.isOpen,
 });
-const cooler = new Cooler(stage, ctx);
+const cooler = new Cooler(tower.roof, ctx);
 addEventListener('pointerdown', () => cooler.poke(), { capture: true });
 addEventListener('keydown', () => cooler.poke(), { capture: true });
 /** The Departments wing that opened the room, so focus can return to it. */
@@ -178,7 +185,7 @@ function openRoom(id: string, dept?: string): void {
   if (!room) return;
   closeDir();
   lastDept = dept;
-  props = floorProps(state, t);
+  props = view();
   rooms.open(room);
   progress.markOpened(id);
   if (cues.cue?.room === id) progress.ackCue(cues.cue.key);
@@ -214,7 +221,7 @@ onEvent((e) => {
 
 // A manual hire: the candidate walks from the street into the lobby.
 onEvent((e) => {
-  if (e.type === 'hire' && e.manual) tower.hire(Math.floor(N.toNumber(state.monkeys)) - 1, floorProps(state, t), !!rooms.current);
+  if (e.type === 'hire' && e.manual) tower.hire(Math.floor(N.toNumber(state.monkeys)) - 1, view(true), !!rooms.current);
 });
 
 // ---------- header controls ----------
@@ -226,7 +233,7 @@ function closeDir(): void {
   dirbtn.setAttribute('aria-expanded', 'false');
   $('reset-confirm').hidden = true;
 }
-const roomHint = (id: string): string => (isOffice(id) ? officeHint(id as (typeof OFFICE_IDS)[number], floorProps(state, t)) : floorHint(id, floorProps(state, t)));
+const roomHint = (id: string): string => (isOffice(id) ? officeHint(id as (typeof OFFICE_IDS)[number], props) : floorHint(id, props));
 /** The Directory lists the Administration offices only once the budget has opened. */
 let dirAdmin: boolean | null = null;
 function buildDir(): void {
@@ -354,15 +361,17 @@ startLoop(() => state, t, sink, () => {
   lastTick = state.tick;
   renderHeader();
   renderFeed();
-  props = floorProps(state, t);
+  props = view();
   tower.apply(props);
   tower.setBudget(budgetView());
   rooms.render();
   if (ceremony.isOpen) ceremony.render();
   memo.render();
+  document.body.classList.toggle('has-memo', !!document.querySelector('.memo-dock:not([hidden])'));
   buildDir();
   payoffs.render();
-  cooler.suppressed = !!rooms.current || ceremony.isOpen || payoffs.active;
+  // The cooler waits for rooms, the ceremony, a payoff, Ernest's card, and the clock's own "Review ready" tag (it shares the roof).
+  cooler.suppressed = !!rooms.current || ceremony.isOpen || payoffs.active || ernest.showing || !!state.budget?.reviewDue;
   cooler.render();
   ernest.update(rooms.current?.id ?? null);
   updateCue();
@@ -378,6 +387,7 @@ if (import.meta.env.DEV) {
         dirty = true;
       },
       run: (seconds: number) => catchUp(state, t, sink, seconds),
+      emit: (e: GameEvent) => sink(e),
       open: openRoom,
       openReview,
       t,

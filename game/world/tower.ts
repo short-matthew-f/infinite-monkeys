@@ -91,14 +91,17 @@ export class Tower {
   private arts = new Map<FloorId, SVGSVGElement>();
   private floors = new Map<FloorId, HTMLElement>();
   private cache = new Map<FloorId, string>();
+  /** The roof band: the quarter clock and the water-cooler card live here. */
+  readonly roof: HTMLElement;
   private hits = new Map<string, HTMLButtonElement>();
+  private cells = new Map<string, HTMLElement>();
   private key = '';
   private walking = 0;
   private deferred: FloorProps | null = null;
   private props: FloorProps | null = null;
   private cueEl = new Map<FloorId, HTMLElement>();
   private limitTag: HTMLElement;
-  private pileNote!: HTMLElement;
+  private pile = false;
   private cued: Cue | null = null;
   private clock: HTMLButtonElement;
   private clockArc: SVGCircleElement;
@@ -113,7 +116,7 @@ export class Tower {
   onOpen: (id: FloorId, from: HTMLElement, dept?: string) => void = () => {};
 
   constructor(private host: HTMLElement) {
-    const roof = el('div', 'roof');
+    const roof = (this.roof = el('div', 'roof'));
     roof.innerHTML = `<svg viewBox="0 -8 400 34" preserveAspectRatio="xMidYMax meet" aria-hidden="true">${roofSVG()}</svg>`;
     this.clock = el('button', 'qclock',
       `<span class="qtag" hidden></span><svg viewBox="0 0 40 40" width="40" height="40" aria-hidden="true"><circle class="qface" cx="20" cy="20" r="19"/><circle class="qtrack" cx="20" cy="20" r="${CLOCK_R}"/><circle class="qarc" cx="20" cy="20" r="${CLOCK_R}" transform="rotate(-90 20 20)" stroke-dasharray="${CLOCK_C.toFixed(2)}"/><circle class="qring" cx="20" cy="20" r="19"/><text class="qnum" x="20" y="24.5" text-anchor="middle">Q1</text></svg>`);
@@ -137,22 +140,32 @@ export class Tower {
   private floor(id: FloorId): HTMLElement {
     const f = el('div', `flr flr-${id}`);
     f.dataset.floor = id;
+    // Every floor is a label rail across its top and, below it, the scene. Text lives in the rail and the
+    // art never sits under it, so a label can never cover a figure. The whole floor is one big button.
+    const wings = id === 'departments' || id === 'admin';
+    const rail = el('div', wings ? 'rail rail-wings' : 'rail');
+    const view = el('div', 'flr-view');
     const art = document.createElementNS(NS, 'svg') as SVGSVGElement;
     art.setAttribute('class', 'flr-art');
     art.setAttribute('viewBox', `0 0 ${FLOOR_BOX[id][0]} ${FLOOR_BOX[id][1]}`);
-    art.setAttribute('preserveAspectRatio', 'xMidYMax meet');
+    art.setAttribute('preserveAspectRatio', id === 'personnel' ? 'xMaxYMax meet' : 'xMidYMax meet');
     art.setAttribute('aria-hidden', 'true');
-    f.append(art);
+    view.append(art);
+    f.append(rail, view);
     this.arts.set(id, art);
     this.floors.set(id, f);
-    f.append(el('span', 'fplate', `<span class="disc sm" aria-hidden="true">${DISC[id]}</span><span>${FLOOR_NAMES[id]}</span>`));
+    rail.append(el('span', 'fplate', `<span class="disc sm" aria-hidden="true">${DISC[id]}</span><span class="pn">${FLOOR_NAMES[id]}</span>`));
     const cue = el('span', 'cue-tag');
     cue.hidden = true;
     cue.setAttribute('aria-hidden', 'true');
     this.cueEl.set(id, cue);
     if (id === 'departments') {
+      // Each wing's label is a cell in the rail: its name and level, or (in the same place) the pile warning, the cue or a flash.
       for (const d of DEPTS) {
-        const w = el('button', `wing wing-${d}`, `<span class="wflash" hidden></span><span class="wlab"><span data-live="${d}"></span>${d === 'editing' ? '<span class="wnote" hidden><span aria-hidden="true">▲</span> Pages piling up</span>' : ''}<span class="acct" aria-hidden="true" hidden><span class="acct-l" aria-hidden="true">Acct</span><span class="acct-bar" aria-hidden="true"></span></span></span>`);
+        const c = el('span', `wcell wcell-${d}`, `<span class="wv wv-name">${DEPT_NAMES[d]} <span class="lvw">Lv </span><span data-live="lv:${d}"></span></span>${d === 'editing' ? '<span class="wv wv-note" aria-hidden="true"><span class="wg" aria-hidden="true">▲</span> Pages piling up</span>' : ''}<span class="wv wv-cue" aria-hidden="true"></span><span class="wv wv-flash" aria-hidden="true"></span><i class="acct-bar" aria-hidden="true" hidden></i>`);
+        this.cells.set(`departments:${d}`, c);
+        rail.append(c);
+        const w = el('button', `wing wing-${d}`);
         w.type = 'button';
         w.dataset.room = 'departments';
         w.dataset.dept = d;
@@ -160,12 +173,13 @@ export class Tower {
         this.hits.set(`departments:${d}`, w);
         f.append(w);
       }
-      this.pileNote = f.querySelector('.wnote') as HTMLElement;
     } else if (id === 'admin') {
       // Administration: three wings, each with its head. A wing opens that office's room.
       f.hidden = true;
       for (const o of OFFICE_IDS) {
-        const w = el('button', `wing wing-${o}`, `<span class="wlab"><span data-live="adm-${o}">${OFFICE_SHORT[o]}</span></span>`);
+        const c = el('span', `wcell wcell-${o}`, `<span class="wv wv-name"><span data-live="adm-${o}">${OFFICE_SHORT[o]}</span></span>`);
+        rail.append(c);
+        const w = el('button', `wing wing-${o}`);
         w.type = 'button';
         w.dataset.room = 'admin';
         w.dataset.dept = o;
@@ -179,10 +193,13 @@ export class Tower {
       b.dataset.room = id;
       b.setAttribute('aria-label', FLOOR_NAMES[id]);
       this.hits.set(id, b);
-      f.append(el('span', 'ftag', `<span data-live="${id}"></span>`), b);
-      if (id === 'pool') f.append(this.limitTag);
+      rail.append(el('span', 'ftag', `<span data-live="${id}"></span>`));
+      const flag = el('span', 'flag');
+      flag.append(cue);
+      if (id === 'pool') flag.append(this.limitTag);
+      rail.append(flag);
+      f.append(b);
     }
-    f.append(cue);
     return f;
   }
 
@@ -238,7 +255,7 @@ export class Tower {
     this.host.classList.toggle('budget', on);
     this.clock.hidden = !on;
     for (const d of DEPTS) {
-      const acct = this.hits.get(`departments:${d}`)?.querySelector<HTMLElement>('.acct');
+      const acct = this.cells.get(`departments:${d}`)?.querySelector<HTMLElement>('.acct-bar');
       if (!acct) continue;
       acct.hidden = !on;
       if (!b) continue;
@@ -264,18 +281,32 @@ export class Tower {
 
   /** A department bought a level from its own account. Flashes on its wing; bursts add up. */
   flashAuto(d: (typeof DEPTS)[number]): void {
-    const w = this.hits.get(`departments:${d}`);
-    const fl = w?.querySelector<HTMLElement>('.wflash');
-    if (!w || !fl) return;
+    const fl = this.cells.get(`departments:${d}`)?.querySelector<HTMLElement>('.wv-flash');
+    if (!fl) return;
     const prev = this.flashes.get(d);
     if (prev) window.clearTimeout(prev.timer);
     const n = (prev?.n ?? 0) + 1;
     fl.textContent = n === 1 ? '+1 level · auto' : `+${n} levels · auto`;
-    fl.hidden = false;
     fl.classList.remove('go');
     void fl.offsetWidth; // restart the animation
     fl.classList.add('go');
-    this.flashes.set(d, { n, timer: window.setTimeout(() => { fl.hidden = true; this.flashes.delete(d); }, 1900) });
+    this.flashes.set(d, { n, timer: window.setTimeout(() => { this.flashes.delete(d); this.paintCell(d); }, 1900) });
+    this.paintCell(d);
+  }
+
+  /**
+   * One wing's rail cell shows one thing at a time, all stacked in the same place so the rail never
+   * shifts: a flash of auto-bought levels, then the cue, then the pile warning, then its name and level.
+   */
+  private paintCell(d: (typeof DEPTS)[number]): void {
+    const c = this.cells.get(`departments:${d}`);
+    if (!c) return;
+    const cueOn = !!this.cued && this.cued.room === 'departments' && (this.cued.view && (DEPTS as readonly string[]).includes(this.cued.view) ? this.cued.view : 'recruiting') === d;
+    const st = this.flashes.has(d) ? 'flash' : cueOn ? 'cue' : this.pile && d === 'editing' ? 'note' : 'name';
+    if (c.dataset.state !== st) c.dataset.state = st;
+    const cueEl = c.querySelector<HTMLElement>('.wv-cue');
+    const want = cueOn ? `● ${this.cued!.tag}` : '';
+    if (cueEl && cueEl.textContent !== want) cueEl.textContent = want;
   }
 
   /** Button labels carry the same status words as the plates. */
@@ -294,8 +325,12 @@ export class Tower {
   /** core's finiteBottleneck, made readable without colour: a drawn pile and words on the wing, or a note on the pool. */
   setBottleneck(b: 'typing' | 'editing' | null): void {
     this.host.dataset.bottleneck = b ?? '';
-    this.pileNote.hidden = b !== 'editing';
+    this.pile = b === 'editing';
+    this.paintCell('editing');
     this.limitTag.hidden = b !== 'typing';
+    this.floors.get('pool')?.classList.toggle('flagged', b === 'typing');
+    // the pile and its warning are always drawn; this class shows them (a flip never redraws the floor)
+    this.floors.get('departments')?.classList.toggle('piled', b === 'editing');
     this.hits.get('departments:editing')?.classList.toggle('limit', b === 'editing');
     this.floors.get('pool')?.classList.toggle('limit', b === 'typing');
   }
@@ -308,7 +343,10 @@ export class Tower {
       tag.hidden = !on;
       if (on) tag.textContent = cue.tag;
       this.floors.get(id)?.classList.toggle('cued', on);
+      // A floor with a flag shows it in place of the status (when the rail is narrow); see tower.css
+      this.floors.get(id)?.classList.toggle('flagged', on || (id === 'pool' && !this.limitTag.hidden));
     }
+    for (const d of DEPTS) this.paintCell(d);
     for (const b of this.hits.values()) b.removeAttribute('aria-description');
     for (const d of DEPTS) this.hits.get(`departments:${d}`)?.classList.remove('cued');
     const wing = cue && cue.room === 'departments' && cue.view && (DEPTS as readonly string[]).includes(cue.view) ? this.hits.get(`departments:${cue.view}`) : undefined;

@@ -4,12 +4,9 @@
 .feed-clip { display: block; overflow: hidden; }
 .feed-text { display: inline-block; white-space: nowrap; }
 .feed-clip.is-printing .feed-text { animation: print .9s steps(24) 1 both; }
-.feed-text.is-panning { animation: feed-pan var(--pan-time, 6s) linear 1.2s 1 both; }
-@keyframes feed-pan { to { transform: translateX(var(--pan, 0)); } }
 .feedbtn.is-human .ft { background: var(--mustard); color: var(--screen); }
 .feedhist li.is-human span { border-left: 3px solid var(--mustard); padding-left: 6px; }
 .feed-count { color: var(--ink-muted); }
 @media (prefers-reduced-motion: reduce) {
-  .feed-clip.is-printing .feed-text, .feed-text.is-panning { animation: none; }
-  .feed-clip { text-overflow: ellipsis; }
+  .feed-clip.is-printing .feed-text { animation: none; }
 }

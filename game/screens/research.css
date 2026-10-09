@@ -5,4 +5,4 @@
 .sheet-pane .note.golden { font-size: 0.9rem; }
 /* Finished tiers: small stamps in a row, not a tall list. */
 .sheet-pane .chip-row .done-chip { min-height: 30px; padding: 2px 8px; gap: 6px; border-width: 2px; }
-.sheet-pane .chip-row .done-text { font-size: 0.78rem; letter-spacing: 0.08em; }
+.sheet-pane .chip-row .done-text { font-size: 0.875rem; letter-spacing: 0.05em; }

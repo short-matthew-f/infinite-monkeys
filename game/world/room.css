@@ -21,7 +21,7 @@
 .exit svg { flex: none; }
 .room-id { min-width: 0; text-align: right; }
 .room h2 { font-size: 1.5rem; line-height: 1; color: var(--head); }
-.room-id .form { margin: 3px 0 0; font-size: .72rem; letter-spacing: .04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.room-id .form { margin: 3px 0 0; font-size: .875rem; letter-spacing: .04em; }
 /* the scene: as wide as the stage, tall enough to read (at least 140 px), never more than a third of the screen */
 .room-scene {
   flex: none; position: relative; overflow: hidden; background: var(--floor); border-bottom: 3px solid var(--edge);

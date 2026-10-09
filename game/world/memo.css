@@ -1,7 +1,7 @@
 /* Requisition memo: a paper tab bottom-left that opens into a small card.
    Material vocabulary per design/STYLE.md: cut rims, two-tier shadows, typed headers, double-ruled stamp. */
 .memo-dock {
-  position: absolute; z-index: 38; left: 8px; bottom: calc(10px + env(safe-area-inset-bottom));
+  position: absolute; z-index: 38; left: 8px; bottom: calc(6px + env(safe-area-inset-bottom));
   display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
   width: min(300px, calc(100% - 16px)); pointer-events: none; transform-origin: 0 100%;
 }
@@ -35,17 +35,17 @@
 .memo-card::after { content: ''; position: absolute; inset: 4px; border: 1px solid var(--rule); border-radius: 2px; pointer-events: none; }
 @keyframes memoopen { from { transform: translateY(10px) scale(.96); opacity: 0; } to { transform: none; opacity: 1; } }
 .memo-card p { margin: 0; }
-.memo-typed { font: 400 .76rem var(--font-type); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-muted); }
+.memo-typed { font: 400 .875rem var(--font-type); letter-spacing: .06em; text-transform: uppercase; color: var(--ink); }
 .memo-ask { font: 600 1.02rem/1.35 var(--font-body); margin-top: 4px !important; }
-.memo-fact { font: 400 .9rem/1.4 var(--font-body); color: var(--ink-muted); margin-top: 2px !important; }
+.memo-fact { font: 400 .9rem/1.4 var(--font-body); color: var(--ink); margin-top: 2px !important; }
 .memo-rows { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; margin: 8px 0 6px; }
-.memo-rows dt { font: 400 .8rem var(--font-type); text-transform: uppercase; letter-spacing: .06em; color: var(--ink-muted); align-self: baseline; }
-.memo-rows dd { margin: 0; text-align: right; align-self: baseline; font-variant-numeric: tabular-nums; }
+.memo-rows dt { font: 400 .875rem var(--font-type); text-transform: uppercase; letter-spacing: .04em; color: var(--ink); align-self: baseline; }
+.memo-rows dd { margin: 0; text-align: right; display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: baseline; align-self: baseline; font-variant-numeric: tabular-nums; }
 .memo-v { font: 700 1.05rem var(--font-body); }
-.memo-list { margin-left: 8px; font: 400 .82rem var(--font-type); color: var(--ink-muted); }
+.memo-list { margin-left: 8px; font: 400 .875rem var(--font-type); color: var(--ink-muted); }
 .memo-bar { height: 10px; border: 1.5px solid var(--walnut); background: var(--sheet); position: relative; }
 .memo-bar > i { position: absolute; inset: 1px auto 1px 1px; max-width: calc(100% - 2px); background: repeating-linear-gradient(135deg, var(--olive) 0 5px, color-mix(in srgb, var(--olive) 62%, var(--edge)) 5px 8px); border-right: 3px solid var(--mustard); }
-.memo-why { font: 400 .85rem var(--font-type); color: var(--ink-muted); margin-top: 8px !important; }
+.memo-why { font: 400 .875rem var(--font-type); color: var(--ink-muted); margin-top: 8px !important; }
 .memo-why[hidden] { display: none; }
 .memo-acts { display: grid; grid-template-columns: 1.4fr 1fr; gap: 8px; margin-top: 10px; }
 .memo-btn {
@@ -75,3 +75,5 @@
   .memo-dock.arrive, .memo-dock.filing, .memo-card, .memo-tab svg, .memo-stamp.hit { animation: none !important; }
   .memo-dock.filing { opacity: 0; transition: opacity .12s; }
 }
+/* the tab sits over the bottom-left of a room's form: leave room to scroll the last lines clear of it */
+body.has-memo .sbody { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }

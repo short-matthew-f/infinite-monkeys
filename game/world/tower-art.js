@@ -28,16 +28,17 @@ function norm(p) {
   const seated = Math.max(0, Math.floor(p.seated || 0));
   const desks = Math.max(seated, Math.floor(p.desks || 0));
   const free = desks - seated;
-  const drawn = Math.min(seated, free > 0 ? 3 : 4);
-  const vac = Math.min(free, 4 - drawn);
+  // Late game the desks and the monkeys sit within one of each other, so a free desk comes and goes.
+  // With four seated the fourth desk is always drawn; it swaps seat for vacancy in place (patchLive), never a redraw.
+  const drawn = seated >= 4 ? 4 : seated;
+  const vac = seated >= 4 ? 0 : Math.min(free, 4 - drawn);
   const tierState = (id) => { const t = (p.tiers || []).find((x) => x.id === id); return t && ['researching', 'discovered'].includes(t.state) ? t.state : 'locked'; };
   const dept = (id) => { const d = (p.depts || {})[id] || {}; return [Math.min(5, Math.max(0, Math.floor(d.level || 0))), Math.min(4, Math.max(1, Math.floor(d.stage || 1)))]; };
   const e = Math.max(0, Math.floor(p.editors || 0));
   return {
-    pool: [drawn, vac], candidate: p.candidate ? 1 : 0,
+    pool: [drawn, vac],
     tiers: TIER_IDS.map(tierState), depts: DEPT_IDS.map(dept),
     editors: e < 1 ? 0 : 1, permit: p.permit ? 1 : 0,
-    pile: p.bottleneck === 'editing' ? 1 : 0,
     // the Administration floor and the amenities the Foreman has built; morale is patched in place, never part of the picture
     admin: p.office && p.office.on ? 1 : 0,
     amen: p.office && p.office.on ? [!!p.office.built.bathrooms, !!p.office.built.breakRoom, !!p.office.built.snackMachine].map(Number) : [0, 0, 0],
@@ -63,6 +64,7 @@ export function floorTag(id, p) {
   const seated = Math.max(0, Math.floor(p.seated || 0)), desks = Math.max(seated, Math.floor(p.desks || 0)), free = desks - seated;
   switch (id) {
     case 'personnel': return free > 0 ? `${count(free)} desk${free === 1 ? '' : 's'} free` : 'Desks full';
+    case 'pool': return `${count(seated)} seated`;
     case 'research': { const d = (p.tiers || []).filter((t) => t.state === 'discovered').length; return `${d} of ${(p.tiers || []).length} tiers`; }
     case 'director': { if (p.permit) return 'Permit stamped'; const m = p.meters || {}; return `${DEPT_IDS.filter((k) => (m[k] || 0) >= 1 - 1e-9).length} of 3 meters`; }
     case 'admin': return `Morale ${moralePct(p)}`;
@@ -89,12 +91,21 @@ export function patchLive(root, p) {
   const live = { 'morale-pct': mor, 'adm-facilities': `Morale ${mor}`, 'adm-accounting': o.audit ? 'Audit under way' : 'Accounting', 'adm-training': 'Training' };
   for (const el of root.querySelectorAll('[data-live]')) {
     const k = el.dataset.live;
-    const v = k in live ? live[k] : DEPT_IDS.includes(k) ? `${DEPT_NAMES[k]} Lv ${count((p.depts[k] || {}).level || 0)}` : k === 'free-board' ? String(Math.max(0, Math.floor(p.desks) - Math.floor(p.seated))) : floorTag(k, p);
+    const v = k in live ? live[k] : k.startsWith('lv:') ? count(((p.depts || {})[k.slice(3)] || {}).level || 0) : DEPT_IDS.includes(k) ? `${DEPT_NAMES[k]} Lv ${count((p.depts[k] || {}).level || 0)}` : k === 'free-board' ? String(Math.max(0, Math.floor(p.desks) - Math.floor(p.seated))) : floorTag(k, p);
     if (el.textContent !== v) el.textContent = v;
   }
   for (const el of root.querySelectorAll('[data-bar]')) {
     const v = `scaleY(${Math.max(0.03, Math.min(1, (p.meters || {})[el.dataset.bar] || 0)).toFixed(2)})`;
     if (el.style.transform !== v) el.style.transform = v;
+  }
+  // the waiting candidate and the fourth desk's vacancy: toggled in place, never part of the picture
+  const free = Math.max(0, Math.floor(p.desks) - Math.floor(p.seated));
+  for (const el of root.querySelectorAll('[data-cand]')) {
+    const v = p.candidate ? '' : 'none';
+    if (el.style.display !== v) el.style.display = v;
+  }
+  for (const el of root.querySelectorAll('[data-vx]')) {
+    if (el.classList.contains('vacant') !== free > 0) el.classList.toggle('vacant', free > 0);
   }
   // the morale dial's needle: one rotate
   for (const el of root.querySelectorAll('[data-needle]')) {
@@ -111,9 +122,10 @@ const back = (cls, h = H, yb = YB) =>
 const hanging = (x, len = 8) => `<g><path d="M${x} -120V${len}" stroke="var(--screen)" stroke-width="1"/><ellipse class="halo" cx="${x}" cy="${len + 8}" rx="30" ry="16" style="opacity:.55"/><path class="fr" style="--c:var(--tangerine)" d="M${x - 8} ${len + 5}L${x - 4} ${len - 2}H${x + 4}L${x + 8} ${len + 5}Z"/></g>`;
 const clock = (x, y, r = 9) => `<g><circle cx="${x}" cy="${y}" r="${r}" fill="var(--edge)" stroke="var(--screen)" stroke-width="1.2"/><path d="M${x} ${y}V${y - r * .62}M${x} ${y}l${r * .45} ${r * .2}" stroke="var(--screen)" stroke-width="1.2" stroke-linecap="round"/></g>`;
 // a monkey seated at a desk, scaled to fit the band
-const seat = (i, cx, yb, k, o) => `<g transform="translate(${cx} ${yb}) scale(${k})">${seatSVG(i, 0, 0, o || {})}</g>`;
+const ka = (name, svg) => `<g data-keyart="${name}">${svg}</g>`;
+const seat = (i, cx, yb, k, o) => `<g data-keyart="monkey" transform="translate(${cx} ${yb}) scale(${k})">${seatSVG(i, 0, 0, o || {})}</g>`;
 const mark = (cx, yb, k, faint) => `<g transform="translate(${cx} ${yb}) scale(${k})">${deskMark(0, 0, 64, faint, '')}</g>`;
-const standing = (x, y, k, s, pose) => `<g transform="translate(${x} ${y}) scale(${k})">${stand(s, pose)}</g>`;
+const standing = (x, y, k, s, pose) => `<g data-keyart="figure" transform="translate(${x} ${y}) scale(${k})">${stand(s, pose)}</g>`;
 
 /* ===== floor 1: street, lobby and Personnel ===== */
 const CLERK = { fur: 3, H: 56, bw: 30, tw: 1.1, hr: 12.5, ears: 'round', lean: 0, view: 'f', gaze: [.5, .6], eyes: 'open', mouth: 'smile', head: 'glassesR', body: 'bowtie', tail: 'curl', prop: 4, ps: 1, beh: 'slam', shirt: 'sk-paper', chair: 'round' };
@@ -121,21 +133,21 @@ function personnelFloor(n) {
   const yb = 88, FH = 134;
   let s = back('tw-pe', FH, yb) + hanging(190) + hanging(330);
   // the lobby door, with its sign, and a welcome mat
-  s += pbox({ x: 126, yb, w: 34, h: 56, d: 7, c: 'concrete', tabs: false, extra: `<rect x="130" y="${yb - 51}" width="26" height="51" fill="var(--glow)" stroke="var(--edge)" stroke-width="1.2"/><polygon points="130,${yb - 51} 130,${yb} 119,${yb + 4} 119,${yb - 55}" fill="var(--olive)" stroke="var(--edge)" stroke-width="1.1"/><circle cx="122" cy="${yb - 26}" r="1.6" class="brass"/>` });
+  s += ka('lobby-door', pbox({ x: 126, yb, w: 34, h: 56, d: 7, c: 'concrete', tabs: false, extra: `<rect x="130" y="${yb - 51}" width="26" height="51" fill="var(--glow)" stroke="var(--edge)" stroke-width="1.2"/><polygon points="130,${yb - 51} 130,${yb} 119,${yb + 4} 119,${yb - 55}" fill="var(--olive)" stroke="var(--edge)" stroke-width="1.1"/><circle cx="122" cy="${yb - 26}" r="1.6" class="brass"/>` }));
   s += `<rect class="fr c-mustard" x="124" y="${yb - 70}" width="38" height="9" rx="1.5"/><text class="sg sm" x="143" y="${yb - 62.6}" style="font-size:7.4px;letter-spacing:.1em">LOBBY</text>`;
   s += ficus(182, yb, .55);
   // More bathrooms: a second door by the lobby, once the Foreman has built it
   if (n.amen[0]) s += pbox({ x: 70, yb, w: 30, h: 48, d: 6, c: 'concrete', tabs: false, extra: `<rect x="74" y="${yb - 43}" width="22" height="43" fill="var(--screen)" stroke="var(--edge)" stroke-width="1.1"/><path d="M76 ${yb - 41}L92 ${yb - 38}V${yb}H76Z" fill="var(--walnut)" stroke="var(--edge)" stroke-width="1.1"/><circle cx="89" cy="${yb - 22}" r="1.4" class="brass"/><rect x="73" y="${yb - 58}" width="24" height="9" rx="1.5" class="brass"/><text class="sg sm" x="85" y="${yb - 51}" style="font-size:7px">WC</text>` });
   // the clerk's desk and the filing cabinet
   s += seat(41, 236, yb, .74, { over: CLERK });
-  s += pbox({ x: 288, yb, w: 28, h: 46, d: 7, c: 'steel', extra: drawers(288, yb - 40, 28, 2, 18, false) });
+  s += ka('cabinet', pbox({ x: 288, yb, w: 28, h: 46, d: 7, c: 'steel', extra: drawers(288, yb - 40, 28, 2, 18, false) }));
   // a board that counts the free desks
-  s += `<g class="up" style="transform-origin:352px ${yb}px"><rect class="fr c-mustard" x="326" y="22" width="52" height="34" rx="2"/><rect x="330" y="26" width="44" height="26" fill="var(--screen)" stroke="var(--edge)" stroke-width=".8"/>` +
+  s += `<g class="up" data-keyart="free-desks-board" style="transform-origin:352px ${yb}px"><rect class="fr c-mustard" x="326" y="22" width="52" height="34" rx="2"/><rect x="330" y="26" width="44" height="26" fill="var(--screen)" stroke="var(--edge)" stroke-width=".8"/>` +
     `<text x="352" y="34.4" style="font:700 6.6px var(--font-display);letter-spacing:.14em;fill:var(--screen-muted);text-anchor:middle;text-transform:uppercase">Free desks</text><text data-live="free-board" x="352" y="48" style="font:600 13px var(--font-mono);fill:var(--screen-ink);text-anchor:middle"></text></g>`;
   // the street: kerb, road, the applicants' bus
   s += `<rect class="tw-walk" x="-260" y="${yb + 10}" width="920" height="7"/><path class="tw-edge" d="M-260 ${yb + 10}H660"/><rect class="tw-road" x="-260" y="${yb + 17}" width="920" height="${FH - yb - 17}"/><path d="M-260 ${yb + 30}H660" stroke="var(--mustard)" stroke-width="1.6" stroke-dasharray="10 9" opacity=".8"/>`;
   s += `<g><rect x="262" y="${yb + 2}" width="104" height="24" rx="5" fill="var(--mustard)" stroke="var(--edge)" stroke-width="1.6"/><rect x="270" y="${yb + 6}" width="78" height="8" fill="color-mix(in srgb, var(--glow) 60%, var(--edge))" stroke="var(--screen)" stroke-width=".6"/><rect x="268" y="${yb + 17}" width="70" height="6" fill="var(--screen)"/><text x="303" y="${yb + 22.4}" style="font:700 5.2px var(--font-display);letter-spacing:.12em;fill:var(--screen-ink);text-anchor:middle">APPLICANTS</text><circle cx="284" cy="${yb + 27}" r="5" fill="var(--screen)" stroke="var(--edge)"/><circle cx="346" cy="${yb + 27}" r="5" fill="var(--screen)" stroke="var(--edge)"/></g>`;
-  if (n.candidate) s += `<g transform="translate(238 ${yb + 22}) scale(.6)"><g id="t-cand" class="cand">${stand(Object.assign({}, CANDIDATE, { H: 58, bw: 24 }), { hl: [-9, -26], hr: [12, -22], front: `<rect x="10" y="-26" width="22" height="16" rx="2" fill="var(--walnut)" stroke="var(--edge)" stroke-width="1.2"/><path d="M16 -26v-4h10v4" fill="none" stroke="var(--edge)" stroke-width="1.6"/><rect x="19" y="-20" width="4" height="4" class="brass"/>` })}</g></g>`;
+  s += `<g data-cand data-keyart="candidate" transform="translate(238 ${yb + 22}) scale(.6)"><g id="t-cand" class="cand">${stand(Object.assign({}, CANDIDATE, { H: 58, bw: 24 }), { hl: [-9, -26], hr: [12, -22], front: `<rect x="10" y="-26" width="22" height="16" rx="2" fill="var(--walnut)" stroke="var(--edge)" stroke-width="1.2"/><path d="M16 -26v-4h10v4" fill="none" stroke="var(--edge)" stroke-width="1.6"/><rect x="19" y="-20" width="4" height="4" class="brass"/>` })}</g></g>`;
   s += `<g class="tw-fx"></g>`;
   return s;
 }
@@ -146,7 +158,8 @@ function poolFloor(n) {
   let s = back('tw-pl') + hanging(150) + hanging(300) + clock(62, 34) + ficus(104, YB, .6);
   const [drawn, vac] = n.pool;
   for (let i = 0; i < 4; i++) {
-    if (i < drawn) s += seat(i, xs[i], YB, k);
+    if (i === 3 && drawn === 4) s += seat(i, xs[i], YB, k, { vx: true });
+    else if (i < drawn) s += seat(i, xs[i], YB, k);
     else if (i < drawn + vac) s += seat(i, xs[i], YB, k, { vacant: true });
     else s += mark(xs[i], YB, k, i > drawn + vac);
   }
@@ -167,14 +180,14 @@ function departmentsFloor(n) {
   let s = back('tw-dp') + wing(0, 'w-r') + wing(133, 'w-c') + wing(266, 'w-e') + hanging(66) + hanging(200) + hanging(332);
   // Recruiting: a filing cabinet that gains drawers, a headset and a telephone
   const rA = 2 + Math.min(lr, 1), hA = 12 + rA * 12;   // kept low so the floor's nameplate never hides the top drawer
-  s += pbox({ x: 10, yb: YB, w: 34, h: hA, d: 7, c: 'steel', extra: drawers(10, YB - hA + 5, 34, rA, 12, false) });
+  s += ka('cabinet', pbox({ x: 10, yb: YB, w: 34, h: hA, d: 7, c: 'steel', extra: drawers(10, YB - hA + 5, 34, rA, 12, false) }));
   s += standing(88, YB - 6, .66, { fur: 1, H: 62, bw: 26, tw: 1.1, hr: 12, ears: 'big', view: 'pl', gaze: [-1, .3], eyes: 'open', mouth: 'smile', head: 'phones', tail: true, shirt: 'sk-rust' }, { hr: [-13, -50], hl: [-6, -22], xr: `<path d="M-10 -52l-5 3v8l5 -3z" fill="var(--screen)" stroke="var(--edge)" stroke-width="1"/>` });
   s += `<g><rect class="fr c-concrete" x="104" y="${YB - 11}" width="22" height="11" rx="1.5"/><path d="M108 ${YB - 11}q0 -7 6 -6t6 6" fill="none" stroke="var(--screen)" stroke-width="2.4" stroke-linecap="round"/></g>`;
   s += stageLamps(124, 68, sr);
   // Construction: a desk frame going up, planks, the Foreman with a hammer
   const plank = Math.min(1 + lc, 4);
   s += Array.from({ length: plank }, (_, k) => `<rect class="fr c-walnut" x="${140 + (k % 2) * 3}" y="${YB - 5 - k * 5}" width="34" height="4.6" rx="1"/>`).join('');
-  s += pbox({ x: 182, yb: YB, w: 40, h: 24, d: 7, c: 'walnut', extra: `<path d="M184 ${YB - 24}v-22M220 ${YB - 24}v-22M184 ${YB - 46}h36" stroke="var(--edge)" stroke-width="2" stroke-dasharray="4 3" fill="none"/>` });
+  s += ka('desk-frame', pbox({ x: 182, yb: YB, w: 40, h: 24, d: 7, c: 'walnut', extra: `<path d="M184 ${YB - 24}v-22M220 ${YB - 24}v-22M184 ${YB - 46}h36" stroke="var(--edge)" stroke-width="2" stroke-dasharray="4 3" fill="none"/>` }));
   s += standing(246, YB - 6, .66, { fur: 4, H: 64, bw: 28, tw: 1.1, hr: 12, ears: 'tuft', view: 'pl', gaze: [-1, .4], eyes: 'open', mouth: 'smirk', head: 'none', tail: true, shirt: 'sk-mustard', beh: 'slam' },
     { hl: [-8, -24], hr: [-14, -40], front: hardhat(64) + `<g class="hammer" style="transform-origin:-14px -40px"><rect x="-17" y="-50" width="3" height="16" fill="var(--walnut)" stroke="var(--edge)" stroke-width=".8"/><rect x="-23" y="-54" width="14" height="7" rx="1.4" fill="var(--concrete)" stroke="var(--edge)" stroke-width=".9"/></g>` });
   s += stageLamps(257, 68, sc);
@@ -182,10 +195,11 @@ function departmentsFloor(n) {
   s += seat(40, 322, YB, .72, { over: EDITOR, dw: 84 });
   if (n.editors) s += seat(42, 288, YB, .5, { over: Object.assign({}, EDITOR, { fur: 2, H: 54, bw: 40, hr: 13, view: 'pr', gaze: [1, .3], head: 'none', body: 'cardigan', shirt: 'sk-paper', chair: 'short', flange: false, ears: 'tuft', lean: -5 }), dw: 64 });
   // the in-tray: two sheets, or a pile to the ceiling when finds are going unreviewed
-  const sheets = n.pile ? 11 : 2;
-  s += `<g class="${n.pile ? 'pile' : ''}">` + pbox({ x: 358, yb: YB, w: 30, h: 12, d: 6, c: 'walnut', tabs: false, extra: '' }) +
-    Array.from({ length: sheets }, (_, k) => `<rect class="page" x="${360 + (k % 3) * 2 - (k > 6 ? 3 : 0)}" y="${YB - 16 - k * 4.4}" width="${27 - (k % 2) * 2}" height="4" rx=".8" transform="rotate(${((k * 37) % 9) - 4} 372 ${YB - 14 - k * 4.4})"/>`).join('') + `</g>`;
-  if (n.pile) s += `<g><path d="M392 ${YB - 62}l9 15h-18z" fill="var(--alert)" stroke="var(--edge)" stroke-width="1.4" stroke-linejoin="round"/><path d="M392 ${YB - 58}v7" stroke="var(--edge)" stroke-width="2" stroke-linecap="round"/><circle cx="392" cy="${YB - 48.5}" r="1.2" fill="var(--edge)"/></g>`;
+  // Both states are drawn; the wing's `piled` class (tower.ts) shows the pile and the warning, so the picture never redraws when the bottleneck flips.
+  const sheets = 11;
+  s += `<g class="pile" data-keyart="in-tray">` + pbox({ x: 358, yb: YB, w: 30, h: 12, d: 6, c: 'walnut', tabs: false, extra: '' }) +
+    Array.from({ length: sheets }, (_, k) => `<rect class="page${k >= 2 ? ' pgx' : ''}" x="${360 + (k % 3) * 2 - (k > 6 ? 3 : 0)}" y="${YB - 16 - k * 4.4}" width="${27 - (k % 2) * 2}" height="4" rx=".8" transform="rotate(${((k * 37) % 9) - 4} 372 ${YB - 14 - k * 4.4})"/>`).join('') + `</g>`;
+  s += `<g class="pgx"><path d="M392 ${YB - 62}l9 15h-18z" fill="var(--alert)" stroke="var(--edge)" stroke-width="1.4" stroke-linejoin="round"/><path d="M392 ${YB - 58}v7" stroke="var(--edge)" stroke-width="2" stroke-linecap="round"/><circle cx="392" cy="${YB - 48.5}" r="1.2" fill="var(--edge)"/></g>`;
   s += stageLamps(390, 68, se);
   return s;
 }
@@ -198,13 +212,13 @@ function adminFloor(n) {
   s += pbox({ x: 8, yb: YB, w: 42, h: 15, d: 6, c: 'walnut', tabs: false }) + pizzaBox(24, YB - 15, 26) + pizzaBox(24, YB - 22, 26, true) + pizzaBox(42, YB - 15, 20);
   // the floor's plate hides the top left of the wing: the manager is drawn small, so his face clears it
   s += standing(70, YB - 6, .52, FM, { xr: clipboard(2, -58) });
-  s += moraleDial(108, 58, 14);
+  s += ka('morale-dial', moraleDial(108, 58, 14));
   // Accounting: the Chief Accountant at the ledger, a filing cabinet, a chart on the wall
-  s += `<rect x="144" y="26" width="26" height="22" fill="var(--paper)" stroke="var(--walnut)" stroke-width="2.4"/><path d="M148 43l6 -8l5 4l8 -10" stroke="var(--olive)" stroke-width="1.8" fill="none"/>`;
+  s += `<rect data-keyart="wall-chart" x="144" y="26" width="26" height="22" fill="var(--paper)" stroke="var(--walnut)" stroke-width="2.4"/><path d="M148 43l6 -8l5 4l8 -10" stroke="var(--olive)" stroke-width="1.8" fill="none"/>`;
   s += seat(2, 204, YB, .72, { over: Object.assign({}, CA, { beh: 'read' }), dw: 84 });
-  s += pbox({ x: 238, yb: YB, w: 24, h: 46, d: 6, c: 'steel', extra: drawers(238, YB - 40, 24, 3, 13, false) });
+  s += ka('cabinet', pbox({ x: 238, yb: YB, w: 24, h: 46, d: 6, c: 'steel', extra: drawers(238, YB - 40, 24, 3, 13, false) }));
   // Training: a chalkboard, the officer with a pointer, a trainee at a desk
-  s += `<rect x="274" y="14" width="56" height="34" rx="2" fill="var(--paper)" stroke="var(--walnut)" stroke-width="3"/><path d="M280 26h34M280 34h22" stroke="var(--olive)" stroke-width="2.4" stroke-linecap="round"/><rect x="316" y="30" width="9" height="9" fill="none" stroke="var(--alert)" stroke-width="1.6"/>`;
+  s += `<rect data-keyart="chalkboard" x="274" y="14" width="56" height="34" rx="2" fill="var(--paper)" stroke="var(--walnut)" stroke-width="3"/><path d="M280 26h34M280 34h22" stroke="var(--olive)" stroke-width="2.4" stroke-linecap="round"/><rect x="316" y="30" width="9" height="9" fill="none" stroke="var(--alert)" stroke-width="1.6"/>`;
   s += seat(9, 306, YB, .5, { over: { beh: 'type', head: 'pencil' }, dw: 60 });
   s += standing(362, YB - 6, .66, TO, { hl: [-30, -84], xl: `<path d="M-30 -84l-30 -22" stroke="var(--walnut)" stroke-width="2.4" stroke-linecap="round"/><circle cx="-60" cy="-106" r="2.2" fill="var(--alert)"/>` });
   return s;
@@ -217,13 +231,13 @@ function researchFloor(n) {
   const bx = 128, bw = 80, bh = 74;
   let shelves = '';
   for (let r = 0; r < 3; r++) { const sy = YB - 4 - (2 - r) * 22; shelves += shelfBooks(bx + 3, sy, bw - 6, 11 + r * 5, 18) + `<rect x="${bx + 3}" y="${sy}" width="${bw - 6}" height="3" fill="var(--walnut)" stroke="var(--edge)" stroke-width=".8"/>`; }
-  s += pbox({ x: bx, yb: YB, w: bw, h: bh, d: 8, c: 'walnut', extra: `<rect x="${bx + 3}" y="${YB - bh + 4}" width="${bw - 6}" height="${bh - 8}" fill="var(--screen)" opacity=".6"/>${shelves}<rect x="${bx + 3}" y="${YB - bh + 4}" width="${bw - 6}" height="${bh - 8}" fill="none" stroke="var(--edge)" stroke-width=".9"/>` });
+  s += ka('bookcase', pbox({ x: bx, yb: YB, w: bw, h: bh, d: 8, c: 'walnut', extra: `<rect x="${bx + 3}" y="${YB - bh + 4}" width="${bw - 6}" height="${bh - 8}" fill="var(--screen)" opacity=".6"/>${shelves}<rect x="${bx + 3}" y="${YB - bh + 4}" width="${bw - 6}" height="${bh - 8}" fill="none" stroke="var(--edge)" stroke-width=".9"/>` }));
   // the librarian, with an armful of volumes
   s += standing(232, YB - 4, .64, { fur: 3, H: 60, bw: 24, tw: 1.1, hr: 11.5, ears: 'round', view: 'pr', gaze: [1, .5], eyes: 'open', mouth: 'smile', head: 'none', tail: true, shirt: 'sk-shade' },
     { hl: [-8, -26], hr: [12, -30], front: `<g><rect x="3" y="-40" width="24" height="5" fill="var(--alert)" stroke="var(--edge)" stroke-width=".8"/><rect x="2" y="-35" width="24" height="5" fill="var(--mustard)" stroke="var(--edge)" stroke-width=".8"/><rect x="4" y="-30" width="22" height="4.6" fill="var(--olive)" stroke="var(--edge)" stroke-width=".8"/></g>` });
   // the volume rack: one volume per tier
   s += pbox({ x: 262, yb: YB, w: 134, h: 14, d: 6, c: 'walnut', tabs: false });
-  s += n.tiers.map((st, i) => volume(265 + i * 33, YB - 14, st, TIER_IDS[i], 30, 26)).join('');
+  s += n.tiers.map((st, i) => ka('volume', volume(265 + i * 33, YB - 14, st, TIER_IDS[i], 30, 26))).join('');
   if (n.tiers.includes('researching')) s += `<g class="spark" style="--d:0s"><path d="M${265 + n.tiers.indexOf('researching') * 33 + 15} 30l2 5l5 2l-5 2l-2 5l-2 -5l-5 -2l5 -2z" fill="var(--mustard)" stroke="var(--edge)" stroke-width=".6"/></g>`;
   return s;
 }
@@ -235,16 +249,16 @@ function directorFloor(n) {
   // three readiness meters, filled live
   [['recruiting', 'R'], ['construction', 'C'], ['editing', 'E']].forEach(([id, ch], i) => {
     const x = 138 + i * 22;
-    s += `<g><rect x="${x}" y="22" width="16" height="54" rx="2" fill="var(--screen)" stroke="var(--edge)" stroke-width="1.2"/><rect class="mbar" data-bar="${id}" x="${x + 2}" y="24" width="12" height="50" rx="1" fill="${['var(--tangerine)', 'var(--mustard)', 'var(--phosphor-green)'][i]}"/><text x="${x + 8}" y="${YB - 3.5}" style="font:700 8.6px var(--font-display);fill:var(--ink);text-anchor:middle">${ch}</text></g>`;
+    s += `<g data-keyart="meter"><rect x="${x}" y="22" width="16" height="54" rx="2" fill="var(--screen)" stroke="var(--edge)" stroke-width="1.2"/><rect class="mbar" data-bar="${id}" x="${x + 2}" y="24" width="12" height="50" rx="1" fill="${['var(--tangerine)', 'var(--mustard)', 'var(--phosphor-green)'][i]}"/><text x="${x + 8}" y="${YB - 3.5}" style="font:700 8.6px var(--font-display);fill:var(--ink);text-anchor:middle">${ch}</text></g>`;
   });
   // the Permit panel on the wall: glowing and blank, or stamped
   const px = 318, py = 12;
   s += n.permit
-    ? `<rect x="${px}" y="${py}" width="50" height="44" fill="var(--mustard)" stroke="var(--edge)" stroke-width="1.6"/><rect x="${px + 4}" y="${py + 4}" width="42" height="36" fill="var(--edge)" stroke="var(--screen)" stroke-width="1"/><path d="M${px + 8} ${py + 10}h30M${px + 8} ${py + 15}h30" stroke="var(--concrete)" stroke-width="1.2"/><g transform="rotate(-9 ${px + 25} ${py + 28})"><rect class="stampd" x="${px + 9}" y="${py + 21}" width="32" height="13" style="stroke-width:1.7"/><text class="stampt" x="${px + 25}" y="${py + 31}" style="font-size:8.4px">PERMIT</text></g><circle cx="${px + 25}" cy="${py + 47}" r="5" class="brass"/>`
-    : `<polygon points="${px},${py} ${px + 50},${py} ${px + 46},${py + 44} ${px + 4},${py + 44}" fill="var(--glow)" stroke="var(--edge)" stroke-width="1.4"/><text x="${px + 25}" y="${py + 26}" style="font:700 7px var(--font-display);letter-spacing:.14em;fill:var(--screen);text-anchor:middle">PERMIT</text>`;
+    ? `<g data-keyart="permit"><rect x="${px}" y="${py}" width="50" height="44" fill="var(--mustard)" stroke="var(--edge)" stroke-width="1.6"/><rect x="${px + 4}" y="${py + 4}" width="42" height="36" fill="var(--edge)" stroke="var(--screen)" stroke-width="1"/><path d="M${px + 8} ${py + 10}h30M${px + 8} ${py + 15}h30" stroke="var(--concrete)" stroke-width="1.2"/><g transform="rotate(-9 ${px + 25} ${py + 28})"><rect class="stampd" x="${px + 9}" y="${py + 21}" width="32" height="13" style="stroke-width:1.7"/><text class="stampt" x="${px + 25}" y="${py + 31}" style="font-size:8.4px">PERMIT</text></g><circle cx="${px + 25}" cy="${py + 47}" r="5" class="brass"/></g>`
+    : `<g data-keyart="permit"><polygon points="${px},${py} ${px + 50},${py} ${px + 46},${py + 44} ${px + 4},${py + 44}" fill="var(--glow)" stroke="var(--edge)" stroke-width="1.4"/><text x="${px + 25}" y="${py + 26}" style="font:700 7px var(--font-display);letter-spacing:.14em;fill:var(--screen);text-anchor:middle">PERMIT</text></g>`;
   // the Director behind the desk: a silhouette, a lamp and the waiting stamp
-  s += `<g class="dsil" style="transform-origin:262px ${YB - 20}px"><rect class="sil" x="248" y="${YB - 58}" width="28" height="40" rx="11"/><circle class="sil" cx="262" cy="${YB - 58}" r="12"/><circle class="sil" cx="248" cy="${YB - 59}" r="5"/><circle class="sil" cx="276" cy="${YB - 59}" r="5"/></g>`;
-  s += pbox({ x: 214, yb: YB, w: 106, h: 22, d: 7, c: 'walnut', extra: `<rect x="258" y="${YB - 16}" width="18" height="3.2" rx="1.2" class="brass"/><rect x="220" y="${YB - 20}" width="24" height="8" fill="var(--edge)" stroke="var(--concrete)" stroke-width=".7"/>` });
+  s += `<g class="dsil" data-keyart="director" style="transform-origin:262px ${YB - 20}px"><rect class="sil" x="248" y="${YB - 58}" width="28" height="40" rx="11"/><circle class="sil" cx="262" cy="${YB - 58}" r="12"/><circle class="sil" cx="248" cy="${YB - 59}" r="5"/><circle class="sil" cx="276" cy="${YB - 59}" r="5"/></g>`;
+  s += ka('director-desk', pbox({ x: 214, yb: YB, w: 106, h: 22, d: 7, c: 'walnut', extra: `<rect x="258" y="${YB - 16}" width="18" height="3.2" rx="1.2" class="brass"/><rect x="220" y="${YB - 20}" width="24" height="8" fill="var(--edge)" stroke="var(--concrete)" stroke-width=".7"/>` }));
   s += `<rect x="292" y="${YB - 31}" width="20" height="9" fill="var(--mustard)" stroke="var(--edge)" stroke-width="1"/>` + (n.permit ? `<rect class="stampd" x="295" y="${YB - 30}" width="14" height="6" style="stroke-width:1.2"/>` : `<g class="dst"><rect x="299" y="${YB - 44}" width="3" height="13" fill="var(--walnut)" stroke="var(--edge)" stroke-width=".7"/><rect x="293" y="${YB - 34}" width="15" height="6" rx="1.4" class="ink"/></g>`);
   s += lamp(392, YB, 0).replace(/ry="26"/, 'ry="20"');
   return s;

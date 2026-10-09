@@ -254,23 +254,37 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
 
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
   let printedTop: Entry | null = null;
+  let fullText = '';
+  /**
+   * The collapsed line shows whole words and an ellipsis, never a word cut in half. The full line is one tap
+   * away (the history), and stays in the accessible name. No marquee: nothing moves, so reduced motion keeps the meaning.
+   */
+  const fit = () => {
+    if (!fullText) return;
+    lineEl.textContent = fullText;
+    const room = clip.clientWidth;
+    if (room <= 0 || lineEl.offsetWidth <= room) {
+      lineEl.removeAttribute('title');
+      return;
+    }
+    const words = fullText.split(' ');
+    while (words.length > 1) {
+      words.pop();
+      lineEl.textContent = `${words.join(' ').replace(/[\s,;:.\-]+$/, '')}…`;
+      if (lineEl.offsetWidth <= room) break;
+    }
+    lineEl.title = fullText;
+  };
+  new ResizeObserver(fit).observe(clip);
   const showTop = (e: Entry) => {
     printedTop = e;
-    text(lineEl, e.text);
+    fullText = e.text;
+    fit();
     tick.classList.toggle('is-human', e.human);
-    // Restart the print-in animation, then pan the line if it overflows the strip.
-    lineEl.classList.remove('is-panning');
     clip.classList.remove('is-printing');
-    lineEl.style.removeProperty('--pan');
     if (reduced.matches) return;
-    void clip.offsetWidth;
+    void clip.offsetWidth; // restart the print-in animation
     clip.classList.add('is-printing');
-    const overflow = lineEl.offsetWidth - clip.clientWidth;
-    if (overflow > 2) {
-      lineEl.style.setProperty('--pan', `-${overflow + 4}px`);
-      lineEl.style.setProperty('--pan-time', `${Math.max(3, overflow / 28)}s`);
-      lineEl.classList.add('is-panning');
-    }
   };
 
   push(lastTick, OPENING_LINE);

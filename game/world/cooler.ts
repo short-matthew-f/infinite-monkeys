@@ -13,7 +13,7 @@ import { headSVG } from './floor-art.js';
 import './cooler.css';
 
 const IDLE_MS = 20_000;
-const SHOW_MS = 8_000;
+const SHOW_MS = 9_000;
 const RECENT_AVOID = 6;
 
 type Line = readonly [string, string];
@@ -91,7 +91,6 @@ export class Cooler {
 
   private readonly card: HTMLElement;
   private readonly lineA: HTMLElement;
-  private readonly lineB: HTMLElement;
   private readonly recent: string[] = [];
   private lastInput: number;
   private shownAt = 0;
@@ -99,14 +98,16 @@ export class Cooler {
   private spent = false;
   private visible = false;
 
+  private speaker: HTMLElement;
+  private beat = 0;
+  private said: Line = ['', ''];
+
+  /** `parent` is the roof band: the card fills the strip left of the quarter clock. */
   constructor(parent: HTMLElement, private readonly ctx: Ctx) {
     this.lastInput = performance.now();
     this.lineA = h('p', { class: 'cl a' });
-    this.lineB = h('p', { class: 'cl' });
-    const faces = h('div', { class: 'faces' });
-    faces.innerHTML = faceSVG(FACES[0]!) + faceSVG(FACES[1]!);
-    const x = h('button', { class: 'x', type: 'button', 'aria-label': 'Dismiss', onclick: () => this.hide() }, '✕');
-    this.card = h('aside', { class: 'cooler', role: 'status', 'aria-label': 'Water cooler', hidden: true, onclick: () => this.hide() }, faces, h('div', { class: 'lines' }, this.lineA, this.lineB), x);
+    this.speaker = h('div', { class: 'faces' });
+    this.card = h('aside', { class: 'cooler', role: 'status', 'aria-label': 'Water cooler', hidden: true, onclick: () => this.hide() }, this.speaker, h('div', { class: 'lines' }, this.lineA));
     parent.append(this.card);
   }
 
@@ -123,6 +124,7 @@ export class Cooler {
     const now = performance.now();
     if (this.visible) {
       if (this.suppressed || now - this.shownAt >= SHOW_MS) this.hide();
+      else this.say((now - this.shownAt) * 2 >= SHOW_MS ? 1 : 0);
       return;
     }
     if (this.suppressed) {
@@ -135,9 +137,9 @@ export class Cooler {
   }
 
   private show(now: number): void {
-    const [a, b] = this.pick().say;
-    this.lineA.textContent = `“${a}”`;
-    this.lineB.textContent = `“${b}”`;
+    this.said = this.pick().say;
+    this.beat = -1;
+    this.say(0);
     this.card.hidden = false;
     this.card.classList.remove('pop');
     void this.card.offsetWidth;
@@ -145,6 +147,14 @@ export class Cooler {
     this.visible = true;
     this.spent = true;
     this.shownAt = now;
+  }
+
+  /** One speaker at a time keeps the card to two short lines; the second beat follows after half the time. */
+  private say(beat: number): void {
+    if (beat === this.beat) return;
+    this.beat = beat;
+    this.lineA.textContent = `“${this.said[beat]}”`;
+    this.speaker.innerHTML = faceSVG(FACES[beat]!);
   }
 
   private hide(): void {

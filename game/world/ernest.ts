@@ -99,6 +99,11 @@ export class Ernest {
     this.go.addEventListener('click', () => this.finish(true));
   }
 
+  /** A card is on screen (the water cooler waits). */
+  get showing(): boolean {
+    return this.shown;
+  }
+
   /** Called at most once per tick. `open` is the open room's id, or null on the building. */
   update(open: string | null): void {
     this.calls++;

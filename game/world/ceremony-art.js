@@ -85,21 +85,21 @@ export const CLIP = {
 };
 
 const FILLS = ['var(--olive)', 'var(--mustard)', 'var(--tangerine)'];
-const AX = 'font:600 7px var(--font-display);fill:var(--screen);text-anchor:middle';
-const VAL = 'font:600 8px var(--font-mono);fill:var(--screen);text-anchor:middle';
+const AX = 'font:600 8.2px var(--font-display);fill:var(--screen);text-anchor:middle';
+const VAL = 'font:600 8.2px var(--font-mono);fill:var(--screen);text-anchor:middle';
 
 /** bars: [{ v: number, label: string, text: string }]. Heights scale to the largest bar. */
 export function barChart(bars, unit) {
   const m = Math.max(1, ...bars.map((b) => b.v)), step = 140 / bars.length, bw = Math.min(40, step - 14);
   return `<svg class="chart-svg" viewBox="0 0 160 70" aria-hidden="true"><path d="M14 60H156M14 6V60" stroke="var(--screen)" stroke-width="1.4"/>` +
-    bars.map((b, i) => { const x = 18 + i * step + (step - bw) / 2, hh = 50 * b.v / m, cx = x + bw / 2; return `<rect x="${x}" y="${60 - hh}" width="${bw}" height="${hh}" fill="${FILLS[i % 3]}" stroke="var(--screen)" stroke-width="1"/><text x="${cx}" y="${56 - hh}" style="${VAL}">${b.text}</text><text x="${cx}" y="68" style="${AX}">${b.label}</text>`; }).join('') +
-    `<text x="20" y="10" style="font:600 7px var(--font-display);fill:var(--screen)">${unit}</text></svg>`;
+    bars.map((b, i) => { const x = 18 + i * step + (step - bw) / 2, hh = 42 * b.v / m, cx = x + bw / 2; return `<rect x="${x}" y="${60 - hh}" width="${bw}" height="${hh}" fill="${FILLS[i % 3]}" stroke="var(--screen)" stroke-width="1"/><text x="${cx}" y="${56 - hh}" style="${VAL}">${b.text}</text><text x="${cx}" y="68" style="${AX}">${b.label}</text>`; }).join('') +
+    `<text x="20" y="6" style="font:600 8.2px var(--font-display);fill:var(--screen)">${unit}</text></svg>`;
 }
 
 /** points: [{ v, label, text }]. The line always goes somewhere. */
 export function lineChart(points) {
-  const m = Math.max(1, ...points.map((p) => p.v)), step = 130 / Math.max(1, points.length - 1);
-  const pts = points.map((p, i) => [24 + i * step, 58 - 44 * p.v / m]);
+  const m = Math.max(1, ...points.map((p) => p.v)), step = 100 / Math.max(1, points.length - 1);
+  const pts = points.map((p, i) => [32 + i * step, 56 - 40 * p.v / m]);
   return `<svg class="chart-svg" viewBox="0 0 160 70" aria-hidden="true"><path d="M14 60H156M14 6V60" stroke="var(--screen)" stroke-width="1.4"/><path d="M${pts.map((p) => p.join(' ')).join('L')}" fill="none" stroke="var(--tangerine)" stroke-width="3" stroke-linejoin="round"/>` +
     pts.map((p, i) => `<circle cx="${p[0]}" cy="${p[1]}" r="4" fill="var(--mustard)" stroke="var(--screen)"/><text x="${p[0]}" y="${p[1] - 7}" style="${VAL}">${points[i].text}</text><text x="${p[0]}" y="68" style="${AX}">${points[i].label}</text>`).join('') + `</svg>`;
 }
@@ -110,7 +110,7 @@ export function creamPie(frac, lines) {
   return `<svg class="chart-svg" viewBox="0 0 160 72" aria-hidden="true"><circle cx="40" cy="36" r="33" fill="var(--walnut)" stroke="var(--screen)"/><circle cx="40" cy="36" r="29" fill="var(--edge)"/>` +
     [[30, 26], [48, 30], [36, 44], [52, 46], [26, 40]].map(([cx, cy]) => `<circle cx="${cx}" cy="${cy}" r="4" fill="color-mix(in srgb, var(--mustard) 45%, var(--edge))" stroke="var(--mustard)"/>`).join('') +
     (f > 0 ? `<path d="M40 36L40 6A30 30 0 ${f > .5 ? 1 : 0} 1 ${x.toFixed(1)} ${y.toFixed(1)}Z" fill="var(--sheet)" stroke="var(--alert)" stroke-width="1.6" stroke-dasharray="3 2" transform="translate(5 -3)"/>` : '') +
-    `<text x="80" y="26" style="font:700 8.5px var(--font-display);fill:var(--screen)">${lines[0]}</text><text x="80" y="42" style="font:700 8.5px var(--font-display);fill:var(--stamp)">${lines[1]}</text><text x="80" y="58" style="font:400 6.5px var(--font-type);fill:var(--screen)">(banana cream)</text></svg>`;
+    `<text x="76" y="26" style="font:700 8.2px var(--font-display);fill:var(--screen)">${lines[0]}</text><text x="76" y="42" style="font:700 8.2px var(--font-display);fill:var(--stamp)">${lines[1]}</text><text x="76" y="58" style="font:400 8px var(--font-type);fill:var(--screen)">(banana cream)</text></svg>`;
 }
 
 /** A hand-drawn signature, for the Sign step. */
