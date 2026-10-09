@@ -51,6 +51,28 @@ export function headShares(s: GameState, t: Tuning): Record<DeptId, number> {
   return suggestShares(s, cap === t.suggestedEditingShareCap ? t : { ...t, suggestedEditingShareCap: cap });
 }
 
+/**
+ * Brings a save from an older build up to the current shape: quarter reports
+ * gain the fields added since (requests, audit funds, ranOnOldLines), the
+ * office state exists once the budget is open, and an open request filed in
+ * the old format is withdrawn (its quote is unknown). Idempotent; cheap when
+ * nothing is missing. The game calls it on load, and step() guards with it.
+ */
+export function upgradeSave(s: GameState): void {
+  const b = s.budget;
+  if (!b) return;
+  for (const r of [b.stats, b.lastReport]) {
+    if (!r) continue;
+    r.requests ??= [];
+    r.auditFound ??= 0;
+    r.ranOnOldLines ??= false;
+    r.requisitions ??= { offered: 0, granted: 0, declined: 0, expired: 0 };
+  }
+  if (s.phase === 'finite') s.office ??= newOffice();
+  const q = b.requisition as Partial<NonNullable<BudgetState['requisition']>> | null;
+  if (q && (typeof q.kind !== 'string' || typeof q.price !== 'number' || !q.from)) b.requisition = null;
+}
+
 /** Budget mode is on for this tuning and the budget has opened. */
 export function activeBudget(s: GameState, t: Tuning): BudgetState | null {
   return t.budget && s.phase === 'finite' ? (s.budget ?? null) : null;

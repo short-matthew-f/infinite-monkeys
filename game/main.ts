@@ -1,5 +1,5 @@
 import { registerSW } from 'virtual:pwa-register';
-import { DEPTS, N, activeBudget, catchUp, certifyTiers, createState, deptLevelCost, editingPool, quarterSecondsLeft, type DeptId, type EventSink, type GameEvent, type GameState } from '../core/index.js';
+import { DEPTS, N, activeBudget, catchUp, certifyTiers, createState, deptLevelCost, editingPool, quarterSecondsLeft, type DeptId, type EventSink, type GameEvent, type GameState, upgradeSave } from '../core/index.js';
 import { prototypeTuning } from '../content/prototype.js';
 import { createCtx } from './ctx.js';
 import { startLoop } from './loop.js';
@@ -71,6 +71,8 @@ function newSeed(): number {
 await persist.migrate();
 const rec = await persist.load();
 let state: GameState = rec ? rec.state : createState(t, newSeed());
+// Saves from older builds lack fields added since; bring them up to date before anything reads them.
+upgradeSave(state);
 const returning = !!rec;
 
 let dirty = true;

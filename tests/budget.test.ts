@@ -20,6 +20,8 @@ import {
   timedMult,
   reviewSpeedMult,
   previewQuarter,
+  upgradeSave,
+  newOffice,
   N,
   nullSink,
   requisitionPrice,
@@ -370,5 +372,31 @@ describe('quarterly budget', () => {
       expect(reviewSpeedMult(s, TB)).toBe(1);
       expect(moraleMult(s)).toBe(1);
     });
+  });
+
+  it('upgrades a save from an older build: missing report fields, office, old-format request', () => {
+    const s = opened();
+    signBudget(s, TB, nullSink, LINES);
+    run(s, TB, nullSink, ticks(Q) + 5);
+    const old = JSON.parse(JSON.stringify(s)) as GameState;
+    const strip = (r: Record<string, unknown> | null) => { if (r) { delete r.requests; delete r.auditFound; delete r.ranOnOldLines; } };
+    strip(old.budget!.lastReport as unknown as Record<string, unknown>);
+    strip(old.budget!.stats as unknown as Record<string, unknown>);
+    delete old.office;
+    old.budget!.requisition = { dept: 'editing', openedTick: old.tick, expiresTick: old.tick + 100 } as never;
+    upgradeSave(old);
+    expect(old.budget!.lastReport!.requests).toEqual([]);
+    expect(old.budget!.stats.auditFound).toBe(0);
+    expect(old.office).toEqual(newOffice());
+    expect(old.budget!.requisition).toBeNull();
+    // Idempotent, and a current save is untouched.
+    const cur = JSON.stringify(s);
+    upgradeSave(s);
+    expect(JSON.stringify(s)).toBe(cur);
+    // An old save also survives a tick without help.
+    const old2 = JSON.parse(JSON.stringify(s)) as GameState;
+    delete (old2.budget!.stats as unknown as Record<string, unknown>).requests;
+    run(old2, TB, nullSink, 1);
+    expect(old2.budget!.stats.requests).toBeDefined();
   });
 });

@@ -16,7 +16,7 @@ import {
   secondsToTicks,
 } from './model.js';
 import type { GameState } from './state.js';
-import { activeBudget, autoBuy, headShares, maybeRequisition, settleAudits, bankIncome, maybeEndQuarter, maybeOpenBudget } from './budget.js';
+import { activeBudget, autoBuy, headShares, maybeRequisition, settleAudits, upgradeSave, bankIncome, maybeEndQuarter, maybeOpenBudget } from './budget.js';
 import { DEPTS, type Tuning } from './tuning.js';
 import { fadeOffice, offlineBonusSeconds } from './office.js';
 
@@ -47,6 +47,7 @@ export function catchUp(s: GameState, t: Tuning, sink: EventSink, elapsedSeconds
 function stepFinite(s: GameState, t: Tuning, sink: EventSink): void {
   const dt = t.tickSeconds;
   maybeOpenBudget(s, t, sink);
+  if (s.budget && !s.budget.stats.requests) upgradeSave(s);
   const b = activeBudget(s, t);
   // Budget mode: the heads coordinate how hard each department works.
   if (b) s.shares = headShares(s, t);
