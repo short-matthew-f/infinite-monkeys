@@ -168,7 +168,13 @@ export interface Tuning {
   /** Common research: review cost reduction. Each level multiplies every tier's review cost. */
   reviewResearch: { costBase: number; costGrowth: number; mult: number };
   milestones: Milestone[];
-  readiness: { minMonkeys: number; ratioThreshold: number; stabilitySeconds: number };
+  readiness: {
+    minMonkeys: number;
+    ratioThreshold: number;
+    stabilitySeconds: number;
+    /** Optional: Editing's self-replication speeds up by demand/pool while behind, up to this factor (1 or missing = off). */
+    editingCatchUpMax?: number;
+  };
   hotel: {
     homeMarket: string;
     ceremonyMarket: string;

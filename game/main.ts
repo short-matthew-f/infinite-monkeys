@@ -14,9 +14,8 @@ import { office } from './screens/office.js';
 import { pool } from './screens/pool.js';
 import { readiness } from './screens/readiness.js';
 import { research } from './screens/research.js';
-import { accounting, facilities, training } from './screens/admin.js';
 import { Payoffs } from './world/payoff.js';
-import { HEAD_NAMES, OFFICE_IDS, projectTitle } from './world/projects.js';
+import { HEAD_NAMES, projectTitle } from './world/projects.js';
 import { text } from './ui/dom.js';
 import * as f from './ui/format.js';
 import { cueCandidates } from './world/advisor.js';
@@ -24,9 +23,9 @@ import { CueView } from './world/cue.js';
 import { Ernest } from './world/ernest.js';
 import { progress } from './world/progress.js';
 import { RoomView, type Room } from './world/room.js';
-import { Tower, directorFloor, floorProps, type BudgetView } from './world/tower.js';
+import { Tower, floorProps, type BudgetView } from './world/tower.js';
 import { Presenter } from './world/present.js';
-import { floorHint, officeHint } from './world/tower-art.js';
+import { floorHint } from './world/tower-art.js';
 
 // The place is the interface: each floor of the building opens its room, full screen.
 const ROOMS: Room[] = [
@@ -34,14 +33,8 @@ const ROOMS: Room[] = [
   { id: 'pool', name: 'Typing Pool', form: 'Form 7-T', disc: 2, screen: pool },
   { id: 'departments', name: 'Departments', form: 'Form 5-D', disc: 3, screen: departments },
   { id: 'research', name: 'Records Library', form: 'Form 4-R', disc: 4, screen: research },
-  // The Administration floor appears with the budget; its three offices are all on floor 5.
-  { id: 'facilities', name: 'Facilities Office', form: 'Form 2-F', disc: 5, screen: facilities },
-  { id: 'accounting', name: 'Accounting Office', form: 'Form 1-A', disc: 5, screen: accounting },
-  { id: 'training', name: 'Training Office', form: 'Form 6-T', disc: 5, screen: training },
-  // The Director's Office moves up a floor when the Administration floor is built beneath it.
-  { id: 'director', name: "Director's Office", form: 'Form 9-R', get disc() { return directorFloor(!!state.office); }, screen: readiness },
+  { id: 'director', name: "Director's Office", form: 'Form 9-R', disc: 5, screen: readiness },
 ];
-const isOffice = (id: string): boolean => (OFFICE_IDS as readonly string[]).includes(id);
 
 const t = prototypeTuning;
 
@@ -217,8 +210,6 @@ rooms.onClose = (room) => {
 };
 
 tower.onOpen = (id, _from, dept) => {
-  // An Administration wing opens that office's room.
-  if (id === 'admin') return openRoom(dept ?? 'facilities', dept);
   // A wing opens its own department's view; the cued department's view is used otherwise.
   if (id === 'departments') dispatchEvent(new CustomEvent('im:dept-view', { detail: dept ?? (cues.cue?.room === 'departments' ? cues.cue.view : undefined) ?? 'summary' }));
   openRoom(id, dept);
@@ -249,16 +240,12 @@ function closeDir(): void {
   dirbtn.setAttribute('aria-expanded', 'false');
   $('reset-confirm').hidden = true;
 }
-const roomHint = (id: string): string => (isOffice(id) ? officeHint(id as (typeof OFFICE_IDS)[number], props) : floorHint(id, props));
-/** The Directory lists the Administration offices only once the budget has opened. */
-let dirAdmin: boolean | null = null;
+const roomHint = (id: string): string => floorHint(id, props);
+/** The Directory lists every floor; the list never changes, so it is built once. */
 function buildDir(): void {
-  const admin = !!state.office;
-  if (admin === dirAdmin) return;
-  dirAdmin = admin;
-  $('dirlist').innerHTML = ROOMS.filter((r) => admin || !isOffice(r.id)).map((r) => `<li><button data-room="${r.id}" aria-current="false"><span class="disc" aria-hidden="true">${r.disc}</span><span class="nm">${r.name}<span class="hn"></span></span></button></li>`).join('');
-  $('dir-range').textContent = `The Bureau · Floors 1–${admin ? 6 : 5}`;
-  $('dir-more').textContent = String(admin ? 7 : 6);
+  $('dirlist').innerHTML = ROOMS.map((r) => `<li><button data-room="${r.id}" aria-current="false"><span class="disc" aria-hidden="true">${r.disc}</span><span class="nm">${r.name}<span class="hn"></span></span></button></li>`).join('');
+  $('dir-range').textContent = `The Bureau · Floors 1–${ROOMS.length}`;
+  $('dir-more').textContent = String(ROOMS.length + 1);
   markDirectory(rooms.current?.id ?? null);
 }
 function markDirectory(id: string | null): void {
@@ -280,7 +267,7 @@ function renderTasks(): void {
   if (b?.reviewDue) items.push({ task: 'review', mark: '!', name: 'Quarterly review', hint: `Q${b.quarter} is ready to sign.` });
   const q = b?.requisition;
   if (q && document.querySelector('.memo-dock:not([hidden])')) items.push({ task: 'memo', mark: '!', name: 'Open request', hint: `${HEAD_NAMES[q.from]}: ${q.kind === 'levels' ? 'department levels' : projectTitle(q.kind)}.` });
-  if (b?.lastReport) items.push({ task: 'report', mark: '§', name: "Last quarter's report", hint: `Q${b.lastReport.quarter}, filed in the Accounting Office.` });
+  if (b?.lastReport) items.push({ task: 'report', mark: '§', name: "Last quarter's report", hint: `Q${b.lastReport.quarter}, filed in the Director's Office.` });
   const key = JSON.stringify(items);
   if (key === tasksKey) return;
   tasksKey = key;
@@ -290,7 +277,10 @@ function renderTasks(): void {
 dirTasks.addEventListener('click', (e) => {
   const task = (e.target as HTMLElement).closest<HTMLElement>('[data-task]')?.dataset.task;
   if (task === 'review') openReview();
-  else if (task === 'report') openRoom('accounting');
+  else if (task === 'report') {
+    openRoom('director');
+    requestAnimationFrame(() => dispatchEvent(new CustomEvent('im:director-report')));
+  }
   else if (task === 'memo') {
     // The memo is a docked paper tab (memo.ts); open it unless it already is.
     closeDir();
@@ -416,7 +406,6 @@ startLoop(() => state, t, sink, () => {
   memo.render();
   renderTasks();
   document.body.classList.toggle('has-memo', !!document.querySelector('.memo-dock:not([hidden])'));
-  buildDir();
   payoffs.render();
   // The cooler waits for rooms, the ceremony, a payoff, Ernest's card, and the clock's own "Review ready" tag (it shares the roof).
   cooler.suppressed = awayCard?.isOpen || !!rooms.current || ceremony.isOpen || payoffs.active || ernest.showing || !!state.budget?.reviewDue;

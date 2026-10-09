@@ -7,6 +7,11 @@ import {
   buyDeptLevel,
   DEPTS,
   catchUp,
+  selfRepRate,
+  setTierAllocation,
+  setTierAuto,
+  suggestTierAllocation,
+  tierAutoOn,
   quarterSecondsLeft,
   createState,
   declareInfinity,
@@ -37,7 +42,7 @@ import {
   type GameState,
   type Tuning,
 } from '../core/index.js';
-import { collector, ofType } from './helpers.js';
+import { collector, lateFiniteState, ofType } from './helpers.js';
 
 const Q = TB.budget!.quarterSeconds;
 const ticks = (sec: number) => Math.round(sec / TB.tickSeconds);
@@ -422,5 +427,34 @@ describe('quarterly budget', () => {
     delete (old2.budget!.stats as unknown as Record<string, unknown>).requests;
     run(old2, TB, nullSink, 1);
     expect(old2.budget!.stats.requests).toBeDefined();
+  });
+
+  it('the tier split follows the suggestion until set by hand, and can go back to automatic', () => {
+    const s = lateFiniteState(3, TB);
+    delete s.tierAuto;
+    run(s, TB, nullSink, 1);
+    expect(tierAutoOn(s, TB)).toBe(true);
+    expect(s.tierAllocation).toEqual(suggestTierAllocation(s, TB));
+    const ids = TB.tiers.map((x) => x.id);
+    const rare = Object.fromEntries(ids.map((id) => [id, id === ids[ids.length - 1] ? 1 : 0]));
+    expect(setTierAllocation(s, TB, nullSink, rare)).toBe(true);
+    run(s, TB, nullSink, 50);
+    expect(tierAutoOn(s, TB)).toBe(false);
+    expect(s.tierAllocation).toEqual(rare);
+    expect(setTierAuto(s, TB, nullSink, true)).toBe(true);
+    run(s, TB, nullSink, 1);
+    expect(s.tierAllocation).toEqual(suggestTierAllocation(s, TB));
+  });
+
+  it("Editing's self-replication catches up while behind, capped, and is normal otherwise", () => {
+    const s = lateFiniteState(3, TB);
+    for (const d of DEPTS) { s.depts[d].stage = 4; s.depts[d].rep = 1; }
+    const base = TB.depts.editing.selfRepRate;
+    s.depts.editing.rep = 1e9;
+    expect(selfRepRate(s, TB, 'editing')).toBe(base);
+    s.depts.editing.rep = 1e-9;
+    expect(selfRepRate(s, TB, 'editing')).toBeCloseTo(base * TB.readiness.editingCatchUpMax!, 12);
+    expect(selfRepRate(s, TB, 'recruiting')).toBe(TB.depts.recruiting.selfRepRate);
+    expect(selfRepRate(s, T, 'editing')).toBe(T.depts.editing.selfRepRate);
   });
 });

@@ -2,7 +2,6 @@
 // draft split, with a before → after preview). Contents of a paper sheet.
 import {
   N,
-  applySuggestedAllocation,
   certifyTiers,
   editingPool,
   editorInChiefSplit,
@@ -11,6 +10,8 @@ import {
   nullSink,
   recordPreview,
   setTierAllocation,
+  setTierAuto,
+  tierAutoOn,
   suggestTierAllocation,
   type Certification,
   type GameState,
@@ -109,12 +110,20 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
       label: 'Editor allocation',
       key: 'pool-adjust',
       options: [
-        { id: 'sug', label: 'Suggested: most bananas' },
+        { id: 'auto', label: 'Automatic' },
         { id: 'common', label: 'Favour common finds' },
         { id: 'rare', label: 'Favour rare finds' },
       ],
       onPick: (id) => {
         const s = ctx.state();
+        if (id === 'auto') {
+          // Automatic applies at once: the split follows the suggestion from here on.
+          draft = null;
+          draftPreset = null;
+          if (!tierAutoOn(s, t)) ctx.act((cs, tt, k) => setTierAuto(cs, tt, k, true));
+          render();
+          return;
+        }
         if (!draft) recordPreview(s, ctx.sink, 'allocation', 'tiers');
         draft = presetPercents(s)[id] ?? null;
         draftPreset = id;
@@ -126,10 +135,8 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
 
   const applyBtn = h('button', { class: 'strong', type: 'button', onclick: () => {
     const s = ctx.state();
-    const ok = draftPreset === 'sug' ? ctx.act(applySuggestedAllocation) : (() => {
-      const next = splitOf(s);
-      return !!next && ctx.act((cs, tt, k) => setTierAllocation(cs, tt, k, next));
-    })();
+    const next = splitOf(s);
+    const ok = !!next && ctx.act((cs, tt, k) => setTierAllocation(cs, tt, k, next));
     if (ok) { draft = null; draftPreset = null; }
     render();
   } }, 'Apply this split');
@@ -139,7 +146,11 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
   const flowDelta = h('p', { class: 'delta' });
   const preview = h('div', { class: 'pool-preview', hidden: true }, incomeDelta, flowDelta);
   const actions = h('div', { class: 'btn-row', hidden: true }, applyBtn, resetBtn);
-  const allocBox = formbox('Who reviews what', h('p', { class: 'note' }, 'Editors split their time between find types.'), nowLine, pre.el, preview, actions, applyWhy);
+  const autoLine = h('p', { class: 'why' });
+  const idleWarn = h('p', { class: 'why alert', role: 'status', hidden: true });
+  const backBtn = h('button', { class: 'quiet', type: 'button', onclick: () => { ctx.act((cs, tt, k) => setTierAuto(cs, tt, k, true)); draft = null; draftPreset = null; render(); } }, 'Back to automatic');
+  const handRow = h('div', { class: 'btn-row', hidden: true }, backBtn);
+  const allocBox = formbox('Who reviews what', h('p', { class: 'note' }, 'Editors split their time between find types.'), nowLine, autoLine, idleWarn, handRow, pre.el, preview, actions, applyWhy);
 
   /** Draft as fractions over discovered tiers, or null. */
   function splitOf(s: GameState): Record<string, number> | null {
@@ -282,6 +293,16 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
     const presets = presetPercents(s);
     text(nowLine, `Reviewing now: ${discovered.map((id) => `${name(id)} ${cur[id] ?? 0}%`).join(' · ')}`);
     const split = splitOf(s);
+    const auto = tierAutoOn(s, t);
+    text(autoLine, auto ? 'Automatic: Editors follow the suggested split as finds change.' : 'Set by hand. Automatic is off.');
+    show(handRow, !auto && ctx.can('setTierAuto', (cs, tt, k) => setTierAuto(cs, tt, k, true)));
+    const idleShare = hasPool ? N.ratio(cert.idle, pool) : 0;
+    const lostNames = discovered.filter((id) => {
+      const fr = finds[id] ?? N.zero;
+      return N.gt(fr, N.zero) && N.ratio(N.sub(fr, cert.certified[id] ?? N.zero), fr) > 0.0005;
+    }).map(name);
+    const warn = !auto && idleShare > 0.25 && discarding && lostNames.length > 0;
+    setWhy(idleWarn, warn ? `${f.pct(idleShare)} of Editors are idle while ${lostNames.length > 1 ? `${lostNames.slice(0, -1).join(', ')} and ${lostNames[lostNames.length - 1]}` : lostNames[0]} are thrown away.` : null);
     for (const r of aRows) {
       const id = r.tier.id;
       const on = discovered.includes(id);
@@ -292,10 +313,10 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
       if (r.input.value !== String(v)) r.input.value = String(v);
       r.input.setAttribute('aria-valuetext', `${v} percent of Editors`);
       text(r.share, `${v}%`);
-      text(r.info, `Current ${cur[id] ?? 0}% · Suggested ${presets.sug?.[id] ?? 0}%`);
+      text(r.info, auto ? `Live ${cur[id] ?? 0}%` : `Current ${cur[id] ?? 0}% · Suggested ${presets.sug?.[id] ?? 0}%`);
     }
     // Chips show the pending pick, or else whichever preset the live split already matches.
-    const live = (['sug', 'common', 'rare'] as const).find((k) => samePercents(presets[k] ?? {}, cur, discovered)) ?? null;
+    const live = auto ? 'auto' : (['common', 'rare'] as const).find((k) => samePercents(presets[k] ?? {}, cur, discovered)) ?? null;
     pre.select(draft ? draftPreset : live);
     const differs = !!draft && discovered.some((id) => (draft?.[id] ?? 0) !== (cur[id] ?? 0));
     show(preview, !!draft);

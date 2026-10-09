@@ -6,7 +6,6 @@
 import type { Ctx, Screen } from '../ctx.js';
 import { h } from '../ui/dom.js';
 import { buildRoom, type FloorProps, type RoomId } from './floor-art.js';
-import { buildOfficeRoom } from './office-art.js';
 import { patchLive } from './tower-art.js';
 import './room.css';
 
@@ -107,9 +106,9 @@ export class RoomView {
     if (!this.current) return;
     const props = this.getProps();
     const id = this.current.id;
-    const scene = id === 'facilities' || id === 'accounting' || id === 'training' ? buildOfficeRoom(id, props) : buildRoom(id, props);
+    const scene = buildRoom(id, props);
     if (scene.key === this.sceneKey) {
-      patchLive(this.art as unknown as Element, props); // small live figures (the morale dial) change without a redraw
+      patchLive(this.art as unknown as Element, props); // small live figures change without a redraw
       return;
     }
     this.sceneKey = scene.key;

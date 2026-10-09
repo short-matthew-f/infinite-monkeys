@@ -107,6 +107,9 @@ export const prototypeTuning: Tuning = {
   // Stages cost 25% more than classic: the heads' projects (morale, managers, audits...)
   // speed the climb, and this keeps the casual game inside 25-35 minutes (sim, Oct 8 2026).
   depts: Object.fromEntries(Object.entries(classicTuning.depts).map(([d, v]) => [d, { ...v, stageCosts: v.stageCosts.map((c) => c * 1.25) }])) as Tuning['depts'],
+  // Editing's self-replication catches up while it's behind on reviews (DESIGN.md §13): a department that reaches
+  // stage 4 after the others would otherwise trail their exponential head start for 30+ minutes.
+  readiness: { ...classicTuning.readiness, editingCatchUpMax: 4 },
   budget: { quarterSeconds: 180, suggestedDiscretionary: 0.7, minDiscretionary: 0.1, sweepShare: 1, editingShareCap: 0.35, readinessEditingShareCap: 0.8,
     requisitions: { levels: 3, priceFactor: 0.8, openSeconds: 60, cooldownSeconds: 10 },
     morale: { max: 1.6, fadePerSecond: 0.002 },

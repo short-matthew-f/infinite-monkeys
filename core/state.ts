@@ -151,6 +151,8 @@ export interface GameState {
   shares: Shares;
   tiers: Record<string, TierState>;
   tierAllocation: Record<string, number>;
+  /** Budget game: the split follows suggestTierAllocation every tick until the player sets one by hand. Missing = on. */
+  tierAuto?: boolean;
   objective: Objective;
   stability: { heldTicks: number; permit: boolean };
   milestonesReached: string[];

@@ -61,12 +61,17 @@ never reimplement them.
   accumulator of expected certified finds triggers discovery at 1.0.
   Discovery rewards are once per save.
 - **Suggested tier split.** Optimal for Maximize bananas (water-fill by
-  value per review unit).
+  value per review unit). In the budget game the split follows it
+  automatically (`tierAuto`) until the player sets one by hand
+  (`setTierAllocation`); `setTierAuto` switches automatic back on.
 - **Departments.** Recruiting, Construction, Editing. Each has permanent
   capability (levels, stages 1–4) and a funding share. Effective output =
   capability × share × 3, so equal shares give 1.0×. At stage 4 each
   department self-replicates at its own rate (Recruiting 0.4%/s,
-  Construction 0.3%/s, Editing 0.35%/s), so balance drifts.
+  Construction 0.3%/s, Editing 0.35%/s), so balance drifts. In the budget
+  game Editing's rate speeds up by demand/pool while it's behind, up to 4×
+  (`selfRepRate`, `readiness.editingCatchUpMax`), so an Editing stage 4
+  bought after the others catches up in minutes instead of 20–30.
 - **Suggested funding.** Editing gets enough to cover review demand plus
   headroom, capped at 50%. The rest balances Recruiting against
   Construction. A department with no capability gets no share.

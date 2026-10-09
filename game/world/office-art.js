@@ -1,6 +1,5 @@
-// The support offices' art: the morale dial, the three heads, the Administration wings, the three
-// office scenes, and the payoff vignettes. Pure: same input, same markup, no DOM. Ported from the tower
-// exploration (design/explorations/tower/index.html: moraleDial, sceneOfac/Oacc/Otrn, the pv* scenes),
+// The office heads' art: the Chief Accountant and Training Officer, and the payoff vignettes. Pure: same input, same markup, no DOM. Ported from the tower
+// exploration (design/explorations/tower/index.html: the pv* scenes),
 // built on the parts kit in floor-art.js. The typed boundary is office-art.d.ts.
 //
 // Payoff vignettes are 360 x 220. Motion classes (.mv .fi .po .bye and a few named ones) animate one
@@ -17,41 +16,15 @@ const txs = txt;
 const sh = (x, yb, w, k = 1) => `<polygon class="shl" points="${x - w / 2},${yb} ${x + w / 2},${yb} ${x + w / 2 + 22 * k},${yb + 7} ${x - w / 2 + 14 * k},${yb + 7}"/><polygon class="shc" points="${x - w / 2},${yb} ${x + w / 2},${yb} ${x + w / 2 + 3},${yb + 3} ${x - w / 2 + 3},${yb + 3}"/>`;
 const standAt = (x, y, s, pose = {}, cls = '') => `<g transform="translate(${x} ${y})"${cls ? ` class="${cls}"` : ''}>${stand(s, pose)}</g>`;
 const seat = (i, cx, yb, over = {}, o = {}) => seatSVG(i, cx, yb, Object.assign({}, o, { over }));
-const plateS = (x, y, t, w = 0) => { const ww = w || Math.max(46, t.length * 6.4 + 14); return `<g transform="translate(${x} ${y})"><rect x="${-ww / 2}" y="-8" width="${ww}" height="15" rx="2" class="brass"/>${txt(0, 3.4, t, 'font-size:9.5px')}</g>`; };
-const crtS = (x, y, t, w = 0) => { const ww = w || t.length * 7.6 + 16; return `<g transform="translate(${x} ${y})"><rect x="${-ww / 2}" y="-11" width="${ww}" height="21" rx="2" fill="var(--screen)" stroke="var(--mustard)" stroke-width="1.6"/><text x="0" y="4" style="font:600 11.5px var(--font-mono);fill:var(--screen-ink);text-anchor:middle">${t}</text></g>`; };
 
-/* ---------- the three heads ---------- */
-export const FM = { fur: 0, H: 76, bw: 34, tw: 1.1, hr: 14, ears: 'round', view: 'pr', gaze: [1, .2], eyes: 'open', mouth: 'smile', head: 'pencil', tail: true, shirt: 'sk-rust' };
+/* ---------- the heads ---------- */
 // the Chief Accountant: a visor and a sharp tie, a different fur from the Chief Editor
 export const CA = { fur: 2, H: 70, bw: 30, tw: 1.05, hr: 14, ears: 'small', view: 'f', gaze: [0, .4], eyes: 'heavy', mouth: 'flat', head: 'visor', body: 'tie', tail: true, shirt: 'sk-olive' };
 export const TO = { fur: 3, H: 78, bw: 28, tw: 1, hr: 13, ears: 'tuft', view: 'pl', gaze: [-1, .2], eyes: 'open', mouth: 'flat', head: 'glassesR', tail: true, shirt: 'sk-mustard' };
 export const clipboard = (x, y) => `<g transform="translate(${x} ${y})"><rect x="0" y="0" width="16" height="22" fill="var(--walnut)" stroke="var(--screen)" stroke-width="1"/><rect x="2" y="3" width="12" height="17" fill="var(--paper)"/><path d="M4 8h8M4 12h8M4 16h6" stroke="var(--concrete)" stroke-width=".9"/><rect x="5" y="-1" width="6" height="3" class="brass"/></g>`;
 export const pizzaBox = (x, y, w = 40, open) => `<g transform="translate(${x} ${y})"><rect x="${-w / 2}" y="-7" width="${w}" height="7" rx="1" fill="color-mix(in srgb, var(--walnut) 40%, var(--paper-shade))" stroke="var(--screen)" stroke-width="1.2"/><path d="M${-w / 2 + 3} -3.5h${w - 6}" stroke="var(--screen)" stroke-width=".7" opacity=".5"/>${open ? `<ellipse cx="0" cy="-8" rx="${w * .4}" ry="3.6" fill="var(--tangerine)" stroke="var(--screen)" stroke-width="1"/><circle cx="-6" cy="-8.4" r="1.7" fill="var(--alert)"/><circle cx="3" cy="-7.4" r="1.7" fill="var(--alert)"/><circle cx="9" cy="-9" r="1.4" fill="var(--alert)"/>` : `<circle cx="${w * .2}" cy="-3.6" r="1.6" fill="var(--tangerine)" opacity=".8"/>`}</g>`;
 
-/* ---------- the brass morale dial (the needle is one rotate, set from morale by patchLive) ---------- */
-/** Needle angle for a 0..1 position along the dial's arc. Drawing only: the position itself comes from core's moraleMult. */
-export const needleAngle = (frac) => -62 + Math.max(0, Math.min(1, frac)) * 124;
-export function moraleDial(cx, cy, r, label) {
-  let tk = '';
-  for (let k = 0; k <= 5; k++) {
-    const a = (-62 + k * 24.8) * Math.PI / 180, s = Math.sin(a), c = Math.cos(a);
-    tk += `<path d="M${r1(cx + s * r * .6)} ${r1(cy - c * r * .6)}L${r1(cx + s * r * .8)} ${r1(cy - c * r * .8)}" stroke="var(--screen)" stroke-width="${r > 20 ? 1.8 : 1.3}"/>`;
-  }
-  return `<g><circle cx="${cx}" cy="${cy}" r="${r}" fill="var(--mustard)" stroke="var(--screen)" stroke-width="${r > 20 ? 2.4 : 1.8}"/><circle cx="${cx}" cy="${cy}" r="${r1(r * .84)}" fill="var(--paper)" stroke="var(--walnut)" stroke-width="1"/>${tk}` +
-    (r > 20 ? `<text x="${cx}" y="${r1(cy + r * .55)}" style="font:700 ${r1(r * .2)}px var(--font-display);letter-spacing:.14em;fill:var(--screen);text-anchor:middle">MORALE</text>` : '') +
-    `<g class="mneedle" data-needle style="transform-origin:${cx}px ${cy}px;transform:rotate(-62deg);transition:transform .7s cubic-bezier(.3,.8,.3,1)"><path d="M${cx} ${r1(cy + r * .1)}L${cx} ${r1(cy - r * .74)}" stroke="var(--alert)" stroke-width="${r > 20 ? 2.4 : 1.8}" stroke-linecap="round"/></g><circle cx="${cx}" cy="${cy}" r="${r1(r * .1)}" fill="var(--screen)"/></g>`;
-}
-
 /* ---------- parts from the exploration ---------- */
-function addingMachine(x, y) {
-  return `<g><rect x="${x - 14}" y="${y - 12}" width="28" height="12" rx="2" fill="var(--concrete)" stroke="var(--edge)" stroke-width="1"/>${[0, 1, 2, 3].map(k => `<circle cx="${x - 9 + k * 6}" cy="${y - 5}" r="1.8" fill="var(--edge)"/>`).join('')}<path class="atape" d="M${x - 4} ${y - 12}v-10q0 -4 4 -4h2" fill="none" stroke="var(--edge)" stroke-width="5"/><path d="M${x + 14} ${y - 6}l6 -4" stroke="var(--screen)" stroke-width="2" stroke-linecap="round"/><path d="M${x - 4} ${y}q-2 10 4 14q6 4 2 12" fill="none" stroke="var(--edge)" stroke-width="5" opacity=".95"/></g>`;
-}
-function wallSafe(x, y) {
-  return `<g><rect x="${x - 20}" y="${y}" width="40" height="40" rx="3" fill="var(--concrete)" stroke="var(--edge)" stroke-width="2"/><circle cx="${x}" cy="${y + 20}" r="9" fill="var(--screen)" stroke="var(--mustard)" stroke-width="2"/><path d="M${x} ${y + 12}v5" stroke="var(--mustard)" stroke-width="1.6"/><rect x="${x + 12}" y="${y + 16}" width="4" height="9" rx="1" class="brass"/></g>`;
-}
-function armchair(x, yb) {
-  return `<g>${sh(x, yb, 46)}<rect x="${x - 20}" y="${yb - 42}" width="40" height="30" rx="8" fill="color-mix(in srgb, var(--alert) 55%, var(--walnut))" stroke="var(--edge)" stroke-width="1.6"/><rect x="${x - 24}" y="${yb - 22}" width="48" height="18" rx="6" fill="color-mix(in srgb, var(--alert) 65%, var(--walnut))" stroke="var(--edge)" stroke-width="1.6"/><path d="M${x - 18} ${yb - 4}v4M${x + 18} ${yb - 4}v4" stroke="var(--walnut)" stroke-width="3"/></g>`;
-}
 function pile(x, yb, n, w = 30, seed = 1) {
   let s = '';
   for (let k = 0; k < n; k++) {
@@ -268,85 +241,15 @@ export const PAYOFF_META = {
   bath: { room: null, ms: 4600, cap: 'A new door by the lobby. The queue shuffles forward.' },
   brk: { room: 'pool', ms: 3800, cap: 'A nook off the Typing Pool. A couch arrives. Somebody is on it.' },
   snack: { room: 'pool', ms: 3800, cap: 'It hums. A monkey shakes it. It gives.' },
-  audit: { room: 'accounting', ms: 5000, cap: 'A magnifying glass, then an envelope of bananas under the filing cabinet.' },
-  stamp: { room: 'accounting', ms: 2800, cap: 'Rubber stamp. The finding is filed.' },
-  mgr: { room: 'training', ms: 3800, cap: 'A monkey receives a tie and a clipboard.' },
-  comm: { room: 'training', ms: 3800, cap: 'The speech bubbles turn polite.' },
-  read: { room: 'training', ms: 3600, cap: 'Pages turn faster. The stopwatch finishes first.' },
+  audit: { room: null, ms: 5000, cap: 'A magnifying glass, then an envelope of bananas under the filing cabinet.' },
+  stamp: { room: null, ms: 2800, cap: 'Rubber stamp. The finding is filed.' },
+  mgr: { room: null, ms: 3800, cap: 'A monkey receives a tie and a clipboard.' },
+  comm: { room: null, ms: 3800, cap: 'The speech bubbles turn polite.' },
+  read: { room: null, ms: 3600, cap: 'Pages turn faster. The stopwatch finishes first.' },
 };
 const PV = { pizza: pvPizza, team: pvTeam, escape: pvEscape, bath: pvBath, brk: pvBreak, snack: pvSnack, audit: pvAudit, stamp: pvStamp, mgr: pvMgr, comm: pvComm, read: pvRead };
 /** One payoff scene's markup for a 0 0 360 220 viewBox. `info` carries real figures: { amount, finding, pct }. */
 export function payoffSVG(id, info = {}) {
   const f = PV[id];
   return f ? f(info) : '';
-}
-
-/* ---------- the three office scenes (360 x 230) ---------- */
-const SW = 360, SH = 240, WALL = 144;
-const roomBase = (tint) =>
-  `<rect x="-20" y="-20" width="${SW + 40}" height="${SH + 40}" fill="color-mix(in srgb, ${tint} 18%, var(--pad))"/>` +
-  `<rect x="-20" y="${WALL - 16}" width="${SW + 40}" height="16" fill="color-mix(in srgb, ${tint} 30%, var(--paper-shade))"/><path d="M-20 ${WALL - 16}H${SW + 20}" stroke="var(--edge)" stroke-width="1.4" opacity=".8"/>` +
-  `<rect x="-20" y="${WALL}" width="${SW + 40}" height="${SH - WALL + 20}" fill="var(--floor)"/><path d="M-20 ${WALL}H${SW + 20}" stroke="var(--edge)" stroke-width="2" opacity=".85"/>`;
-const hang = (x) => `<path d="M${x} -20V8" stroke="var(--screen)" stroke-width="1.4"/><ellipse class="halo" cx="${x}" cy="30" rx="34" ry="18" style="opacity:.45"/><path class="fr" style="--c:var(--tangerine)" d="M${x - 10} 14L${x - 5} 6H${x + 5}L${x + 10} 14Z"/>`;
-const FRAME = (x, y, w, h, a, b, c) => `<g><rect x="${x}" y="${y}" width="${w}" height="${h}" fill="color-mix(in srgb, var(--mustard) 40%, var(--paper))" stroke="var(--walnut)" stroke-width="3"/>${txt(x + w / 2, y + h * .36, a, 'font-size:8px')}${txt(x + w / 2, y + h * .62, b, 'font-size:8px')}${c ? txt(x + w / 2, y + h * .88, c, 'font-size:8.5px;fill:var(--alert)') : ''}</g>`;
-const vending = (x, yb, stocked) => pbox({ x, yb, w: 40, h: 74, d: 9, c: 'steel', extra: `<rect x="${x + 5}" y="${yb - 66}" width="30" height="40" fill="var(--screen)" opacity=".85"/>${stocked ? [0, 1, 2].map((k) => banana(x + 20, yb - 58 + k * 12, .35)).join('') : ''}<rect x="${x + 6}" y="${yb - 20}" width="28" height="9" fill="var(--screen)" stroke="var(--edge)" stroke-width="1"/>` });
-
-/** n: { built: [bathrooms, breakRoom, snackMachine], audit: bool }. Facilities also lists the Foreman's amenities. */
-function facilitiesScene(n) {
-  const [bath, brk, snack] = n.built;
-  let s = roomBase('var(--tangerine)') + hang(90) + hang(270);
-  s += `<g><rect x="12" y="14" width="26" height="40" rx="5" class="fr c-paper"/><circle cx="25" cy="29" r="8" fill="var(--screen)" stroke="var(--mustard)" stroke-width="2"/><path d="M25 29l4 -4" stroke="var(--alert)" stroke-width="2"/><rect x="18" y="41" width="14" height="7" fill="var(--screen)"/>${txs(25, 47.4, '72°', 'font:600 6px var(--font-mono);fill:var(--screen-ink)')}</g>`;
-  s += moraleDial(180, 54, 38);
-  s += `<g transform="translate(180 106)"><rect x="-44" y="-11" width="88" height="21" rx="2" fill="var(--screen)" stroke="var(--mustard)" stroke-width="1.6"/><text data-live="morale-pct" x="0" y="4" style="font:600 12px var(--font-mono);fill:var(--screen-ink);text-anchor:middle">100%</text></g>`;
-  // the bulletin of what the Foreman has built
-  const row = (y, t, ok) => `<g transform="translate(0 ${y})"><rect x="-6" y="-8" width="9" height="9" fill="none" stroke="var(--screen)" stroke-width="1.3"/>${ok ? '<path d="M-4 -3.5l3 3l5 -8" stroke="var(--olive)" stroke-width="2.2" fill="none"/>' : ''}${txs(8, 0, t, 'text-anchor:start;font-size:9.5px')}</g>`;
-  s += `<g transform="translate(254 22)"><rect x="-8" y="-12" width="104" height="70" rx="3" fill="var(--paper)" stroke="var(--walnut)" stroke-width="3"/>${txs(44, 0, 'BUILT BY THE FOREMAN', 'font-size:7.6px')}<g transform="translate(6 18)">${row(0, 'More bathrooms', bath)}${row(15, 'Break room', brk)}${row(30, 'Snack machine', snack)}</g></g>`;
-  s += standAt(72, 214, FM, { xr: `<rect x="2" y="-58" width="16" height="22" fill="var(--edge)" stroke="var(--screen)" stroke-width="1"/><path d="M5 -52h10M5 -48h10M5 -44h8" stroke="var(--concrete)" stroke-width=".8"/>` }) + plateS(72, 224, 'FACILITIES MGR', 96);
-  // the party table
-  s += pbox({ x: 228, yb: 206, w: 108, h: 26, d: 10, c: 'walnut' }) + pizzaBox(262, 180, 44) + pizzaBox(262, 173, 44, true) + pizzaBox(312, 180, 40);
-  s += ficus(20, 214, .8);
-  if (snack) s += vending(122, 206, true);
-  if (brk) s += armchair(206, 208);
-  if (bath) s += `<g><rect x="326" y="82" width="26" height="60" fill="var(--screen)" stroke="var(--edge)" stroke-width="2"/><path d="M329 85L346 89V142H329Z" fill="var(--walnut)" stroke="var(--edge)" stroke-width="1.2"/><rect x="322" y="70" width="34" height="11" rx="2" class="brass"/>${txs(339, 78.4, 'WC', 'font-size:9px')}</g>`;
-  return s;
-}
-
-/** n: { audit: bool }. */
-function accountingScene(n) {
-  let s = roomBase('var(--olive)') + hang(110) + hang(290);
-  s += `<rect x="10" y="14" width="56" height="58" fill="var(--paper)" stroke="var(--walnut)" stroke-width="4"/><path d="M18 58l11 -13l9 7l15 -20" stroke="var(--olive)" stroke-width="3" fill="none"/><path d="M15 64h46" stroke="var(--edge)" stroke-width="1.4"/>`;
-  s += wallSafe(150, 20);
-  s += FRAME(262, 12, 86, 52, 'LIFETIME', 'EARNINGS', '−1/12 🍌');
-  // the Chief Accountant at the ledger desk
-  s += seat(2, 108, 214, { beh: 'read', head: 'visor', shirt: 'sk-olive', H: 62, fur: 2 }, { dw: 128 }) + plateS(108, 226, 'CHIEF ACCOUNTANT', 106);
-  s += `<g transform="translate(84 174)"><path d="M0 0l24 -6l24 6v18l-24 -6l-24 6z" fill="var(--paper)" stroke="var(--screen)" stroke-width="1.4"/><path d="M24 -6v18" stroke="var(--screen)" stroke-width="1.2"/><path d="M6 2l14 -3M6 7l14 -3M30 -3l12 3M30 2l12 3" stroke="var(--olive)" stroke-width="1"/></g>`;
-  s += addingMachine(176, 190);
-  if (n.audit) s += `<g transform="translate(196 168)"><rect x="-18" y="-10" width="36" height="22" fill="color-mix(in srgb, var(--mustard) 45%, var(--paper))" stroke="var(--screen)" stroke-width="1.4"/><path d="M-18 -10l18 12l18 -12" fill="none" stroke="var(--walnut)" stroke-width="1.2"/></g>`;
-  // filing cabinets
-  for (let k = 0; k < 3; k++) {
-    const x = 224 + k * 44;
-    s += pbox({ x, yb: 210, w: 38, h: 78, d: 9, c: 'steel', extra: [0, 1, 2].map((j) => `<rect x="${x + 4}" y="${210 - 72 + j * 24}" width="30" height="20" fill="none" stroke="var(--edge)" stroke-width="1.2"/><rect x="${x + 13}" y="${210 - 65 + j * 24}" width="12" height="3.4" class="brass"/>`).join('') });
-  }
-  s += pbox({ x: 14, yb: 206, w: 56, h: 12, d: 6, c: 'walnut', tabs: false }) + pile(42, 194, 5, 30, 5);
-  return s;
-}
-
-function trainingScene() {
-  let s = roomBase('var(--alert)') + hang(100) + hang(280);
-  s += `<g><rect x="10" y="12" width="190" height="78" rx="2" fill="var(--paper)" stroke="var(--walnut)" stroke-width="5"/>${txs(105, 34, 'ORG CHARTS 101', 'font-size:12px')}<path d="M26 50h120M26 62h86" stroke="var(--olive)" stroke-width="3" stroke-linecap="round"/><rect x="150" y="54" width="22" height="22" fill="none" stroke="var(--alert)" stroke-width="2.4"/><path d="M161 54v-8" stroke="var(--alert)" stroke-width="2"/></g>`;
-  s += `<rect x="276" y="16" width="70" height="46" fill="color-mix(in srgb, var(--mustard) 36%, var(--paper))" stroke="var(--walnut)" stroke-width="3.4"/>${txs(311, 36, 'DIPLOMA', 'font-size:10px')}${txs(311, 50, 'IN PROGRESS', 'font-size:8px')}`;
-  s += standAt(300, 214, TO, { hl: [-34, -90], xl: `<path d="M-34 -90l-34 -22" stroke="var(--walnut)" stroke-width="2.6" stroke-linecap="round"/><circle cx="-68" cy="-112" r="2.4" fill="var(--alert)"/>` }) + plateS(300, 226, 'TRAINING OFFICER', 100);
-  [[1, 62, 214, 'read'], [5, 160, 214, 'type']].forEach(([i, x, y, beh]) => { s += seat(i, x, y, { beh }, { dw: 60 }); });
-  s += pbox({ x: 214, yb: 206, w: 40, h: 14, d: 6, c: 'walnut', tabs: false }) + pile(234, 192, 5, 24, 2);
-  return s;
-}
-
-/** The three office rooms: { svg, viewBox, key } like floor-art's buildRoom. */
-export function buildOfficeRoom(id, props) {
-  const o = (props && props.office) || {};
-  const built = [!!(o.built && o.built.bathrooms), !!(o.built && o.built.breakRoom), !!(o.built && o.built.snackMachine)];
-  const n = { built, audit: !!o.audit };
-  const body = id === 'facilities' ? facilitiesScene(n) : id === 'accounting' ? accountingScene(n) : trainingScene();
-  const key = id + (id === 'facilities' ? built.join() : id === 'accounting' ? String(n.audit) : '');
-  return { svg: body, viewBox: [0, 0, SW, SH], key };
 }

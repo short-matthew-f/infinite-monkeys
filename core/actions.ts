@@ -147,8 +147,27 @@ export function setTierAllocation(s: GameState, t: Tuning, sink: EventSink, next
   if (s.phase !== 'finite' || !validSplit(next, t.tiers.map((x) => x.id))) return false;
   const previous = { ...s.tierAllocation };
   s.tierAllocation = { ...previous, ...next };
+  // A split set by hand holds until the player switches automatic back on.
+  s.tierAuto = false;
   sink({ type: 'allocationChanged', tick: s.tick, layer: 'tiers', previous, next: { ...s.tierAllocation }, suggested: suggestTierAllocation(s, t), objective: s.objective });
   return true;
+}
+
+/** Budget game: let the split follow the suggestion every tick (on), or hold the current split (off). */
+export function setTierAuto(s: GameState, t: Tuning, sink: EventSink, on: boolean): boolean {
+  if (s.phase !== 'finite' || !t.budget) return false;
+  if (on) {
+    const previous = { ...s.tierAllocation };
+    s.tierAllocation = suggestTierAllocation(s, t);
+    sink({ type: 'allocationChanged', tick: s.tick, layer: 'tiers', previous, next: { ...s.tierAllocation }, suggested: { ...s.tierAllocation }, objective: s.objective });
+  }
+  s.tierAuto = on;
+  return true;
+}
+
+/** Is the tier split following the suggestion automatically? */
+export function tierAutoOn(s: GameState, t: Tuning): boolean {
+  return !!t.budget && s.phase === 'finite' && s.tierAuto !== false;
 }
 
 export function setMarketAllocation(s: GameState, t: Tuning, sink: EventSink, next: Record<string, number>): boolean {

@@ -245,6 +245,21 @@ export function meters(s: GameState, t: Tuning): Meters {
   };
 }
 
+/**
+ * Self-replication rate per second at stage 4. Editing's speeds up by
+ * demand/pool while it's behind (capped by readiness.editingCatchUpMax), so a
+ * late stage 4 catches up instead of trailing the others' head start.
+ */
+export function selfRepRate(s: GameState, t: Tuning, d: DeptId): number {
+  const base = t.depts[d].selfRepRate;
+  const max = t.readiness.editingCatchUpMax ?? 1;
+  if (d !== 'editing' || max <= 1) return base;
+  const pool = N.add(hiredEditingCapacity(s, t), N.of(t.editorInChiefCapacity * reviewSpeedMult(s, t)));
+  const demand = certifyTiers(s, t, N.zero, s.tierAllocation).demand;
+  if (N.lte(pool, N.zero) || N.lte(demand, pool)) return base;
+  return base * Math.min(max, N.ratio(demand, pool));
+}
+
 export function metersFull(m: Meters): boolean {
   return DEPTS.every((d) => m[d] >= 1 - 1e-9);
 }

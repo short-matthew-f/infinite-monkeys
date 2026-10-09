@@ -18,20 +18,8 @@ export const HEAD_NAMES: Record<HeadId, string> = {
 
 export const DEPT_LABEL = { recruiting: 'Recruiting', construction: 'Construction', editing: 'Editing' } as const;
 
-/** The three support offices, as the building and the Directory name them. */
-export type OfficeId = 'facilities' | 'accounting' | 'training';
-export const OFFICE_IDS: readonly OfficeId[] = ['facilities', 'accounting', 'training'];
-export const OFFICE_NAMES: Record<OfficeId, string> = { facilities: 'Facilities Office', accounting: 'Accounting Office', training: 'Training Office' };
-/** Short wing names for the building. */
-export const OFFICE_SHORT: Record<OfficeId, string> = { facilities: 'Facilities', accounting: 'Accounting', training: 'Training' };
-
-/** Which office a head's projects are listed in (the Foreman's amenities are listed under Facilities). */
-export function officeOf(from: HeadId): OfficeId | null {
-  if (from === 'facilities' || from === 'construction') return 'facilities';
-  if (from === 'accounting') return 'accounting';
-  if (from === 'training') return 'training';
-  return null;
-}
+/** Short names for the three support offices' heads (memo tabs). */
+export const OFFICE_SHORT = { facilities: 'Facilities', accounting: 'Accounting', training: 'Training' } as const;
 
 const TITLES: Record<string, string> = {
   pizzaParty: 'Friday pizza party',

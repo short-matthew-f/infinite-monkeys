@@ -6,6 +6,7 @@ import type { Ctx, Screen } from '../ctx.js';
 import { h, show, text, enable } from '../ui/dom.js';
 import * as f from '../ui/format.js';
 import { field, figure, formbox, ledger, nextCard, setWhy, stack, stamp, why } from '../ui/forms.js';
+import { mountOfficeNotes } from './office-notes.js';
 import './readiness.css';
 
 const METERS: { id: DeptId; name: string; raises: string }[] = [
@@ -100,10 +101,17 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
     h('p', { class: 'why' }, 'Department levels, research, desks and Zeno can no longer be bought.'),
   );
   doneView.hidden = true;
-  root.append(stack(readyView, doneView));
+  const notes = mountOfficeNotes(ctx);
+  root.append(stack(readyView, doneView, notes.el));
+  // The Directory's "Last quarter's report" row opens this room scrolled to that section.
+  addEventListener('im:director-report', () => {
+    notes.render(ctx.state());
+    notes.report.scrollIntoView({ block: 'start' });
+  });
 
   return () => {
     const s = ctx.state();
+    notes.render(s);
     const declared = s.phase !== 'finite';
     readyView.hidden = declared;
     doneView.hidden = !declared;

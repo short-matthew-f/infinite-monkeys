@@ -712,6 +712,12 @@ rhythm.
   reviews on the old lines, which piled up dozens of quarters overnight;
   `missedReviews` remains for those saves.) Offline catch-up runs the same
   ticks.
+- Editors follow the suggested tier split automatically until the player sets
+  one by hand (a playtester's hand-set "rare finds" split left 98% of Editors
+  idle). Editing's stage-4 self-replication speeds up by demand/pool while it's
+  behind, up to 4×: a late Editing stage 4 otherwise trailed the others'
+  exponential head start for 20–30 minutes of play (it caught up only
+  offline).
 - The heads coordinate how hard each department works: funding shares follow
   `headShares` every tick, and `setShares` is refused in this mode. That's the
   `suggestShares` rule with the budget's own Editing cap (`editingShareCap`,
@@ -767,6 +773,11 @@ you can't always accept everything").
   - Speed-reading: one level of review research.
 - The quarter report lists every request and how it closed, plus funds that
   audits found, for the Chief Accountant's quarter-end slides.
+- The support offices are not places on the map (Oct 9 2026, Matt: "let's
+  just have them occasionally appeal to the player for help"). Facilities,
+  Accounting and Training reach the player only through their memos. Morale,
+  active boosts, owned upgrades, audits and the last quarter's report live in
+  the Director's Office.
 - At the ceremony the heads hand funding back as an even split. Their last
   finite split used to carry into the hotel, which skewed the Commission
   previews by about 10%.

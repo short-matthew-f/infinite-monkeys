@@ -14,6 +14,8 @@ import {
   meters,
   metersFull,
   secondsToTicks,
+  selfRepRate,
+  suggestTierAllocation,
 } from './model.js';
 import type { GameState } from './state.js';
 import { activeBudget, autoBuy, headShares, maybeRequisition, settleAudits, upgradeSave, bankIncome, maybeEndQuarter, maybeOpenBudget } from './budget.js';
@@ -46,6 +48,8 @@ export function catchUp(s: GameState, t: Tuning, sink: EventSink, elapsedSeconds
 
 function stepFinite(s: GameState, t: Tuning, sink: EventSink): void {
   const dt = t.tickSeconds;
+  // Budget game: Editors follow the suggested split unless the player has set one by hand.
+  if (t.budget && s.tierAuto !== false) s.tierAllocation = suggestTierAllocation(s, t);
   maybeOpenBudget(s, t, sink);
   if (s.budget && !s.budget.stats.requests) upgradeSave(s);
   const b = activeBudget(s, t);
@@ -89,10 +93,10 @@ function stepFinite(s: GameState, t: Tuning, sink: EventSink): void {
     s.bananas = N.add(s.bananas, N.mul(cert.income, dt));
   }
 
-  // Self-replication at stage 4.
+  // Self-replication at stage 4 (Editing's catches up while behind).
   for (const d of DEPTS) {
     const st = s.depts[d];
-    if (st.stage === 4 && st.level > 0) st.rep *= 1 + t.depts[d].selfRepRate * dt;
+    if (st.stage === 4 && st.level > 0) st.rep *= 1 + selfRepRate(s, t, d) * dt;
   }
 
   // Milestones.
