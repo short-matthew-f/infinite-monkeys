@@ -482,6 +482,35 @@ $('check-update').addEventListener('click', async () => {
   else if ($('update').hidden) status.textContent = 'Up to date';
 });
 
+// Export: the whole save as JSON, for sending to the developer. Share sheet on phones, else clipboard, else a download.
+$('export-save').addEventListener('click', async () => {
+  const status = $('export-status');
+  await save();
+  const json = JSON.stringify({ schemaVersion: persist.SCHEMA_VERSION, build: __BUILD_SHA__, exportedAt: new Date().toISOString(), state });
+  const name = `infinite-monkeys-save-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}.json`;
+  const file = new File([json], name, { type: 'application/json' });
+  try {
+    if (navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file], title: 'Infinite Monkeys save' });
+      status.textContent = 'Save shared.';
+      return;
+    }
+  } catch (e) {
+    if ((e as Error).name === 'AbortError') { status.textContent = ''; return; }
+  }
+  try {
+    await navigator.clipboard.writeText(json);
+    status.textContent = `Save copied to the clipboard (${Math.round(json.length / 1024)} KB).`;
+    return;
+  } catch { /* fall through to a download */ }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(file);
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
+  status.textContent = 'Save downloaded.';
+});
+
 $('reload').addEventListener('click', async () => {
   await save();
   await updateSW(true);
