@@ -329,7 +329,7 @@ const TIER_IDS = ['letters', 'words', 'phrases', 'sentences'];
 const TIER_NAMES = { letters: 'Letters', words: 'Words', phrases: 'Phrases', sentences: 'Sentences' };
 const DEPT_IDS = ['recruiting', 'construction', 'editing'];
 // What each room's full-width scene shows: [x, y, w, h] in the room art's own coordinates.
-const ROOM_VIEWS = {
+export const ROOM_VIEWS = {
   personnel: [110, 1342, 510, 308],
   pool: [214, 706, 352, 335],
   departments: [60, 140, 260, 184],
@@ -351,7 +351,13 @@ export function normalize(p) {
     tiers: TIER_IDS.map(id => tierState(id)),
     depts: DEPT_IDS.map(dept),
     office: ms.has('office') ? 1 : 0, building: ms.has('building') ? 1 : 0, tall: ms.has('tall') ? 1 : 0,
-    permit: p.permit ? 1 : 0, tutorial: p.tutorial ? 1 : 0
+    permit: p.permit ? 1 : 0, tutorial: p.tutorial ? 1 : 0,
+    // after Infinity: only what changes the picture (live text such as the arrivals board time is patched in place)
+    hotel: p.hotel ? {
+      offers: clamp(Math.floor(p.hotel.offers || 0), 0, 3), pinned: p.hotel.pinned ? 1 : 0, gold: clamp(Math.floor(p.hotel.golden || 0), 0, 6),
+      online: (p.hotel.markets || []).filter(m => m.status === 'online').length,
+      staff: DEPT_IDS.map(id => clamp(Math.floor(((p.hotel.staff || {})[id] || {}).level || 0), 0, 5))
+    } : 0
   };
 }
 const headcountText = n => `${Math.max(0, Math.floor(n)).toLocaleString('en-US')} seated`;
@@ -364,6 +370,10 @@ export function deskMark(cx, yb, dw, faint, label) {
   return `<g class="dmark${faint ? ' faint' : ''}"><rect class="chalk" x="${x0}" y="${y0}" width="${x1 - x0}" height="${y1 - y0}" rx="3"/><path class="tapec" d="${c}"/>` +
     (label ? `<rect x="${cx - 20}" y="${yb - 20}" width="40" height="12" rx="1.5" class="tape"/><text class="dtag" x="${cx}" y="${yb - 11}">${label}</text>` : `<path d="M${cx - 4} ${yb - 12}h8M${cx} ${yb - 16}v8" stroke="var(--edge)" stroke-width="1.6" opacity=".5"/>`) + `</g>`;
 }
+// a golden banana (the same glyph the ceremony and the vault use)
+const goldBanana = (x, y, s = 1) => `<g transform="translate(${x} ${y}) scale(${s})"><ellipse cx="2" cy="-4" rx="17" ry="9" fill="var(--glow)" opacity=".4"/><path d="M-14 -2q14 14 30 -6q-4 4 -12 4q-10 0 -18 2z" fill="var(--mustard)" stroke="var(--screen)" stroke-width="1.1" stroke-linejoin="round"/><path d="M16 -8l3 -3" stroke="var(--walnut)" stroke-width="2.4" stroke-linecap="round"/></g>`;
+// a brass plate with the wing's name where the finite era shows its stage lamps
+const wingPlate = (cx, y, name) => `<g><rect class="brass" x="${cx - 40}" y="${y}" width="80" height="13" rx="2"/><text class="sg sm" x="${cx}" y="${y + 9.6}" textLength="68" lengthAdjust="spacingAndGlyphs" style="font-size:8.2px;letter-spacing:.05em">${name}</text></g>`;
 export const stagePlate = (cx, y, stage) => {
   let lamps = '';
   for (let k = 0; k < 4; k++) lamps += `<circle cx="${cx - 15 + k * 10}" cy="${y - 5}" r="3.1" fill="${k < stage ? 'var(--tangerine)' : 'var(--paper-shade)'}" stroke="var(--screen)" stroke-width=".9"/>`;
@@ -377,11 +387,13 @@ export const drawers = (x, y0, w, n, rh, hasLabel = true) => Array.from({ length
 /* ----- the back wall: windows (closed until 'office'), elevator (barrier until 'building'), sky (changes at 'tall') ----- */
 /* ----- Departments: cabinets grow with level, a plate and four lamps show the stage ----- */
 function departmentsSVG(n) {
-  const [[lr, sr], [lc, sc], [le, se]] = n.depts, yb = 314;
+  const [[lr0, sr], [lc0, sc], [le0, se]] = n.depts, yb = 314;
+  // after Infinity the cabinets grow with the hotel upgrade lines (Bus Wranglers, Shift Crews, Editors), not the old department levels
+  const hot = n.hotel, [lr, lc, le] = hot ? hot.staff : [lr0, lc0, le0];
   // Recruiting: a filing cabinet that gains drawers, with a pile of applications on top
   const rA = 2 + Math.min(lr, 3), hA = 14 + rA * 20;
   const pile = Array.from({ length: Math.min(lr + 1, 6) }, (_, k) => `<rect class="page" x="${52 + (k % 2) * 3}" y="${yb - hA - 9 - k * 3.4}" width="32" height="4" rx=".8"/>`).join('');
-  const flag = lr > 0 ? `<path d="M88 ${yb - hA - 12}v-18" stroke="var(--screen)" stroke-width="1.4"/><path d="M88 ${yb - hA - 30}l11 4l-11 4z" fill="var(--alert)" stroke="var(--edge)" stroke-width=".8"/>` : '';
+  const flag = hot ? `<path d="M88 ${yb - hA - 12}v-34" stroke="var(--screen)" stroke-width="1.6"/><rect class="fr c-mustard" x="68" y="${yb - hA - 54}" width="40" height="15" rx="2"/><text x="88" y="${yb - hA - 42.6}" style="font:700 10px var(--font-display);fill:var(--screen);text-anchor:middle">BUS \u2192</text>` : lr > 0 ? `<path d="M88 ${yb - hA - 12}v-18" stroke="var(--screen)" stroke-width="1.4"/><path d="M88 ${yb - hA - 30}l11 4l-11 4z" fill="var(--alert)" stroke="var(--edge)" stroke-width=".8"/>` : '';
   let s = pbox({ x: 40, yb, w: 60, h: hA, d: 11, c: 'steel', extra: drawers(40, yb - hA + 8, 60, rA, 20) + pile + flag });
   // Construction: a wide plan chest with rolled blueprints and a hard hat
   const rB = 1 + Math.min(lc, 2), hB = 12 + rB * 19;
@@ -393,22 +405,29 @@ function departmentsSVG(n) {
   const proofs = Array.from({ length: Math.min(le + 1, 5) }, (_, k) => `<rect class="page" x="${252 + (k % 2) * 2}" y="${yb - hC - 9 - k * 3.6}" width="26" height="4" rx=".8"/><path d="M${256 + (k % 2) * 2} ${yb - hC - 7 - k * 3.6}h10" stroke="var(--alert)" stroke-width="1.2"/>`).join('');
   s += pbox({ x: 222, yb, w: 62, h: hC, d: 11, c: 'steel', extra: drawers(222, yb - hC + 8, 62, rC, 20) +
     `<rect x="230" y="${yb - hC - 22}" width="20" height="18" rx="2" fill="var(--edge)" stroke="var(--screen)" stroke-width="1"/><path d="M235 ${yb - hC - 22}l-3 -13M241 ${yb - hC - 22}l1 -16M247 ${yb - hC - 22}l5 -12" stroke="var(--alert)" stroke-width="2.4" stroke-linecap="round"/><path d="M234 ${yb - hC - 13}h12" stroke="var(--alert)" stroke-width="1.4"/>` + proofs });
-  s += stagePlate(70, 320, sr) + stagePlate(162, 320, sc) + stagePlate(253, 320, se);
-  return `<g class="zone area" id="z-departments" transform="translate(43.6 18) scale(.88)">` + padSVG(30, 150, 270, 185, 't-dp') + sign(165, 160, 112, 20, 'Departments', 0) + lamp(40, 208, 0) + lamp(292, 200, -1.7) + s + `<rect class="ring" x="28" y="148" width="274" height="189" rx="8"/></g>`;
+  s += hot ? wingPlate(70, 320, 'Bus Wranglers') + wingPlate(162, 320, 'Shift Crews') + wingPlate(253, 320, 'Editors') : stagePlate(70, 320, sr) + stagePlate(162, 320, sc) + stagePlate(253, 320, se);
+  return `<g class="zone area" id="z-departments" transform="translate(43.6 18) scale(.88)">` + padSVG(30, 150, 270, 185, 't-dp') + sign(165, 160, 112, 20, hot ? 'Staff' : 'Departments', 0) + lamp(40, 208, 0) + lamp(292, 200, -1.7) + s + `<rect class="ring" x="28" y="148" width="274" height="189" rx="8"/></g>`;
 }
 
 /* ----- Director's Office: a folder waits for the stamp; once the Permit is stamped it stands on the desk ----- */
 function directorSVG(n) {
   const ox = 520, ow = 196, oyb = 322, oh = 82;
   let s = `<g class="zone area" id="z-director" transform="translate(49.6 18) scale(.88)">` + padSVG(480, 150, 270, 185, 't-dr');
-  s += sign(615, 160, 112, 20, 'Director', 1.3) + lamp(500, 224, -.9) + lamp(738, 224, -2.4);
+  const hot = n.hotel;
+  s += (hot ? sign(615, 160, 128, 20, 'Commissions', 1.3) : sign(615, 160, 112, 20, 'Director', 1.3)) + lamp(500, 224, -.9) + lamp(738, 224, -2.4);
   // before the Permit: a glowing wall panel and a blank folder under a waiting stamp. After: a framed Permit on the wall (red double-ruled stamp, ribbon, brass seal) and the folder is stamped
-  const panel = n.permit
+  // after Infinity the Permit panel gives way to the Commissions board: offers hang as playbills, a pinned one wears a pin
+  const bx = ox + 120;
+  const board = hot ? `<rect x="${bx - 3}" y="${oyb - 80}" width="76" height="44" fill="var(--edge)" stroke="var(--edge)" stroke-width="1.4"/><rect class="fr c-mustard" x="${bx}" y="${oyb - 77}" width="70" height="9" rx="1.2"/><text class="sg sm" x="${bx + 35}" y="${oyb - 70}" textLength="62" lengthAdjust="spacingAndGlyphs" style="font-size:6.2px">COMMISSIONS</text>` +
+    [0, 1, 2].map(i => { const x = bx + 2 + i * 23, hung = i < hot.offers + hot.pinned;
+      return hung ? `<g transform="rotate(${[-2, 1.5, -1][i]} ${x + 10} ${oyb - 52})"><rect x="${x}" y="${oyb - 65}" width="20" height="27" fill="var(--paper)" stroke="var(--screen)" stroke-width=".9"/><rect x="${x + 2}" y="${oyb - 63}" width="16" height="7" fill="${['var(--tangerine)', 'var(--mustard)', 'var(--olive)'][i]}"/><path d="M${x + 3} ${oyb - 53}h14M${x + 3} ${oyb - 49}h14M${x + 3} ${oyb - 45}h9" stroke="var(--concrete)" stroke-width="1"/>${hot.pinned && i === 0 ? `<circle cx="${x + 10}" cy="${oyb - 65}" r="3" fill="var(--alert)" stroke="var(--screen)" stroke-width=".8"/>` : ''}</g>`
+        : `<rect x="${x}" y="${oyb - 65}" width="20" height="27" fill="none" stroke="var(--concrete)" stroke-width="1" stroke-dasharray="3 2" opacity=".8"/>`; }).join('') : '';
+  const panel = hot ? board : n.permit
     ? `<rect x="${ox + 136}" y="${oyb - 80}" width="46" height="40" fill="var(--mustard)" stroke="var(--edge)" stroke-width="1.6"/><rect x="${ox + 140}" y="${oyb - 76}" width="38" height="32" fill="var(--edge)" stroke="var(--screen)" stroke-width="1"/>` +
       `<path d="M${ox + 144} ${oyb - 71}h30M${ox + 144} ${oyb - 67}h30" stroke="var(--concrete)" stroke-width="1.2"/><g transform="rotate(-9 ${ox + 159} ${oyb - 57})"><rect class="stampd" x="${ox + 145}" y="${oyb - 63}" width="28" height="12" style="stroke-width:1.7"/><text class="stampt" x="${ox + 159}" y="${oyb - 54}" style="font-size:8px">PERMIT</text></g>` +
       `<path d="M${ox + 164} ${oyb - 42}l-5 10l5 -3l5 3z" fill="var(--alert)" stroke="var(--edge)" stroke-width=".8"/><circle cx="${ox + 164}" cy="${oyb - 45}" r="5" class="brass"/>`
     : `<polygon points="${ox + 136},${oyb - 74} ${ox + 184},${oyb - 74} ${ox + 180},${oyb - 40} ${ox + 140},${oyb - 40}" fill="var(--glow)" stroke="var(--edge)" stroke-width="1.2"/>`;
-  const permit = `<rect x="${ox + 126}" y="${oyb - 44}" width="26" height="9" fill="var(--mustard)" stroke="var(--edge)" stroke-width="1"/>` + (n.permit
+  const permit = `<rect x="${ox + 126}" y="${oyb - 44}" width="26" height="9" fill="var(--mustard)" stroke="var(--edge)" stroke-width="1"/>` + (n.permit || hot
     ? `<rect class="stampd" x="${ox + 130}" y="${oyb - 43}" width="18" height="6.4" style="stroke-width:1.3"/><g><rect x="${ox + 108}" y="${oyb - 44}" width="3" height="10" fill="var(--walnut)" stroke="var(--edge)" stroke-width=".7"/><rect x="${ox + 101}" y="${oyb - 36}" width="16" height="5" rx="1.4" class="ink"/></g>`
     : `<path d="M${ox + 132} ${oyb - 40}h14" stroke="var(--screen)" stroke-width="1" stroke-dasharray="2 2" opacity=".6"/><g><rect x="${ox + 137}" y="${oyb - 58}" width="3" height="12" fill="var(--walnut)" stroke="var(--edge)" stroke-width=".7"/><rect x="${ox + 130}" y="${oyb - 48}" width="16" height="7" rx="1.4" class="ink"/></g>`);
   s += `<g class="up" style="transform-origin:${ox + ow / 2}px ${oyb}px"><polygon class="shl" points="${ox},${oyb} ${ox + ow},${oyb} ${ox + ow + 30},${oyb + 16} ${ox + 28},${oyb + 16}"/><polygon class="shc" points="${ox},${oyb} ${ox + ow},${oyb} ${ox + ow + 3},${oyb + 4} ${ox + 3},${oyb + 4}"/>` +
@@ -467,6 +486,8 @@ function librarySVG(n) {
   let dr = '';
   for (let r = 0; r < 4; r++) for (let c = 0; c < 3; c++) { const x = cx0 + 4 + c * 15.4, y = yb - ch + 6 + r * 17; dr += `<rect x="${x}" y="${y}" width="13.4" height="15" rx="1" fill="none" stroke="var(--edge)" stroke-width=".9"/><rect x="${x + 3}" y="${y + 3}" width="7.4" height="3.6" fill="var(--edge)" stroke="var(--concrete)" stroke-width=".5"/><rect x="${x + 3.4}" y="${y + 9}" width="6.6" height="2.4" rx="1.1" class="brass"/>`; }
   s += pbox({ x: cx0, yb, w: cw, h: ch, d: 9, c: 'walnut', extra: dr + `<g transform="rotate(-6 ${cx0 + 36} ${yb - ch - 6})"><rect class="page" x="${cx0 + 8}" y="${yb - ch - 11}" width="16" height="9"/><rect class="page" x="${cx0 + 12}" y="${yb - ch - 13}" width="16" height="9"/></g><rect x="${cx0 + 34}" y="${yb - ch - 14}" width="14" height="6" rx="1" fill="var(--alert)" stroke="var(--edge)" stroke-width=".8"/>` });
+  const hot = n.hotel;
+  if (!hot) {
   // lectern with an open volume and the reading lamp
   const lx = 162;
   const flip = researching >= 0 ? ' b-read' : '';
@@ -483,9 +504,19 @@ function librarySVG(n) {
     `<path d="M${lx + 58} ${yb - 40}V${yb - 94}Q${lx + 58} ${yb - 106} ${lx + 46} ${yb - 106}" fill="none" stroke="var(--edge)" stroke-width="5" stroke-linecap="round"/><path d="M${lx + 58} ${yb - 40}V${yb - 94}Q${lx + 58} ${yb - 106} ${lx + 46} ${yb - 106}" fill="none" stroke="var(--mustard)" stroke-width="2.6" stroke-linecap="round"/>` +
     `<ellipse class="fr" style="--c:var(--walnut)" cx="${lx + 58}" cy="${yb - 38}" rx="7" ry="3"/><path class="fr" style="--c:var(--olive)" d="M${lx + 35} ${yb - 100}L${lx + 41} ${yb - 112}H${lx + 54}L${lx + 58} ${yb - 100}Z"/><ellipse class="lampc" cx="${lx + 46}" cy="${yb - 99}" rx="9" ry="3.2"/>` +
     `<rect x="${lx - 2}" y="${yb - 62}" width="12" height="6" rx="1.4" class="ink"/><rect x="${lx + 1}" y="${yb - 72}" width="6" height="11" rx="1" fill="var(--walnut)" stroke="var(--edge)" stroke-width=".8"/></g>`;
+  }
+  else {
+    // after Infinity the lectern and the tier volumes make way for the Golden Banana vault: a steel door with a window onto what is banked
+    const vx = 150, vw = 92, vh = 88, vyb = 312;
+    s += pbox({ x: vx, yb: vyb, w: vw, h: vh, d: 10, c: 'steel', extra: `<rect x="${vx + 7}" y="${vyb - vh + 9}" width="${vw - 36}" height="${vh - 28}" rx="2" fill="var(--screen)" stroke="var(--edge)" stroke-width="1.2"/>` +
+      Array.from({ length: 6 }, (_, i) => { const bx = vx + 7 + (vw - 36) * (.2 + (i % 2) * .6), by = vyb - vh + 9 + 14 + Math.floor(i / 2) * 18; return i < hot.gold ? goldBanana(bx, by, .78) : `<path d="M${bx - 9} ${by}h18" stroke="var(--concrete)" stroke-width="1.2" stroke-dasharray="3 2" opacity=".7"/>`; }).join('') +
+      `<circle cx="${vx + vw - 15}" cy="${vyb - vh / 2 - 4}" r="10" class="brass"/><circle cx="${vx + vw - 15}" cy="${vyb - vh / 2 - 4}" r="3.4" fill="var(--screen)"/><path d="M${vx + vw - 15} ${vyb - vh / 2 - 14}v20M${vx + vw - 25} ${vyb - vh / 2 - 4}h20" stroke="var(--screen)" stroke-width="1.5"/>` +
+      `<rect x="${vx + 12}" y="${vyb - vh - 4}" width="${vw - 24}" height="10" rx="1.5" class="brass"/><text class="sg sm" x="${vx + vw / 2}" y="${vyb - vh + 3.6}" style="font-size:7.4px">VAULT</text>` });
+  }
   // librarian
   s += T(142, 316, stand({ fur: 3, H: 60, bw: 24, tw: 1.1, hr: 11.5, ears: 'round', view: 'pr', gaze: [1, .5], eyes: 'open', mouth: 'smile', head: 'none', tail: true, shirt: 'sk-shade' },
     { hl: [-8, -26], hr: [12, -30], front: `<g><rect x="3" y="-40" width="24" height="5" fill="var(--alert)" stroke="var(--edge)" stroke-width=".8"/><rect x="2" y="-35" width="24" height="5" fill="var(--mustard)" stroke="var(--edge)" stroke-width=".8"/><rect x="4" y="-30" width="22" height="4.6" fill="var(--olive)" stroke="var(--edge)" stroke-width=".8"/></g>` }));
+  if (hot) return s + `<rect class="ring" x="28" y="148" width="274" height="209" rx="8"/></g>`;
   // the volume rack: one volume per tier
   const slots = n.tiers.map((st, i) => volume(70 + i * 50, 347, st, TIER_IDS[i])).join('');
   s += pbox({ x: 62, yb: 351, w: 208, h: 36, d: 8, c: 'walnut', tabs: false, extra: `<rect x="66" y="${351 - 33}" width="200" height="30" fill="var(--screen)" opacity=".5"/>` });
@@ -502,6 +533,8 @@ const ED_OVER = [
 function poolSVG(n, count) {
   const { xs, rows, edRow, edXs, edDw } = POOL_G;
   let s = `<g class="zone area" id="z-pool" transform="translate(0 ${POOL_DY})">` + padSVG(220, 450, 340, 525, 't-pl');
+  // After Infinity the pool never ends: more rows of desks recede behind the sign, smaller and paler, into the distance.
+  if (n.hotel) s += [[551, .5, .6, 0], [538, .38, .4, 2], [528, .28, .28, 2]].map(([yb, k, o, j]) => `<g opacity="${o}" transform="translate(390 ${yb}) scale(${k}) translate(-390 ${-yb})">${xs.map((cx, c) => j < 2 ? seatSVG(60 + j * 4 + c, cx, yb, {}) : deskMark(cx, yb, 64, true, '')).join('')}</g>`).join('');
   s += sign(390, 460, 124, 21, 'Typing Pool', 2.2) + lamp(238, 506, 0) + lamp(542, 506, -1.7);
   const marks = [], front = [], vac = [];
   for (let i = 0; i < CAP; i++) {
@@ -523,20 +556,32 @@ function poolSVG(n, count) {
   }
   s += `<g class="up" style="transform-origin:556px ${edRow}px"><polygon class="shl" points="551,${edRow} 561,${edRow} 596,${edRow + 14} 585,${edRow + 14}"/><polygon class="shc" points="551,${edRow} 561,${edRow} 564,${edRow + 4} 554,${edRow + 4}"/><rect class="fr c-steel" x="551" y="${edRow - 222}" width="10" height="222" rx="2"/><rect x="549" y="${edRow - 228}" width="14" height="8" rx="2" class="brass"/><rect x="549" y="${edRow - 8}" width="14" height="8" rx="2" class="brass"/><rect x="549" y="${edRow - 120}" width="14" height="4" rx="1.5" class="brass"/><g class="cap"><rect x="553" y="${edRow - 26}" width="6" height="12" rx="2.6" fill="var(--edge)" stroke="var(--screen)" stroke-width=".8"/></g></g>`;
   s += cactus(236, 862, .9);
-  if (n.crowd) s += `<g class="up" style="transform-origin:390px 962px"><polygon class="shl" points="318,968 462,968 478,978 334,978"/><rect class="fr c-mustard" x="318" y="944" width="144" height="24" rx="3"/><path class="rim" d="M320 966V946H460"/><circle cx="326" cy="956" r="2.2" fill="var(--screen)"/><circle cx="454" cy="956" r="2.2" fill="var(--screen)"/><text class="hc" x="390" y="961" data-hc="1">${headcountText(count)}</text></g>`;
+  if (n.crowd && !n.hotel) s += `<g class="up" style="transform-origin:390px 962px"><polygon class="shl" points="318,968 462,968 478,978 334,978"/><rect class="fr c-mustard" x="318" y="944" width="144" height="24" rx="3"/><path class="rim" d="M320 966V946H460"/><circle cx="326" cy="956" r="2.2" fill="var(--screen)"/><circle cx="454" cy="956" r="2.2" fill="var(--screen)"/><text class="hc" x="390" y="961" data-hc="1">${headcountText(count)}</text></g>`;
   return s + `<rect class="ring" x="218" y="448" width="344" height="529" rx="8"/></g>`;
 }
 
 /* ----- Personnel, the entrance, the shredder station ----- */
 function personnelSVG(n) {
+  const hot = n.hotel;
   let s = `<g class="zone area" id="z-personnel" transform="translate(155 160)">` + padSVG(110, 965, 250, 170, 't-pe');
-  s += sign(235, 975, 112, 20, 'Personnel', 3.1) + lamp(128, 1040, -.6, true);
+  s += sign(235, 975, 112, 20, hot ? 'Front Desk' : 'Personnel', 3.1) + lamp(128, 1040, -.6, true);
   s += seatSVG(41, 235, 1100, { over: { fur: 3, H: 56, bw: 30, tw: 1.1, hr: 12.5, ears: 'round', lean: 0, view: 'f', gaze: [.5, .6], eyes: 'open', mouth: 'smile', head: 'glassesR', body: 'bowtie', tail: 'curl', prop: 4, ps: 1, beh: 'slam', shirt: 'sk-paper', chair: 'round' } });
   const fy = 1112 - 54;
-  s += pbox({ x: 290, yb: 1112, w: 40, h: 54, d: 8, c: 'steel', extra: `<rect x="295" y="${fy + 8}" width="30" height="20" rx="1.2" fill="none" stroke="var(--edge)" stroke-width="1"/><rect x="295" y="${fy + 32}" width="30" height="16" rx="1.2" fill="none" stroke="var(--edge)" stroke-width="1"/><rect x="303" y="${fy + 15}" width="14" height="6" rx="1.4" class="brass"/><rect x="303" y="${fy + 37}" width="14" height="6" rx="1.4" class="brass"/>` });
+  // after Infinity the filing cabinet becomes the room-key pigeonholes (a key hangs in a cubby for each online market's rooms), with a reception bell on the desk
+  const pigeon = () => {
+    const x = 282, w = 72, h = 88, yb = 1112, cells = [];
+    for (let r = 0; r < 4; r++) for (let c = 0; c < 3; c++) {
+      const cx = x + 5 + c * 21, cy = yb - h + 7 + r * 19, k = r * 3 + c, key = k < hot.online * 3 + 2;
+      cells.push(`<rect x="${cx}" y="${cy}" width="19" height="17" fill="var(--screen)" stroke="var(--edge)" stroke-width="1"/>` + (key ? `<path d="M${cx + 9.5} ${cy + 1}v6" stroke="var(--concrete)" stroke-width="1"/><circle cx="${cx + 9.5}" cy="${cy + 10}" r="3" class="brass"/><circle cx="${cx + 9.5}" cy="${cy + 10}" r="1" fill="var(--screen)"/><rect x="${cx + 8.6}" y="${cy + 12.6}" width="1.8" height="3.4" class="brass"/>` : `<rect x="${cx + 5}" y="${cy + 11}" width="9" height="3" rx="1" fill="var(--paper-shade)" opacity=".5"/>`));
+    }
+    return pbox({ x, yb, w, h, d: 8, c: 'walnut', extra: cells.join('') + `<rect x="${x + 14}" y="${yb - h - 4}" width="${w - 28}" height="9" rx="1.5" class="brass"/><text class="sg sm" x="${x + w / 2}" y="${yb - h + 2.8}" style="font-size:6.4px">ROOM KEYS</text>` });
+  };
+  const deskBell = `<g transform="translate(262 1082)"><rect x="-10" y="-1" width="20" height="3.4" rx="1.4" fill="var(--walnut)" stroke="var(--screen)" stroke-width="1"/><path d="M-8 -1q0 -12 8 -12q8 0 8 12z" fill="var(--mustard)" stroke="var(--screen)" stroke-width="1.1"/><circle cx="0" cy="-15" r="1.8" fill="var(--mustard)" stroke="var(--screen)" stroke-width=".9"/></g>`;
+  if (hot) s += pigeon() + deskBell;
+  else s += pbox({ x: 290, yb: 1112, w: 40, h: 54, d: 8, c: 'steel', extra: `<rect x="295" y="${fy + 8}" width="30" height="20" rx="1.2" fill="none" stroke="var(--edge)" stroke-width="1"/><rect x="295" y="${fy + 32}" width="30" height="16" rx="1.2" fill="none" stroke="var(--edge)" stroke-width="1"/><rect x="303" y="${fy + 15}" width="14" height="6" rx="1.4" class="brass"/><rect x="303" y="${fy + 37}" width="14" height="6" rx="1.4" class="brass"/>` });
   s += `<g transform="translate(0 -34)"><g class="up" style="transform-origin:146px 1146px"><polygon class="shc" points="130,1146 164,1146 167,1150 133,1150"/><rect class="fr c-paper" x="132" y="1128" width="32" height="18" rx="1.5"/><rect class="fr c-paper" x="135" y="1118" width="32" height="18" rx="1.5"/><path d="M139 1124h20M139 1128h14" stroke="var(--concrete)" stroke-width="1"/></g></g>`;
   // the tutorial hand points at the clerk's desk while nobody waits at the door
-  if (n.tutorial && !n.candidate) s += nextCue(190, 1070);
+  if (!hot && n.tutorial && !n.candidate) s += nextCue(190, 1070);
   s += `<rect class="ring" x="108" y="963" width="254" height="174" rx="8"/></g>`;
   // entrance: door, mat, umbrella stand, plant, and the candidate waiting when a desk is free
   s += `<g class="area" id="a-entrance" transform="translate(62 260)">`;
@@ -544,14 +589,15 @@ function personnelSVG(n) {
     // the sign hangs over the door (it used to sit under the floor line, outside the scene)
     `<rect x="165" y="1170" width="80" height="25" rx="2.5" class="brass"/><text class="sg" x="205" y="1188" style="font-size:17px;letter-spacing:.06em">Entrance</text>`);
   s += umbrellaStand(282, 1190) + ficus(30, 1204, 1.15);
-  if (n.tutorial && n.candidate) s += nextCue(300, 1090);
-  s += `<g data-cand id="candpos" style="transform:translate(300px,1210px)"><g id="cand" class="cand">${stand(Object.assign({}, CANDIDATE, { H: 58, bw: 24 }), { hl: [-9, -26], hr: [12, -22], xr: '', front: `<rect x="10" y="-26" width="22" height="16" rx="2" fill="var(--walnut)" stroke="var(--edge)" stroke-width="1.2"/><path d="M16 -26v-4h10v4" fill="none" stroke="var(--edge)" stroke-width="1.6"/><rect x="19" y="-20" width="4" height="4" class="brass"/>` })}</g></g>`;
+  if (!hot && n.tutorial && n.candidate) s += nextCue(300, 1090);
+  if (!hot) s += `<g data-cand id="candpos" style="transform:translate(300px,1210px)"><g id="cand" class="cand">${stand(Object.assign({}, CANDIDATE, { H: 58, bw: 24 }), { hl: [-9, -26], hr: [12, -22], xr: '', front: `<rect x="10" y="-26" width="22" height="16" rx="2" fill="var(--walnut)" stroke="var(--edge)" stroke-width="1.2"/><path d="M16 -26v-4h10v4" fill="none" stroke="var(--edge)" stroke-width="1.6"/><rect x="19" y="-20" width="4" height="4" class="brass"/>` })}</g></g>`;
   s += T(-100, -98, T(556, 1288, stand({ fur: 0, H: 58, bw: 28, tw: 1.15, hr: 12.5, ears: 'round', view: 'l', gaze: [-1, .7], eyes: 'heavy', mouth: 'flat', head: 'glassesR', tail: true, shirt: 'sk-shade' }, { hl: [-14, -34], hr: [-4, -34], front: `<g class="rpage" style="transform-origin:-18px -44px"><rect class="page" x="-28" y="-52" width="20" height="24" rx="1" transform="rotate(-6 -18 -40)"/><path d="M-24 -46h12M-24 -42h12M-24 -38h8" stroke="var(--concrete)" stroke-width="1" transform="rotate(-6 -18 -40)"/></g>` })) +
     pbox({ x: 500, yb: 1296, w: 112, h: 16, d: 10, c: 'walnut', extra: `<rect x="504" y="1268" width="104" height="8" fill="var(--paper-shade)" stroke="var(--edge)" stroke-width="1"/>` }) +
     pbox({ x: 664, yb: 1296, w: 46, h: 62, d: 9, c: 'mustard', extra: `<rect x="676" y="1246" width="22" height="4" rx="2" class="ink"/><rect class="page" x="684" y="1238" width="14" height="12" transform="rotate(12 690 1244)"/><rect x="672" y="1262" width="30" height="20" fill="var(--edge)" stroke="var(--screen)" stroke-width=".9"/><path d="M676 1268h22M676 1273h14" stroke="var(--concrete)" stroke-width="1"/>` }));
   s += snake(650, 1204, 1.1) + `</g>`;
   s += `<g class="area" id="a-shred" transform="translate(150 225)"><g transform="translate(-128 -80)">` +
-    pbox({ x: 628, yb: 1120, w: 70, h: 52, d: 12, c: 'steel', extra: `<rect x="640" y="1076" width="46" height="4" rx="2" class="ink"/><rect x="636" y="1092" width="54" height="22" rx="1.2" fill="none" stroke="var(--edge)" stroke-width="1"/><rect x="654" y="1098" width="18" height="6" rx="1.6" class="brass"/><g class="shred"><rect class="page" x="654" y="1070" width="14" height="12"/></g><path d="M646 1114v6M652 1114v6M658 1114v6M664 1114v6M670 1114v6M676 1114v6" stroke="var(--edge)" stroke-width="1.6"/>` }) +
+    (hot ? pbox({ x: 628, yb: 1120, w: 70, h: 40, d: 12, c: 'steel', extra: `<rect x="634" y="1086" width="26" height="18" rx="2" fill="var(--walnut)" stroke="var(--edge)" stroke-width="1.2"/><path d="M642 1086v-4h10v4" fill="none" stroke="var(--edge)" stroke-width="1.6"/><rect x="645" y="1093" width="4" height="4" class="brass"/><rect x="664" y="1090" width="28" height="14" rx="2" fill="var(--tangerine)" stroke="var(--edge)" stroke-width="1.2"/><path d="M673 1090v-4h10v4" fill="none" stroke="var(--edge)" stroke-width="1.6"/><circle cx="640" cy="1118" r="3" fill="var(--screen)"/><circle cx="686" cy="1118" r="3" fill="var(--screen)"/>` }) +
+      `<g><rect x="661.5" y="1030" width="3" height="40" fill="var(--screen)"/><rect class="fr c-mustard" x="630" y="996" width="66" height="36" rx="2"/><rect x="634" y="1000" width="58" height="28" fill="var(--screen)" stroke="var(--edge)" stroke-width=".8"/><text x="663" y="1008.4" style="font:700 6.6px var(--font-display);letter-spacing:.14em;fill:var(--screen-muted);text-anchor:middle;text-transform:uppercase">Next bus</text><text data-live="arr-board" x="663" y="1022" style="font:600 13px var(--font-mono);fill:var(--screen-ink);text-anchor:middle"></text></g>` : pbox({ x: 628, yb: 1120, w: 70, h: 52, d: 12, c: 'steel', extra: `<rect x="640" y="1076" width="46" height="4" rx="2" class="ink"/><rect x="636" y="1092" width="54" height="22" rx="1.2" fill="none" stroke="var(--edge)" stroke-width="1"/><rect x="654" y="1098" width="18" height="6" rx="1.6" class="brass"/><g class="shred"><rect class="page" x="654" y="1070" width="14" height="12"/></g><path d="M646 1114v6M652 1114v6M658 1114v6M664 1114v6M670 1114v6M676 1114v6" stroke="var(--edge)" stroke-width="1.6"/>` })) +
     T(604, 1126, stand({ fur: 3, H: 62, bw: 26, tw: 1.1, hr: 12, ears: 'tuft', view: 'pr', gaze: [1, .5], eyes: 'open', mouth: 'flat', head: 'swirl', tail: true, shirt: 'sk-mustard' }, { hr: [22, -52], hl: [-6, -24] })) + `</g>` + snake(594, 1070, .9) + `</g>`;
   return s;
 }

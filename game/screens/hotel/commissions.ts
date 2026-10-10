@@ -7,7 +7,7 @@
 // frozen requirements and rewards on the Commission, deadlineTick, certifyMarkets for the live income.
 import {
   N, bestMarket, certifyMarkets, hotelPool, marketAutoOn, pinObjective, previewCommission, previewMarketAllocation,
-  type CommissionState, type GameState,
+  type CommissionState, type FrozenReward, type GameState,
 } from '../../../core/index.js';
 import type { Ctx, Screen } from '../../ctx.js';
 import { h, show, text } from '../../ui/dom.js';
@@ -18,6 +18,14 @@ import './hotel.css';
 
 const KIND_LABEL = { immediate: 'Immediate', permanent: 'Permanent', expansion: 'Expansion' } as const;
 const BANANAS = { kind: 'bananas' } as const;
+
+/** What a Commission pays, short enough for a phone row. */
+function shortPay(r: FrozenReward): string {
+  if (r.bananas !== null) return f.bananaText(r.bananas);
+  if (r.golden !== null) return `${f.count(r.golden)} Golden`;
+  if (r.market !== null) return `${marketName(r.market)} market`;
+  return 'Nothing';
+}
 
 interface Progress {
   market: string;
@@ -109,7 +117,32 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
   const hint = h('p', { class: 'note' }, 'Pin one Commission and the Editors work on it. The deadline starts when you first pin it, and keeps running if you unpin. Deliveries count only while it is pinned.');
   const offersBox = formbox('Ref. 12-C / Commissions on offer', hint, bills);
 
-  root.append(stack(reward.el, nowBox, incomeField, offersBox));
+  // ----- compare at a glance: one compact row per open offer, so a phone need not scroll between playbills -----
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  const cmpRows = cards.map((c) => {
+    const name = h('span', { class: 'cmp-name' }, commissionTitle(c.def.id));
+    const fit = h('span', { class: 'cmp-fit' });
+    const eta = h('span', { class: 'cmp-v' });
+    const dl = h('span', { class: 'cmp-v' });
+    const pays = h('span', { class: 'cmp-v' });
+    const gone = h('span', { class: 'cmp-v' });
+    const btn = h('button', { class: 'cmp-row', type: 'button', onclick: () => {
+      // Open the playbill: scroll the sheet to it and move focus there (without a second scroll).
+      c.wrap.scrollIntoView({ block: 'start', behavior: reduceMotion.matches ? 'auto' : 'smooth' });
+      c.el.tabIndex = -1;
+      c.el.focus({ preventScroll: true });
+    } },
+      h('span', { class: 'cmp-top' }, name, fit),
+      h('span', { class: 'cmp-vals' }, eta, dl, pays, gone));
+    const li = h('li', { class: 'cmp-item' }, btn);
+    return { c, li, btn, name, fit, eta, dl, pays, gone };
+  });
+  const cmpNone = h('p', { class: 'note' }, 'No offers open right now.');
+  const cmpHint = h('p', { class: 'note' }, 'Assuming suggested split and funding. Tap an offer to jump to its playbill.');
+  const cmpHead = h('p', { class: 'cmp-head', 'aria-hidden': 'true' }, h('span', {}, 'ETA'), h('span', {}, 'Due'), h('span', {}, 'Pays'), h('span', {}, 'Gives up'));
+  const cmpBox = formbox('Ref. 12-C / Compare offers', cmpHint, cmpHead, h('ul', { class: 'cmp-list' }, ...cmpRows.map((r) => r.li)), cmpNone);
+
+  root.append(stack(cmpBox, reward.el, nowBox, incomeField, offersBox));
 
   return () => {
     const s = ctx.state();
@@ -174,6 +207,30 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
       show(nowClock.el, false);
       for (const el of [nowClockLine, nowEta, nowEtaHand, nowForgone, unpinBtn, unpinNote]) show(el, false);
     }
+
+    // ----- compare rows -----
+    let openCount = 0;
+    for (const r of cmpRows) {
+      const cm = hot.commissions[r.c.def.id];
+      const p = cm && (cm.status === 'offered' || cm.status === 'active') ? previewCommission(s, t, cm.id) : null;
+      show(r.li, !!p);
+      if (!cm || !p) continue;
+      openCount++;
+      const isPinned = pinned === cm.id;
+      const total = r.c.def.deadlineSeconds;
+      const left = cm.status === 'active' && cm.deadlineTick !== null ? Math.max(0, (cm.deadlineTick - s.tick) * t.tickSeconds) : total;
+      const fits = p.etaSeconds <= left;
+      text(r.eta, f.duration(p.etaSeconds));
+      text(r.dl, cm.status === 'active' && cm.deadlineTick !== null ? `${f.duration(left)} left` : f.duration(total));
+      text(r.pays, shortPay(cm.reward));
+      text(r.gone, f.count(p.productionIncomeForgone)); // bananas; the aria-label spells the unit out
+      text(r.fit, `${isPinned ? 'Pinned · ' : ''}${fits ? '\u2713 Fits deadline' : '\u2717 Misses deadline'}`);
+      r.fit.className = `cmp-fit ${fits ? 'ok' : 'warn'}`;
+      r.btn.setAttribute('aria-label', `${commissionTitle(cm.id)}: ready to finish in ${f.duration(p.etaSeconds)}, deadline ${total > 0 ? f.duration(left) : 'none'}, pays ${shortPay(cm.reward)}, gives up ${f.bananaText(p.productionIncomeForgone)} of income, ${fits ? 'fits' : 'misses'} the deadline. Jump to its playbill.`);
+    }
+    show(cmpNone, openCount === 0);
+    show(cmpHint, openCount > 0);
+    show(cmpHead, openCount > 0);
 
     // ----- playbills -----
     const anyOffer = defs.some((d) => hot.commissions[d.id]);

@@ -28,6 +28,11 @@
   height: clamp(140px, calc(min(100vw, 560px) * var(--ar, .7)), max(140px, 34dvh));
 }
 .room-art { display: block; width: 100%; height: 100%; }
+/* short screens (a small phone, or landscape): the scene gives its room back to the form. About 30% of the height;
+   room.ts switches the art to crop a little instead of shrinking when that keeps it readable. */
+@media (max-height: 700px) {
+  .room-scene { height: clamp(104px, calc(min(100vw, 560px) * var(--ar, .7)), max(104px, 30dvh)); }
+}
 .room-art.fold .up { transform: scaleY(.06); transition: none; }
 .sbody { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 10px 14px calc(14px + env(safe-area-inset-bottom)); position: relative; }
 @media (prefers-reduced-motion: reduce) {

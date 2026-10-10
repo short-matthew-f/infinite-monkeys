@@ -10,6 +10,7 @@ import { patchLive } from './tower-art.js';
 import './room.css';
 
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+const shortScreen = matchMedia('(max-height: 700px)');
 const NS = 'http://www.w3.org/2000/svg';
 
 export interface Room {
@@ -63,6 +64,23 @@ export class RoomView {
     );
     parent.append(this.el);
     this.el.addEventListener('keydown', (e) => this.onKey(e));
+    addEventListener('resize', () => this.fit());
+  }
+
+  /** The art's own height-to-width ratio, from its viewBox (0 until a scene is drawn). */
+  private ratio = 0;
+
+  /**
+   * When the scene band is shorter than the art would be at full width (short screens), either shrink the art
+   * (letterbox; best for tall scenes) or crop a little off the top and bottom (best when only a sliver is lost).
+   */
+  private fit(): void {
+    if (!this.ratio || !this.current) return;
+    const w = this.scene.clientWidth, hh = this.scene.clientHeight;
+    if (!w || !hh) return;
+    const natural = w * this.ratio;
+    const crop = shortScreen.matches && natural / hh <= 1.3;
+    this.art.setAttribute('preserveAspectRatio', crop ? 'xMidYMid slice' : 'xMidYMin meet');
   }
 
   /** Mounts each room's screen once, hidden, so state like drafts survives closing. */
@@ -85,6 +103,8 @@ export class RoomView {
     this.sceneKey = '';
     this.drawScene(true);
     this.el.hidden = false;
+    this.body.scrollTop = 0; // a hidden (display: none) box ignores scrollTop, so it has to be reset once the room shows
+    this.fit();
     document.body.classList.add('room-open');
     this.render();
     // One frame at the closed pose, then the transition runs.
@@ -120,8 +140,10 @@ export class RoomView {
     const [x, y, w, hh] = scene.viewBox;
     this.art.setAttribute('viewBox', `${x} ${y} ${w} ${hh}`);
     this.scene.style.setProperty('--ar', String(hh / w));
+    this.ratio = hh / w;
     this.art.innerHTML = scene.svg;
     patchLive(this.art as unknown as Element, props);
+    this.fit();
     // The first time a room opens its pieces start folded flat and stand up.
     if (first && !reduceMotion.matches) this.art.classList.add('fold');
   }

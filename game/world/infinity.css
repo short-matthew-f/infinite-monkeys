@@ -103,9 +103,13 @@
 .inf::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 150px; pointer-events: none; background: linear-gradient(to top, color-mix(in srgb, var(--screen) 88%, transparent), transparent); }
 .inf-cap, .inf-skip { z-index: 2; }
 .inf-cap {
-  position: absolute; left: 0; right: 0; bottom: calc(66px + env(safe-area-inset-bottom)); padding: 0 16px; text-align: center; pointer-events: none;
-  font: 400 .95rem/1.3 var(--font-type); letter-spacing: .04em; color: var(--glow); text-shadow: 0 1px 6px var(--screen), 0 0 2px var(--screen);
+  /* a dark plate behind the words: glow on screen is about 15:1, whatever the building behind it looks like */
+  position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(66px + env(safe-area-inset-bottom)); width: max-content; max-width: calc(100% - 32px);
+  padding: 8px 14px; text-align: center; pointer-events: none; box-sizing: border-box;
+  background: color-mix(in srgb, var(--screen) 94%, transparent); border: 1px solid color-mix(in srgb, var(--glow) 45%, var(--screen)); border-radius: 3px 3px 10px 3px;
+  font: 400 .95rem/1.3 var(--font-type); letter-spacing: .04em; color: var(--glow);
 }
+.inf-cap:empty { display: none; }
 .inf-skip {
   position: absolute; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); min-width: 72px; min-height: 48px; padding: 0 18px; cursor: pointer;
   background: color-mix(in srgb, var(--screen) 80%, transparent); color: var(--glow); border: 2px solid var(--glow); border-radius: 3px 3px 10px 3px;
