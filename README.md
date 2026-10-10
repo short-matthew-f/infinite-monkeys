@@ -167,29 +167,29 @@ never reimplement them.
 ```
 # Finite phase
 
-casual  declare 25.5 min | office 0.3 min building 1.8 min tall 6.9 min all-stage-4 21.0 min
+casual  declare 25.0 min | office 0.3 min building 1.8 min tall 6.9 min all-stage-4 20.5 min
         longest dead gap 270 s purchases only, 270 s counting rebalances | Readiness rebalances: 0 at Y=10%, 0 episodes
-hard    declare 25.5 min | office 0.2 min building 1.6 min tall 7.2 min all-stage-4 20.8 min
-        longest dead gap 284 s purchases only, 284 s counting rebalances | Readiness rebalances: 0 at Y=10%, 0 episodes
-idler   declare 27.0 min | office 0.4 min building 2.5 min tall 8.3 min all-stage-4 22.2 min
-        longest dead gap 290 s purchases only, 290 s counting rebalances | Readiness rebalances: 0 at Y=10%, 0 episodes
+hard    declare 25.1 min | office 0.2 min building 1.6 min tall 7.2 min all-stage-4 20.6 min
+        longest dead gap 270 s purchases only, 270 s counting rebalances | Readiness rebalances: 0 at Y=10%, 0 episodes
+idler   declare 26.3 min | office 0.4 min building 2.5 min tall 8.0 min all-stage-4 21.8 min
+        longest dead gap 270 s purchases only, 270 s counting rebalances | Readiness rebalances: 0 at Y=10%, 0 episodes
 
 # First hotel decision (casual)
 
-bank 120 s of income; banana-rush target 450 s of income
+bank 67 s of income; banana-rush target 450 s of income
 
 Four fixed policies following the suggested split and funding (not a search).
 
 choice      banana rush  epic first  expansion first  completed  payoff  Greek Commission  forgone (s of income)
-ordinary          308 s           —                —          —       —                 —  —
-immediate         276 s           —                —      182 s    94 s                 —  72
-permanent         481 s       452 s                —      452 s     0 s                 —  192
-expansion         407 s       645 s            483 s      443 s    40 s             645 s  120
+ordinary          356 s           —                —          —       —                 —  —
+immediate         323 s           —                —      182 s   141 s                 —  72
+permanent         528 s       452 s                —      452 s     0 s                 —  192
+expansion         486 s       645 s            483 s      443 s    40 s             645 s  120
 
 preview vs actual completion:
-  immediate  preview 201 s actual 182 s
-  permanent  preview 471 s actual 452 s
-  expansion  preview 446 s actual 443 s
+  immediate  preview 182 s actual 182 s
+  permanent  preview 452 s actual 452 s
+  expansion  preview 443 s actual 443 s
 
 # Candidate: cheaper first hotel upgrade, across arrival balances (×1.5)
 
@@ -202,34 +202,34 @@ first upgrade (s of income) | bank at arrival (s of income) → ordinary / immed
 # Suggested idle funding: 90% vs 100% Editing (reference share fixed at 90%; current: 100%)
 
 choice      completed (90% / 100%)   banana rush (90% / 100%)   expansion first (90% / 100%)
-ordinary    — / —                    340 s / 308 s              — / —
-immediate   200 s / 182 s            304 s / 276 s              — / —
-permanent   500 s / 452 s            532 s / 481 s              — / —
-expansion   490 s / 443 s            450 s / 407 s              530 s / 483 s
+ordinary    — / —                    393 s / 356 s              — / —
+immediate   200 s / 182 s            357 s / 323 s              — / —
+permanent   500 s / 452 s            585 s / 528 s              — / —
+expansion   490 s / 443 s            533 s / 486 s              530 s / 483 s
 
 # Immediate vs ordinary under banana rush: sensitivity
 
 upgrade cost (s of income) × payout multiplier → ordinary / immediate (seconds to target)
- 300 s   ×1.5: 173 s / 182 s   ×2: 173 s / 182 s   ×3: 173 s / 182 s
- 600 s   ×1.5: 443 s / 411 s ✓   ×2: 443 s / 378 s ✓   ×3: 443 s / 314 s ✓
- 900 s   ×1.5: 713 s / 681 s ✓   ×2: 713 s / 648 s ✓   ×3: 713 s / 584 s ✓
+ 300 s   ×1.5: 221 s / 188 s ✓   ×2: 221 s / 182 s ✓   ×3: 221 s / 182 s ✓
+ 600 s   ×1.5: 491 s / 458 s ✓   ×2: 491 s / 426 s ✓   ×3: 491 s / 361 s ✓
+ 900 s   ×1.5: 761 s / 728 s ✓   ×2: 761 s / 696 s ✓   ×3: 761 s / 631 s ✓
 ```
 
 ## §10 results
 
 | Assertion | Result |
 |---|---|
-| Casual declares in 25–35 min | ✅ 25.5 min |
+| Casual declares in 25–35 min | ✅ 25.0 min |
 | All Commissions complete before deadline | ✅ 182 s, 452 s, 443 s |
 | Every Commission diverts from home, own split | ✅ |
-| Commission previews within 10% of actual | ✅ 201/182 (9.5%, near the limit), 471/452, 446/443 |
+| Commission previews within 10% of actual | ✅ 182/182 (0%), 452/452, 443/443 |
 | Custom allocation preview matches actual | ✅ within 1 s |
-| Immediate beats ordinary under banana rush | ✅ 276 s vs 308 s |
+| Immediate beats ordinary under banana rush | ✅ 323 s vs 356 s |
 | Permanent reaches the epic first; Expansion later via Greek | ✅ 452 s vs 645 s |
 | Expansion wins expansion first | ✅ 483 s |
 | Permanent and Expansion have a banana-rush sacrifice | ✅ |
 | Greek has a practical payoff | ✅ Greek Commission at 645 s |
-| All three pay off within 3 min | ✅ 149 s, 0 s, 40 s |
+| All three pay off within 3 min | ✅ 141 s, 0 s, 40 s |
 | No dead gap over 2 min | ❌ known failure, ~270 s (F2) |
 | 2–3 rebalancing decisions in Readiness | Retired: the heads set shares under the budget; decisions are quarterly reviews (signs every one) |
 

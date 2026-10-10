@@ -7,6 +7,7 @@ import type { Ctx, Screen } from '../ctx.js';
 import { h, show, text } from '../ui/dom.js';
 import * as f from '../ui/format.js';
 import { afford, buyRow, chip, ledger, nextCard, sealed, stack } from '../ui/forms.js';
+import { mountShelf } from './works-shelf.js';
 import './research.css';
 
 const title = (id: string): string => id.charAt(0).toUpperCase() + id.slice(1);
@@ -44,7 +45,10 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
   // 5. Golden Bananas.
   const golden = h('p', { class: 'note golden' });
 
-  root.append(stack(next.el, review, glossary, chipRow, laterWrap, seal.el, typingWrap, golden));
+  // 6. The Complete Works shelf (real lines the monkeys have typed).
+  const shelf = mountShelf(ctx);
+
+  root.append(stack(next.el, review, glossary, chipRow, laterWrap, seal.el, typingWrap, golden, shelf.el));
 
   return () => {
     const s = ctx.state();
@@ -146,6 +150,7 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
     const g = s.save.golden;
     show(golden, g > 0);
     if (g > 0) text(golden, `Golden Bananas in reserve: ${f.count(g)}. They carry over past Infinity.`);
+    shelf.render();
   };
 }
 

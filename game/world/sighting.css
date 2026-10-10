@@ -1,0 +1,61 @@
+/* Sightings (game/world/sighting.ts): a typed page pinned to the roof band, a compact strip inside rooms, and the
+   flight, chip, sprout and bin that play around a catch or a miss. Motion is transform and opacity only; the page
+   never sits over a floor's tap area or a room's form. */
+.sight-page {
+  position: relative; display: block; width: 100%; min-height: 48px; margin: 0; padding: 5px 10px 8px; text-align: left; cursor: pointer;
+  background: var(--sheet); color: var(--ink); border: 2px solid var(--edge); border-radius: 2px 2px 8px 2px;
+  box-shadow: 0 2px 0 var(--lift-sh), 3px 7px 12px var(--soft-sh); overflow: hidden;
+  background-image: repeating-linear-gradient(transparent 0 15px, color-mix(in srgb, var(--rule, var(--concrete)) 35%, transparent) 15px 16px);
+}
+/* a lifted corner: the tap cue */
+.sight-page::before {
+  content: ''; position: absolute; top: 0; right: 0; width: 18px; height: 18px; z-index: 1;
+  background: linear-gradient(225deg, var(--paper-shade) 50%, var(--tangerine) 50%); border-bottom-left-radius: 3px; box-shadow: -1px 1px 2px var(--soft-sh);
+}
+.sight-page:active { transform: translateY(2px); box-shadow: none; }
+.sight-page:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; box-shadow: 0 0 0 6px var(--paper); }
+.sight-page[hidden] { display: none; }
+.sp-text { display: grid; padding-right: 14px; font: 400 .875rem/16px var(--font-type); letter-spacing: .035em; font-weight: 700; text-transform: uppercase; overflow-wrap: anywhere; }
+/* the full line, invisible, holds the page's size so typing never reflows it */
+.sp-ghost { grid-area: 1 / 1; visibility: hidden; }
+.sp-typed { grid-area: 1 / 1; }
+.sp-text { position: relative; }
+.sp-typed::after { content: ''; display: inline-block; width: .5em; height: 1em; margin-left: 1px; background: var(--ink); vertical-align: -.15em; animation: sp-blink .5s steps(2, jump-none) infinite; }
+.sight-page.typing-done .sp-typed::after { display: none; }
+@keyframes sp-blink { 50% { opacity: 0; } }
+/* the countdown edge: a bar along the bottom that drains from ticks */
+.sp-edge { position: absolute; left: 0; right: 0; bottom: 0; height: 5px; background: color-mix(in srgb, var(--tangerine) 22%, transparent); }
+.sp-edge i { display: block; height: 100%; background: var(--tangerine); transform-origin: 0 50%; transition: transform .1s linear; }
+.sight-page.low .sp-edge i { background: var(--alert); }
+.sight-page.low { border-color: var(--alert); }
+
+/* pinned in the roof band, left of the quarter clock (like the water cooler) */
+.sight-page.pinned { position: absolute; z-index: 6; left: 4px; right: 58px; top: 0; width: auto; transform-origin: 50% 100%; }
+/* inside a room: a strip over the scene, under the bar */
+.sight-page.strip { position: absolute; z-index: 6; left: 8px; right: 8px; top: 62px; width: auto; min-height: 52px; }
+.sight-page.strip[data-state] { pointer-events: none; }
+.sight-page.strip[data-state='caught'] .sp-text, .sight-page.strip[data-state='caught'] .sp-edge { opacity: 0; }
+.sight-page.strip[data-state='missed'] { animation: sp-crumple .6s ease-in both; }
+@keyframes sp-crumple { to { transform: scale(.9, .2) rotate(2deg); opacity: 0; } }
+.sp-chip { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; text-align: center; background: var(--sheet); animation: sp-chip-in .3s cubic-bezier(.3, 1.5, .4, 1) both; }
+@keyframes sp-chip-in { from { transform: scale(.7); opacity: 0; } }
+.sp-chip b, .sight-chip b { font: 700 1.05rem/1.1 var(--font-display); letter-spacing: .06em; text-transform: uppercase; color: var(--stamp-ok, var(--phosphor-green)); }
+.sp-chip small, .sight-chip small { font: 400 .875rem/1.2 var(--font-type); color: var(--ink-muted); }
+
+/* flying copy of the page and the things around it (stage-level, never interactive) */
+.sight-fly { position: absolute; z-index: 48; margin: 0; pointer-events: none; will-change: transform; }
+.sight-fly::before, .sight-fly .sp-typed::after { display: none; }
+.sight-chip {
+  position: absolute; z-index: 49; pointer-events: none; display: grid; justify-items: center; padding: 4px 12px 5px; white-space: nowrap;
+  background: var(--sheet); border: 2px solid var(--stamp-ok, var(--phosphor-green)); border-radius: 3px 3px 10px 3px; box-shadow: 0 2px 0 var(--lift-sh), 2px 6px 10px var(--soft-sh);
+}
+.sight-sprout {
+  position: absolute; z-index: 48; width: 20px; height: 26px; pointer-events: none; background: var(--sheet); border: 2px solid var(--edge); border-radius: 1px 1px 4px 1px; opacity: 0;
+  background-image: repeating-linear-gradient(transparent 0 4px, var(--concrete) 4px 5px); box-shadow: 0 2px 4px var(--soft-sh);
+}
+.sight-bin { position: absolute; z-index: 47; pointer-events: none; opacity: 0; }
+.sight-bin svg { display: block; }
+@media (prefers-reduced-motion: reduce) {
+  .sp-typed::after, .sp-chip, .sight-page.strip[data-state='missed'] { animation: none; }
+  .sp-edge i { transition: none; }
+}

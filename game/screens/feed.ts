@@ -21,6 +21,7 @@ import {
   type FeedStage,
 } from '../content/feed-lines.js';
 import { commissionTitle, marketName, rewardLineData } from './hotel/names.js';
+import { nearMiss } from '../world/works.js';
 import './feed.css';
 
 const DEPT_NAMES: Record<DeptId, string> = { recruiting: 'Recruiting', construction: 'Construction', editing: 'Editing' };
@@ -163,6 +164,17 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
       case 'auditFound':
         push(e.tick, `The audit is back: ${f.bananaText(e.amount)} found, and they go to the pot.`, false, true);
         break;
+      // Sightings: a catch is always live. A miss is reported by the sighting view (im:sighting-miss), and only if the page was ever on screen.
+      case 'sightingCaught': {
+        const w = t.pages?.works.find((x) => x.id === e.work);
+        if (!w) break;
+        const line = w.lines[e.line] ?? '';
+        const short = line.length > 38 ? `${line.slice(0, 36).trimEnd()}…` : line;
+        if (e.completed) push(e.tick, variant([`${w.title} is complete. The Editors know it by heart.`, `The last line of ${w.title} is in. Filed under the Complete Works.`, `${w.title}: finished. The Editors have started reciting it.`]), false, true);
+        else if (e.isNew) push(e.tick, variant([`Filed: "${short}" (${w.title}). Nobody asked the monkey to sign it.`, `A real line, caught: "${short}". The Library has made room on the shelf.`, `The Editors checked "${short}" against the original. It matches.`]), false, true);
+        else push(e.tick, variant([`Another copy of "${short}". The Library already had it, and paid anyway.`, `The monkey typed "${short}" again. Consistency is a virtue.`, `Duplicate line from ${w.title}. It still pays.`]), false, true);
+        break;
+      }
       // The hotel: facts, so offline events reach the ticker too.
       case 'busArrived':
         push(e.tick, `The ${marketName(e.market)} bus has arrived. The Shift Crews are onboarding its staff.`, false, true);
@@ -309,6 +321,24 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
   addEventListener('im:memo', (e) => {
     const text = (e as CustomEvent<string>).detail;
     if (text) push(lastTick, text);
+  });
+
+  // A page that got away (game/world/sighting.ts). Near-miss jokes; the variant comes from the presentation stream.
+  addEventListener('im:sighting-miss', (e) => {
+    const d = (e as CustomEvent<{ work: string; line: number }>).detail;
+    const line = t.pages?.works.find((x) => x.id === d.work)?.lines[d.line];
+    if (line === undefined) return;
+    const m = nearMiss(line);
+    push(
+      lastTick,
+      variant([
+        `The page went in the bin. It said ${m.wrongWord} where it meant ${m.rightWord}, which the Editors would have caught anyway.`,
+        'A monkey typed something real and nobody was looking. It will not be mentioned again.',
+        `Missed one. The monkey is practising ${m.wrongWord} while we wait.`,
+        'The page got away. The Editors say it was probably a draft.',
+        `Nearly: the monkey had ${m.wrongWord}, then fixed it, then the page was gone.`,
+      ]),
+    );
   });
 
   return () => {

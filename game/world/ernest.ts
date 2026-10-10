@@ -29,6 +29,8 @@ interface Reel {
   essential?: boolean;
   /** Has the moment passed, so the card would be stale? */
   stale?: (s: GameState) => boolean;
+  /** A card about something on the screen already: no "Take me there". */
+  noGo?: boolean;
 }
 
 const seatedOf = (s: GameState) => Math.floor(N.toNumber(s.monkeys));
@@ -66,6 +68,8 @@ REELS.push(
   { id: 'hotel-vault', n: 12, title: 'The Vault', room: 'research',
     say: () => 'Golden Bananas buy epic research in the Records Library. It lasts across every later run.' },
 );
+// Both phases: the first sighting. The page is on the roof for ten seconds, so the card goes the moment it ends.
+REELS.push({ id: 'sighting', n: 13, title: 'A Real Line', room: 'pool', noGo: true, say: () => 'A monkey typed something real. Catch it!', stale: (s) => !s.pages?.open });
 const BY_ID = new Map(REELS.map((r) => [r.id, r]));
 
 const MAX_QUEUE = 2;
@@ -131,6 +135,8 @@ export class Ernest {
       this.queue = this.queue.filter((r) => r.n >= 10);
       if (this.current && this.current.n < 10) this.retire();
     }
+    // A sighting card is only about the page on the roof: when the page is gone, so is the card.
+    if (this.current?.id === 'sighting' && !s.pages?.open) this.retire();
     this.detect(s, open);
     if (open) progress.markOpened(open);
     this.lastOpen = open;
@@ -142,7 +148,8 @@ export class Ernest {
       while (this.queue.length) {
         const next = this.queue.shift()!;
         if (next.stale?.(s)) {
-          progress.markReel(next.id);
+          // A missed sighting teaches nothing: leave the reel unseen so the next page gets its card.
+          if (next.id !== 'sighting') progress.markReel(next.id);
           continue;
         }
         this.current = next;
@@ -177,6 +184,7 @@ export class Ernest {
       this.enqueue(BY_ID.get(id)!);
     };
 
+    now('sighting', () => !!s.pages?.open);
     if (s.phase === 'hotel') {
       const hot = s.hotel;
       now('hotel-offers', () => !!hot && s.objective.kind !== 'commission' && Object.values(hot.commissions).some((c) => c.status === 'offered'));
@@ -229,7 +237,7 @@ export class Ernest {
       this.lastSay = text;
     }
     this.wrap.classList.toggle('docked', docked);
-    this.go.hidden = docked;
+    this.go.hidden = docked || !!r.noGo;
     this.fig?.setAttribute('viewBox', '50 8 86 76');
     if (!this.shown) {
       this.shown = true;

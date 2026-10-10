@@ -10,6 +10,7 @@ import { h, show, text } from '../../ui/dom.js';
 import * as f from '../../ui/format.js';
 import { field, figure, formbox, setWhy, stack, stamp, why } from '../../ui/forms.js';
 import { epicName, goldenText, marketName } from './names.js';
+import { mountShelf } from '../works-shelf.js';
 import './hotel.css';
 
 /** What an epic changes, as words (numbers from tuning) and as a read of one value in a state. */
@@ -50,10 +51,12 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
       h('p', { class: 'why' }, describe(def)), fx, field('Cost', costV), buy, reason);
     return { def, el, own, fx, costV, buy, reason };
   });
-  root.append(stack(vault, ...items.map((i) => i.el)));
+  const shelf = mountShelf(ctx);
+  root.append(stack(vault, ...items.map((i) => i.el), shelf.el));
 
   return () => {
     const s = ctx.state();
+    shelf.render();
     const g = s.save.golden;
     text(balance, `${f.count(g)}`);
     for (const it of items) {

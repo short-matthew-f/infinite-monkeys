@@ -22,6 +22,8 @@ import { pool } from './screens/pool.js';
 import { readiness } from './screens/readiness.js';
 import { research } from './screens/research.js';
 import { Payoffs } from './world/payoff.js';
+import { Sightings } from './world/sighting.js';
+import { WorksCards } from './world/works-card.js';
 import { HEAD_NAMES, projectTitle } from './world/projects.js';
 import { text } from './ui/dom.js';
 import * as f from './ui/format.js';
@@ -207,6 +209,9 @@ onEvent((e) => {
     syncDirNames();
   }
 });
+// Sightings: a typed page on the roof band (a strip inside rooms), and the Complete Works card when a work is filed.
+const sightings = new Sightings(tower.roof, stage, $('map'), ctx, { room: () => (rooms.current ? { id: rooms.current.id, el: rooms.el } : null) }, rooms.el);
+const worksCards = new WorksCards(stage, ctx, { busy: () => ceremony.isOpen || infinity.isOpen || !!awayCard?.isOpen || payoffs.active });
 const cooler = new Cooler(tower.roof, ctx);
 addEventListener('pointerdown', () => cooler.poke(), { capture: true });
 addEventListener('keydown', () => cooler.poke(), { capture: true });
@@ -459,9 +464,11 @@ startLoop(() => state, t, sink, () => {
   syncDirNames();
   document.body.classList.toggle('has-memo', !!document.querySelector('.memo-dock:not([hidden])'));
   payoffs.render();
+  sightings.render();
+  worksCards.render();
   // The cooler waits for rooms, the ceremony, a payoff, Ernest's card, and the clock's own "Review ready" tag (it shares the roof).
   ernest.suppressed = infinity.isOpen;
-  cooler.suppressed = awayCard?.isOpen || !!rooms.current || ceremony.isOpen || infinity.isOpen || payoffs.active || ernest.showing || !!state.budget?.reviewDue;
+  cooler.suppressed = awayCard?.isOpen || sightings.active || !!rooms.current || ceremony.isOpen || infinity.isOpen || payoffs.active || ernest.showing || !!state.budget?.reviewDue;
   cooler.render();
   ernest.update(rooms.current?.id ?? null);
   updateCue();
