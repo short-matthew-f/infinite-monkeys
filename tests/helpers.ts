@@ -50,10 +50,10 @@ export function hotelState(seed = 1, sink = collector().sink): GameState {
 }
 
 /** Runs until predicate holds or the tick budget runs out. Returns ticks used, or null. */
-export function runUntil(s: GameState, sink: (e: GameEvent) => void, pred: () => boolean, maxTicks: number): number | null {
+export function runUntil(s: GameState, sink: (e: GameEvent) => void, pred: () => boolean, maxTicks: number, t: Tuning = T): number | null {
   for (let i = 0; i < maxTicks; i++) {
     if (pred()) return i;
-    run(s, T, sink, 1);
+    run(s, t, sink, 1);
   }
   return pred() ? maxTicks : null;
 }

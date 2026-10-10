@@ -7,9 +7,12 @@
 import {
   DEPTS,
   N,
+  HOTEL_UPGRADES,
   buyDeptLevel,
   buyDeptStage,
   buyDesk,
+  buyEpic,
+  buyHotelUpgrade,
   buyTypingResearch,
   certifyTiers,
   editingPool,
@@ -47,6 +50,7 @@ export function discardShare(s: GameState, t: Tuning): number {
  */
 export function cueCandidates(ctx: Ctx): Cue[] {
   const s = ctx.state(), t = ctx.t;
+  if (s.phase === 'hotel') return hotelCues(ctx);
   if (s.phase !== 'finite') return [];
   const out: Cue[] = [];
   const seated = Math.floor(N.toNumber(s.monkeys)), desks = Math.floor(N.toNumber(s.desks));
@@ -91,5 +95,40 @@ export function cueCandidates(ctx: Ctx): Cue[] {
     out.push({ key: `discards:${band}`, room: 'departments', view: 'editing', tag: 'Editors needed', memo: `Memo: ${Math.round(share * 100)}% of finds are going unreviewed. Departments can add Editors.` });
   }
 
+  return out;
+}
+
+/** What is waiting on the Director in the hotel: Commission offers, an affordable upgrade, Golden Bananas to spend. */
+export function hotelNeeds(ctx: Ctx): { offers: string[]; upgrade: boolean; vault: boolean } {
+  const s = ctx.state();
+  const h = s.hotel;
+  if (s.phase !== 'hotel' || !h) return { offers: [], upgrade: false, vault: false };
+  const offers = s.objective.kind === 'commission' ? [] : Object.values(h.commissions).filter((c) => c.status === 'offered').map((c) => c.id);
+  const upgrade = HOTEL_UPGRADES.some((line) => ctx.can(`buyHotelUpgrade:${line}`, (st, tt, k) => buyHotelUpgrade(st, tt, k, line)));
+  const vault = ctx.t.epics.some((e) => ctx.can(`buyEpic:${e.id}`, (st, tt, k) => buyEpic(st, tt, k, e.id)));
+  return { offers, upgrade, vault };
+}
+
+/**
+ * Hotel cues, in priority order: a Commission's payoff first (point at what it makes possible), then new
+ * offers, then upgrades and Golden Bananas that became affordable. Same guardrail as the finite cues:
+ * they point at rooms, never rank purchases.
+ */
+function hotelCues(ctx: Ctx): Cue[] {
+  const s = ctx.state();
+  const h = s.hotel;
+  if (!h) return [];
+  const out: Cue[] = [];
+  const need = hotelNeeds(ctx);
+  const pr = h.pendingReward;
+  if (pr?.kind === 'immediate' && need.upgrade)
+    out.push({ key: `payoff:${pr.commission}`, room: 'departments', tag: 'Payout ready', memo: 'Memo: the Commission paid out. Staff has an upgrade within reach.' });
+  if (pr?.kind === 'permanent' && s.save.golden > 0)
+    out.push({ key: `payoff:${pr.commission}`, room: 'research', tag: 'Golden Bananas', memo: 'Memo: Golden Bananas arrived. The Records Library vault can spend them on epic research.' });
+  if (pr?.kind === 'expansion')
+    out.push({ key: `payoff:${pr.commission}`, room: 'personnel', tag: 'Bus on its way', memo: 'Memo: a new bus is on its way. The Front Desk shows when the market comes online.' });
+  if (need.offers.length) out.push({ key: `offers:${need.offers.join('+')}`, room: 'director', tag: 'Commissions', memo: "Memo: Commissions are on offer in the Director's Office." });
+  if (need.upgrade) out.push({ key: `upgrade:${HOTEL_UPGRADES.reduce((n, l) => n + h.upgradeLevels[l], 0)}`, room: 'departments', tag: 'Upgrade ready', memo: 'Memo: Staff can afford an upgrade.' });
+  if (need.vault) out.push({ key: `vault:${s.save.epics.length}`, room: 'research', tag: 'Vault open', memo: 'Memo: the Records Library vault has Golden Bananas to spend.' });
   return out;
 }

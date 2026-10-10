@@ -1,5 +1,5 @@
 import { registerSW } from 'virtual:pwa-register';
-import { DEPTS, N, activeBudget, catchUp, certifyTiers, createState, deptLevelCost, editingPool, quarterSecondsLeft, type DeptId, type EventSink, type GameEvent, type GameState, upgradeSave } from '../core/index.js';
+import { DEPTS, N, activeBudget, catchUp, certifyMarkets, certifyTiers, createState, hotelPool, deptLevelCost, editingPool, quarterSecondsLeft, type DeptId, type EventSink, type GameEvent, type GameState, upgradeSave } from '../core/index.js';
 import { prototypeTuning } from '../content/prototype.js';
 import { createCtx } from './ctx.js';
 import { startLoop } from './loop.js';
@@ -9,6 +9,13 @@ import { Cooler } from './world/cooler.js';
 import { MemoView } from './world/memo.js';
 import * as persist from './persist.js';
 import { departments } from './screens/departments.js';
+import { arrivals } from './screens/hotel/arrivals.js';
+import { commissions } from './screens/hotel/commissions.js';
+import { marketPool } from './screens/hotel/market-pool.js';
+import { HOTEL_ROOM_NAME, commissionTitle, hotelHint } from './screens/hotel/names.js';
+import { staff } from './screens/hotel/staff.js';
+import { vault } from './screens/hotel/vault.js';
+import { phased } from './screens/phased.js';
 import { feed } from './screens/feed.js';
 import { office } from './screens/office.js';
 import { pool } from './screens/pool.js';
@@ -18,22 +25,24 @@ import { Payoffs } from './world/payoff.js';
 import { HEAD_NAMES, projectTitle } from './world/projects.js';
 import { text } from './ui/dom.js';
 import * as f from './ui/format.js';
-import { cueCandidates } from './world/advisor.js';
+import { cueCandidates, hotelNeeds } from './world/advisor.js';
+import { InfinityCeremony } from './world/infinity.js';
 import { CueView } from './world/cue.js';
 import { Ernest } from './world/ernest.js';
 import { progress } from './world/progress.js';
-import { RoomView, type Room } from './world/room.js';
+import { RoomView, phaseName, type Room } from './world/room.js';
 import { Tower, floorProps, type BudgetView } from './world/tower.js';
 import { Presenter } from './world/present.js';
 import { floorHint } from './world/tower-art.js';
 
 // The place is the interface: each floor of the building opens its room, full screen.
 const ROOMS: Room[] = [
-  { id: 'personnel', name: 'Personnel', form: 'Form 3-H', disc: 1, screen: office },
-  { id: 'pool', name: 'Typing Pool', form: 'Form 7-T', disc: 2, screen: pool },
-  { id: 'departments', name: 'Departments', form: 'Form 5-D', disc: 3, screen: departments },
-  { id: 'research', name: 'Records Library', form: 'Form 4-R', disc: 4, screen: research },
-  { id: 'director', name: "Director's Office", form: 'Form 9-R', disc: 5, screen: readiness },
+  // After Infinity each room keeps its id and takes its hotel name and screen.
+  { id: 'personnel', name: 'Personnel', hotelName: HOTEL_ROOM_NAME.personnel, form: 'Form 3-H', disc: 1, screen: phased(office, arrivals) },
+  { id: 'pool', name: 'Typing Pool', hotelName: HOTEL_ROOM_NAME.pool, form: 'Form 7-T', disc: 2, screen: phased(pool, marketPool) },
+  { id: 'departments', name: 'Departments', hotelName: HOTEL_ROOM_NAME.departments, form: 'Form 5-D', disc: 3, screen: phased(departments, staff) },
+  { id: 'research', name: 'Records Library', hotelName: HOTEL_ROOM_NAME.research, form: 'Form 4-R', disc: 4, screen: phased(research, vault) },
+  { id: 'director', name: "Director's Office", hotelName: HOTEL_ROOM_NAME.director, form: 'Form 9-R', disc: 5, screen: phased(readiness, commissions) },
 ];
 
 const t = prototypeTuning;
@@ -176,12 +185,27 @@ const ceremony = new Ceremony(stage, ctx);
 ceremony.onClose = () => (dirty = true);
 const memo = new MemoView(stage, ctx);
 awayCard = new AwayCard(stage, t, () => state);
-awayCard.bind({ busy: () => ceremony.isOpen, openReview });
+awayCard.bind({ busy: () => ceremony.isOpen || infinity.isOpen, openReview });
 awayCard.onClose = () => (dirty = true);
 for (const a of earlyAway.splice(0)) awayCard.record(a.before, a.gone, a.ticks);
 const payoffs = new Payoffs(stage, ctx, {
   room: () => (rooms.current ? { id: rooms.current.id, el: rooms.el } : null),
-  busy: () => ceremony.isOpen,
+  busy: () => ceremony.isOpen || infinity.isOpen,
+});
+// The Infinity ceremony: starts on the declare, hears every event, and closes back onto the building.
+const infinity = new InfinityCeremony({ host: stage, state: () => state, t, onDone: () => (dirty = true) });
+onEvent((e) => {
+  if (e.type === 'infinityDeclared') {
+    // The player declared from the Director's Office: leave it, so the ceremony plays over the building.
+    closeDir();
+    if (rooms.current) rooms.close();
+    infinity.start();
+  }
+  infinity.onEvent(e);
+  if (e.type === 'infinityDeclared') {
+    dirty = true;
+    syncDirNames();
+  }
 });
 const cooler = new Cooler(tower.roof, ctx);
 addEventListener('pointerdown', () => cooler.poke(), { capture: true });
@@ -199,7 +223,7 @@ function openRoom(id: string, dept?: string): void {
   progress.markOpened(id);
   if (cues.cue?.room === id) progress.ackCue(cues.cue.key);
   markDirectory(id);
-  say(`${room.name} opened.`);
+  say(`${phaseName(room, state.phase)} opened.`);
   dirty = true;
 }
 rooms.onClose = (room) => {
@@ -240,7 +264,7 @@ function closeDir(): void {
   dirbtn.setAttribute('aria-expanded', 'false');
   $('reset-confirm').hidden = true;
 }
-const roomHint = (id: string): string => floorHint(id, props);
+const roomHint = (id: string): string => (state.phase === 'hotel' ? hotelHint(state, t, id) : floorHint(id, props));
 /** The Directory lists every floor; the list never changes, so it is built once. */
 function buildDir(): void {
   $('dirlist').innerHTML = ROOMS.map((r) => `<li><button data-room="${r.id}" aria-current="false"><span class="disc" aria-hidden="true">${r.disc}</span><span class="nm">${r.name}<span class="hn"></span></span></button></li>`).join('');
@@ -251,7 +275,19 @@ function buildDir(): void {
 function markDirectory(id: string | null): void {
   for (const b of dir.querySelectorAll<HTMLElement>('[data-room]')) b.setAttribute('aria-current', String(b.dataset.room === id));
 }
+/** After Infinity the Directory lists each floor by its hotel name. */
+function syncDirNames(): void {
+  for (const b of dir.querySelectorAll<HTMLElement>('[data-room]')) {
+    const room = ROOMS.find((r) => r.id === b.dataset.room);
+    const node = b.querySelector('.nm')?.firstChild;
+    if (room && node && node.nodeType === Node.TEXT_NODE) {
+      const name = phaseName(room, state.phase);
+      if (node.nodeValue !== name) node.nodeValue = name;
+    }
+  }
+}
 buildDir();
+syncDirNames();
 dirbtn.addEventListener('click', () => {
   const opening = dir.hidden;
   dir.hidden = !opening;
@@ -268,6 +304,12 @@ function renderTasks(): void {
   const q = b?.requisition;
   if (q && document.querySelector('.memo-dock:not([hidden])')) items.push({ task: 'memo', mark: '!', name: 'Open request', hint: `${HEAD_NAMES[q.from]}: ${q.kind === 'levels' ? 'department levels' : projectTitle(q.kind)}.` });
   if (b?.lastReport) items.push({ task: 'report', mark: '§', name: "Last quarter's report", hint: `Q${b.lastReport.quarter}, filed in the Director's Office.` });
+  if (state.phase === 'hotel') {
+    const need = hotelNeeds(ctx);
+    if (need.offers.length) items.push({ task: 'offers', mark: '!', name: 'Commission offers', hint: `${need.offers.map(commissionTitle).join(', ')}: none is pinned yet.` });
+    if (need.upgrade) items.push({ task: 'upgrade', mark: '+', name: 'Upgrade affordable', hint: 'Staff can buy one now.' });
+    if (need.vault) items.push({ task: 'vault', mark: '★', name: 'Golden Bananas to spend', hint: 'The Records Library vault has epic research you can afford.' });
+  }
   const key = JSON.stringify(items);
   if (key === tasksKey) return;
   tasksKey = key;
@@ -277,6 +319,9 @@ function renderTasks(): void {
 dirTasks.addEventListener('click', (e) => {
   const task = (e.target as HTMLElement).closest<HTMLElement>('[data-task]')?.dataset.task;
   if (task === 'review') openReview();
+  else if (task === 'offers') openRoom('director');
+  else if (task === 'upgrade') openRoom('departments');
+  else if (task === 'vault') openRoom('research');
   else if (task === 'report') {
     openRoom('director');
     requestAnimationFrame(() => dispatchEvent(new CustomEvent('im:director-report')));
@@ -300,7 +345,7 @@ document.addEventListener('pointerdown', (e) => {
 });
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
-  if (ceremony.isOpen || awayCard?.isOpen) return; // the ceremony and the away card handle their own Escape
+  if (ceremony.isOpen || infinity.isOpen || awayCard?.isOpen) return; // the ceremony and the away card handle their own Escape
   // Escape leaves an open room even when focus has left it (e.g. a button that just disabled itself).
   if (rooms.current) {
     if (!rooms.el.contains(document.activeElement)) rooms.close();
@@ -336,7 +381,7 @@ const ernest = new Ernest($('ewrap'), ctx, t);
 // ---------- the next-thing cue ----------
 
 const cues = new CueView(tower, $('dir'));
-const roomName = (id: string) => ROOMS.find((r) => r.id === id)?.name ?? id;
+const roomName = (id: string) => { const r = ROOMS.find((x) => x.id === id); return r ? phaseName(r, state.phase) : id; };
 function updateCue(): void {
   const open = rooms.current?.id;
   // The first cue the player hasn't already acted on; a cue for the open room is acted on.
@@ -373,13 +418,19 @@ function say(msg: string): void {
 function renderHeader(): void {
   text($('r-ban'), f.count(state.bananas));
   const pot = state.budget?.pot;
-  const show = !!pot && N.gt(pot, N.zero);
+  const show = !!pot && N.gt(pot, N.zero) && state.phase === 'finite';
   $('r-pot').hidden = !show;
   if (show) text($('r-pot-v'), f.count(pot!));
-  text($('r-inc'), f.rate(certifyTiers(state, t, editingPool(state, t), state.tierAllocation).income));
+  const hotel = state.phase === 'hotel' && !!state.hotel;
+  // The hotel earns by market, not by tier; the budget's wallet and pot are closed.
+  text($('r-inc'), f.rate(hotel ? certifyMarkets(state, t, hotelPool(state, t), state.hotel!.allocation).income : certifyTiers(state, t, editingPool(state, t), state.tierAllocation).income));
+  text($('r-ban-lb'), hotel ? 'Bananas' : 'Wallet');
+  document.querySelector('.readout')!.classList.toggle('budget', !hotel); // the pot's reserved line closes with the budget
+  $('r-ban').parentElement!.setAttribute('aria-label', hotel ? 'Bananas' : 'Wallet: bananas to spend on manual purchases');
   // After 'tall', the finish line needs a headcount: show it as progress toward the Permit's minimum.
   const goal = state.milestonesReached.includes('tall') && state.phase === 'finite';
-  text($('r-mon'), f.count(state.monkeys));
+  // The ceremony spins this counter itself while it plays; the hotel's count is ℵ₀.
+  if (!infinity.isOpen) text($('r-mon'), hotel ? 'ℵ₀' : f.count(state.monkeys));
   const bar = $('r-goal');
   bar.hidden = !goal;
   if (goal) {
@@ -405,10 +456,12 @@ startLoop(() => state, t, sink, () => {
   awayCard?.render();
   memo.render();
   renderTasks();
+  syncDirNames();
   document.body.classList.toggle('has-memo', !!document.querySelector('.memo-dock:not([hidden])'));
   payoffs.render();
   // The cooler waits for rooms, the ceremony, a payoff, Ernest's card, and the clock's own "Review ready" tag (it shares the roof).
-  cooler.suppressed = awayCard?.isOpen || !!rooms.current || ceremony.isOpen || payoffs.active || ernest.showing || !!state.budget?.reviewDue;
+  ernest.suppressed = infinity.isOpen;
+  cooler.suppressed = awayCard?.isOpen || !!rooms.current || ceremony.isOpen || infinity.isOpen || payoffs.active || ernest.showing || !!state.budget?.reviewDue;
   cooler.render();
   ernest.update(rooms.current?.id ?? null);
   updateCue();

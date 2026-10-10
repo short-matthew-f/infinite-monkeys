@@ -97,7 +97,7 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
   const readyView = h('div', { class: 'form-stack' }, slotTop, next.el, info, metersBox, slotEnd);
   const doneView = formbox('Infinity declared',
     h('p', {}, stamp('Declared', 'ok')),
-    h('p', { class: 'note' }, 'The Hotel opens in the next build. Everything you earned carries over.'),
+    h('p', { class: 'note' }, 'The Hotel is open. Everything you earned carries over.'),
     h('p', { class: 'why' }, 'Department levels, research, desks and Zeno can no longer be bought.'),
   );
   doneView.hidden = true;

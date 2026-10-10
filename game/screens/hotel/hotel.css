@@ -1,0 +1,60 @@
+/* Hotel screens: playbills, market rows, staff lines, epics, arrivals. Tokens come from game/style.css and
+   game/ui/forms.css. Nothing here has a fixed height on text, so larger text never clips. */
+
+/* A stamp that is always a word: green-ink when fine, red-ink when it needs a look, grey when idle. */
+.sheet-pane .cm-stamp {
+  display: inline-block;
+  border: 3px double currentColor;
+  font: 700 0.85rem/1.25 var(--font-display);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 1px 8px;
+  border-radius: 2px;
+  white-space: nowrap;
+  flex: none;
+  align-self: flex-start;
+}
+.sheet-pane .cm-stamp.ok { color: var(--stamp-ok); }
+.sheet-pane .cm-stamp.warn { color: var(--stamp); }
+.sheet-pane .cm-stamp.plain { color: var(--ink-muted); }
+
+.sheet-pane .pb-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.sheet-pane .pb-title, .sheet-pane .st-title, .sheet-pane .cm-now-title { margin: 0; font: 700 1.35rem/1.15 var(--font-display); letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink); }
+.sheet-pane .st-formerly { font: 400 0.85rem var(--font-body); letter-spacing: 0; text-transform: none; color: var(--ink-muted); }
+.sheet-pane .st-level { font: 600 0.9rem var(--font-mono); color: var(--ink-muted); }
+.sheet-pane .cm-kicker { font: 400 0.85rem var(--font-type); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-muted); }
+.sheet-pane .pb-about { font: 400 0.95rem/1.35 var(--font-body); color: var(--ink-muted); }
+
+/* ---------- playbills: side by side where the sheet is wide, stacked on a phone ---------- */
+.sheet-pane .playbills { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr)); gap: 12px; align-items: start; }
+.sheet-pane .pb-wrap { min-width: 0; }
+.sheet-pane .playbill {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px 12px 12px;
+  background: var(--next-bg);
+  border: 1.5px solid var(--rule);
+  border-top: 6px double var(--ctl);
+  box-shadow: 0 3px 0 var(--lift-sh);
+}
+.sheet-pane .playbill[data-status='pinned'] { border-color: var(--ctl); border-top-width: 8px; }
+.sheet-pane .playbill[data-status='completed'], .sheet-pane .playbill[data-status='failed'] { opacity: 1; background: transparent; box-shadow: none; }
+
+/* ETA is the largest number on the card. */
+.sheet-pane .cm-eta { display: grid; gap: 2px; padding: 4px 0; border-top: 1.5px dotted var(--concrete); border-bottom: 1.5px dotted var(--concrete); }
+.sheet-pane .cm-eta-row { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.sheet-pane .cm-eta-v { font: 600 2rem/1.1 var(--font-mono); font-variant-numeric: tabular-nums; color: var(--ink); overflow-wrap: anywhere; }
+.sheet-pane .cm-eta-k { font: 600 0.95rem var(--font-body); color: var(--ink); }
+.sheet-pane .cm-eta-note { font: 400 0.85rem/1.3 var(--font-body); color: var(--ink-muted); }
+.sheet-pane .cm-pays { text-align: right; font-size: 1rem; }
+.sheet-pane .playbill .field .big { font-size: 1rem; }
+.sheet-pane .cm-prog { display: grid; gap: 3px; }
+
+/* ---------- staff, epics, arrivals ---------- */
+.sheet-pane .st-line, .sheet-pane .epic, .sheet-pane .arrival {
+  display: grid; gap: 6px; min-width: 0; padding: 10px 12px; border: 1.5px solid var(--rule); background: var(--box);
+}
+.sheet-pane .ar-alpha { font: 600 1rem var(--font-mono); color: var(--ink); overflow-wrap: anywhere; }
+.sheet-pane .mk-row { display: grid; gap: 3px; }
+.sheet-pane .phase-pane { min-width: 0; }

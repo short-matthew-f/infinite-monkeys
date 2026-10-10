@@ -22,12 +22,19 @@ import {
   suggestMarketAllocation,
   type GameEvent,
   type GameState,
+  type Tuning,
+  marketAutoOn,
+  setMarketAuto,
+  suggestHotelShares,
 } from '../core/index.js';
 import { collector, hotelState, lateFiniteState, ofType, runUntil, secs, T } from './helpers.js';
 
 const IDS = ['immediate', 'permanent', 'expansion'] as const;
 
 /** Applies the suggested market split and the suggested hotel funding. */
+/** Hand-set staffing (the engine's manual mode), for tests of funding and custom splits. */
+const TM: Tuning = { ...T, hotel: { ...T.hotel, autoStaff: false } };
+
 function follow(s: GameState, sink: (e: GameEvent) => void) {
   applySuggestedAllocation(s, T, sink);
   setShares(s, T, sink, suggestShares(s, T));
@@ -185,9 +192,10 @@ describe('reward payoffs', () => {
 
   it('starving the crews slows the bus: hotel funding is a real tradeoff', () => {
     const s = hotelState();
-    const fast = busWaitTicks(s, T);
-    setShares(s, T, collector().sink, { recruiting: 0.05, construction: 0.05, editing: 0.9 });
-    expect(busWaitTicks(s, T)).toBeGreaterThan(fast);
+    setShares(s, TM, collector().sink, { recruiting: 0.5, construction: 0.05, editing: 0.45 }); // the in-transit suggestion
+    const fast = busWaitTicks(s, TM);
+    expect(setShares(s, TM, collector().sink, { recruiting: 0.05, construction: 0.05, editing: 0.9 })).toBe(true);
+    expect(busWaitTicks(s, TM)).toBeGreaterThan(fast);
   });
 });
 
@@ -245,12 +253,12 @@ describe('M2.1 fixes', () => {
     const s = hotelState();
     const { sink } = collector();
     expect(s.hotel!.markets.cyrillic!.status).toBe('onboarding');
-    pinObjective(s, T, sink, { kind: 'commission', id: 'permanent' });
-    setShares(s, T, sink, { recruiting: 0.05, construction: 0.15, editing: 0.8 }); // off-suggestion, kept throughout
+    pinObjective(s, TM, sink, { kind: 'commission', id: 'permanent' });
+    setShares(s, TM, sink, { recruiting: 0.05, construction: 0.15, editing: 0.8 }); // off-suggestion, kept throughout
     const split = { home: 0.1, cyrillic: 0.9 }; // custom: capacity on Cyrillic while it's still onboarding
-    setMarketAllocation(s, T, sink, split);
-    const eta = previewMarketAllocation(s, T, split).objectiveEtaSeconds!;
-    const actual = runUntil(s, sink, () => s.hotel!.commissions.permanent!.status !== 'active', secs(2000))! * T.tickSeconds;
+    setMarketAllocation(s, TM, sink, split);
+    const eta = previewMarketAllocation(s, TM, split).objectiveEtaSeconds!;
+    const actual = runUntil(s, sink, () => s.hotel!.commissions.permanent!.status !== 'active', secs(2000), TM)! * T.tickSeconds;
     expect(s.hotel!.commissions.permanent!.status).toBe('completed');
     expect(Math.abs(actual - eta)).toBeLessThanOrEqual(1);
   });
@@ -323,3 +331,32 @@ describe('objectives and previews', () => {
 function structuredCopy<T>(x: T): T {
   return JSON.parse(JSON.stringify(x)) as T;
 }
+
+describe('auto staff (the shipped game)', () => {
+  it('crews and the market split follow the suggestions every tick, and a hand-set split holds until automatic is back on', () => {
+    const s = hotelState();
+    const { sink } = collector();
+    expect(s.shares).toEqual(suggestHotelShares(s, T));
+    expect(setShares(s, T, sink, { recruiting: 0.2, construction: 0.2, editing: 0.6 })).toBe(false);
+    expect(pinObjective(s, T, sink, { kind: 'commission', id: 'immediate' })).toBe(true);
+    run(s, T, sink, 1);
+    expect(marketAutoOn(s, T)).toBe(true);
+    expect(s.hotel!.allocation).toEqual(suggestMarketAllocation(s, T, s.objective));
+    expect(setMarketAllocation(s, T, sink, { home: 1, cyrillic: 0, greek: 0 })).toBe(true);
+    run(s, T, sink, 50);
+    expect(marketAutoOn(s, T)).toBe(false);
+    expect(s.hotel!.allocation.home).toBe(1);
+    expect(setMarketAuto(s, T, sink, true)).toBe(true);
+    expect(s.hotel!.allocation).toEqual(suggestMarketAllocation(s, T, s.objective));
+  });
+
+  it('a pinned Commission completes on automatic alone, with no other input', () => {
+    const s = hotelState();
+    const { sink } = collector();
+    pinObjective(s, T, sink, { kind: 'commission', id: 'immediate' });
+    const eta = previewCommission(s, T, 'immediate')!.etaSeconds;
+    const used = runUntil(s, sink, () => s.hotel!.commissions.immediate!.status !== 'active', secs(400))!;
+    expect(s.hotel!.commissions.immediate!.status).toBe('completed');
+    expect(Math.abs(used * T.tickSeconds - eta)).toBeLessThanOrEqual(Math.max(5, eta * 0.1));
+  });
+});

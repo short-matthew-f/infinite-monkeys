@@ -150,6 +150,31 @@ export interface Milestone {
   desks: number;
 }
 
+/** A public-domain passage whose lines can be sighted (core/pages.ts). */
+export interface WorkDef {
+  id: string;
+  title: string;
+  author: string;
+  /** The market whose alphabet it's in: home works appear before Infinity; others once that market is online. */
+  market: string;
+  lines: string[];
+}
+
+/** Sightings: now and then a monkey types a real line, and the player has a few seconds to catch it. */
+export interface PagesDef {
+  /** Sightings start once this tier is discovered (finite phase). */
+  unlockTier: string;
+  /** Seconds between a sighting closing and the next (drawn uniformly from the range on the gameplay stream). */
+  gapSeconds: [number, number];
+  /** How long a sighting stays catchable. */
+  openSeconds: number;
+  /** A catch pays this many seconds of current income. */
+  rewardIncomeSeconds: number;
+  /** Each completed work multiplies review speed by this (the Editors know it by heart). */
+  workReviewMult: number;
+  works: WorkDef[];
+}
+
 export interface Tuning {
   tickSeconds: number;
   typingSpeed: number;
@@ -197,9 +222,13 @@ export interface Tuning {
      * repricing anything.
      */
     funding: { idleEditing: number; referenceEditing: number; pendingCrew: number; minCrew: number };
+    /** Optional: staff follow suggestHotelShares every tick (setShares refused), and the market split follows the suggestion until set by hand. */
+    autoStaff?: boolean;
     commissions: CommissionDef[];
   };
   epics: EpicDef[];
   offlineCapSeconds: number;
   budget?: BudgetDef | null;
+  /** Optional: sightings and the Complete Works. */
+  pages?: PagesDef | null;
 }

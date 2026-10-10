@@ -360,9 +360,9 @@ Weightings are not adjusted after the fact to make a reward win.
 |---|---|---|
 | **M1: Headless core** ✅ | Production formula, classification, accumulator, Editor-in-Chief, departments, funding shares, objectives, markets, Commissions, **event interface** | Unit tests pass; events emitted |
 | **M2: Sim harness** ✅ | Bots, strategy profiles, accelerated tuning table, assertions from §10 | Sim assertions pass |
-| **M3: Finite UI** | Diorama, bars, allocation, departments, previews, feed | Playable to Readiness |
-| **M4: Transition** | Readiness screen, ceremony, staff transformation, first bus | Playable through the ceremony |
-| **M5: Hotel** | Three markets, unlock chain, Commissions, epic research, payoff window | Playable to the end condition |
+| **M3: Finite UI** ✅ | Diorama, bars, allocation, departments, previews, feed | Playable to Readiness |
+| **M4: Transition** ✅ | Readiness screen, ceremony, staff transformation, first bus | Playable through the ceremony |
+| **M5: Hotel** ✅ (no end screen yet) | Three markets, unlock chain, Commissions, epic research, payoff window | Playable to the end condition |
 | **M6: Instrumentation** | Export, end screen, questionnaire, verification | Logs verified on a test run |
 | **M7: Playtest** | Protocol in §8 | Results written up against §9 |
 

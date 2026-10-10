@@ -6,9 +6,9 @@
 // The markup is built once. Each floor's art is replaced only when its picture
 // changes; small live numbers are patched in place. Every number comes from
 // core (floorProps) and is never computed here.
-import { DEPTS, N, certifyTiers, editingPool, finiteBottleneck, meters, type GameState, type Tuning } from '../../core/index.js';
+import { DEPTS, N, busSpeed, certifyTiers, editingPool, finiteBottleneck, hotelUpgradeCost, meters, onboardSpeed, type GameState, type HotelUpgrade, type Tuning } from '../../core/index.js';
 import type { FloorProps } from './floor-art.js';
-import { FLOOR_BOX, FLOOR_NAMES, buildTower, deptHint, floorHint, patchLive, roofSVG, towerKey, type FloorId } from './tower-art.js';
+import { FLOOR_BOX, FLOOR_NAMES, KIND_NAMES, buildTower, busSVG, deptHint, floorHint, floorName, floorTag, marketLook, mmss, patchLive, roofSVG, skySVG, splitParts, towerKey, wingName, type FloorId } from './tower-art.js';
 import type { Cue } from './advisor.js';
 import './tower.css';
 
@@ -48,7 +48,51 @@ export function floorProps(s: GameState, t: Tuning): FloorProps {
       pressure: s.phase === 'finite' ? pressure(s, t) : null,
     },
     office: s.office ? officeProps(s) : undefined,
+    hotel: s.phase === 'hotel' && s.hotel ? hotelProps(s, t) : undefined,
   };
+}
+
+/** The wings after Infinity: which hotel upgrade line each one runs. */
+const WING_LINE: Record<(typeof DEPTS)[number], HotelUpgrade> = { recruiting: 'busWranglers', construction: 'shiftCrews', editing: 'editors' };
+
+/**
+ * What the hotel building shows. Times are core's own speeds applied to the work left (the same arithmetic as
+ * readySeconds); the pinned Commission's clock is its deadline tick less the current tick, in ticks of t.tickSeconds.
+ */
+function hotelProps(s: GameState, t: Tuning): NonNullable<FloorProps['hotel']> {
+  const h = s.hotel!;
+  const online = t.hotel.markets.filter((m) => h.markets[m.id]?.status === 'online');
+  const total = online.reduce((a, m) => a + Math.max(0, h.allocation[m.id] ?? 0), 0);
+  const markets = t.hotel.markets.map((def) => {
+    const m = h.markets[def.id]!;
+    const speed = m.status === 'inTransit' ? busSpeed(s, t) : m.status === 'onboarding' ? onboardSpeed(s, t) : 0;
+    const secondsLeft = speed > 0 ? m.workLeft / speed : m.status === 'online' || m.status === 'locked' ? 0 : Infinity;
+    const share = m.status === 'online' && total > 0 ? Math.max(0, h.allocation[def.id] ?? 0) / total : 0;
+    return { id: def.id, status: m.status, secondsLeft, share };
+  });
+  const staff = {} as NonNullable<FloorProps['hotel']>['staff'];
+  for (const d of DEPTS) {
+    const line = WING_LINE[d];
+    const cost = hotelUpgradeCost(s, t, line);
+    staff[d] = { level: h.upgradeLevels[line], affordable: cost !== null && N.gte(s.bananas, cost) };
+  }
+  let pinned: NonNullable<FloorProps['hotel']>['pinned'] = null;
+  const obj = s.objective;
+  if (obj.kind === 'commission') {
+    const c = h.commissions[obj.id];
+    const def = t.hotel.commissions.find((d) => d.id === obj.id);
+    if (c && def && c.status === 'active' && c.deadlineTick !== null) {
+      let need = 0;
+      let got = 0;
+      for (const [m, req] of Object.entries(c.required)) {
+        need += N.toNumber(req);
+        got += Math.min(N.toNumber(req), N.toNumber(c.delivered[m] ?? N.zero));
+      }
+      pinned = { id: c.id, kind: c.kind, frac: need > 0 ? got / need : 0, secondsLeft: Math.max(0, (c.deadlineTick - s.tick) * t.tickSeconds), totalSeconds: def.deadlineSeconds };
+    }
+  }
+  const offers = Object.values(h.commissions).filter((c) => c.status === 'offered').length;
+  return { markets, staff, golden: s.save.golden, offers, reward: !!h.pendingReward, pinned };
 }
 
 /** Review demand over the review pool, the two numbers core's finiteBottleneck compares. Drawing bands only. */
@@ -110,6 +154,21 @@ export class Tower {
   private clockQ: SVGTextElement;
   private clockTag: HTMLElement;
   private clockKey = '';
+  // after Infinity: the Commission deadline clock on the roof, the market share bar, and the street's buses
+  private dclock: HTMLButtonElement;
+  private dArc: SVGCircleElement;
+  private dNum: SVGTextElement;
+  private dPin: SVGGElement;
+  private dTag: HTMLElement;
+  private dKey = '';
+  private sbar: HTMLElement;
+  private sbarKey = '';
+  private hotelOn = false;
+  private noteText = new Map<string, string>();
+  private marketSeen = new Map<string, string>();
+  private shuffleEl: HTMLElement | null = null;
+  private shuffleTimers: number[] = [];
+  private pendingShuffle: string | null = null;
   /** The scrolling building (short screens). The roof sits above it and never scrolls. */
   private bldg!: HTMLElement;
   private born = performance.now();
@@ -124,7 +183,7 @@ export class Tower {
 
   constructor(private host: HTMLElement) {
     const roof = (this.roof = el('div', 'roof'));
-    roof.innerHTML = `<svg viewBox="0 -8 400 34" preserveAspectRatio="xMidYMax meet" aria-hidden="true">${roofSVG()}</svg>`;
+    roof.innerHTML = `<svg class="roof-art" viewBox="0 -8 400 34" preserveAspectRatio="xMidYMax meet" aria-hidden="true">${roofSVG()}</svg><svg class="sky-art" viewBox="0 -72 400 98" preserveAspectRatio="xMidYMax meet" aria-hidden="true">${skySVG()}</svg>`;
     this.clock = el('button', 'qclock',
       `<span class="qtag" hidden></span><svg viewBox="0 0 40 40" width="40" height="40" aria-hidden="true"><circle class="qface" cx="20" cy="20" r="19"/><circle class="qtrack" cx="20" cy="20" r="${CLOCK_R}"/><circle class="qarc" cx="20" cy="20" r="${CLOCK_R}" transform="rotate(-90 20 20)" stroke-dasharray="${CLOCK_C.toFixed(2)}"/><circle class="qring" cx="20" cy="20" r="19"/><text class="qnum" x="20" y="24.5" text-anchor="middle">Q1</text></svg>`);
     this.clock.type = 'button';
@@ -134,6 +193,20 @@ export class Tower {
     this.clockQ = this.clock.querySelector('.qnum') as unknown as SVGTextElement;
     this.clockTag = this.clock.querySelector('.qtag') as HTMLElement;
     roof.append(this.clock);
+    // After Infinity the roof clock is the pinned Commission's deadline. It opens the Director's Office like the floor does.
+    this.dclock = el('button', 'qclock dclock',
+      `<span class="qtag" hidden></span><svg viewBox="0 0 40 40" width="40" height="40" aria-hidden="true"><circle class="qface" cx="20" cy="20" r="19"/><circle class="qtrack" cx="20" cy="20" r="${CLOCK_R}"/><circle class="qarc" cx="20" cy="20" r="${CLOCK_R}" transform="rotate(-90 20 20)" stroke-dasharray="${CLOCK_C.toFixed(2)}"/><text class="qnum" x="20" y="24.5" text-anchor="middle"></text><g class="dpin"><path d="M20 27V14" stroke="var(--screen-ink)" stroke-width="2.4" stroke-linecap="round"/><circle cx="20" cy="13" r="5" fill="var(--tangerine)" stroke="var(--screen-ink)" stroke-width="1.6"/></g></svg>`);
+    this.dclock.type = 'button';
+    this.dclock.hidden = true;
+    this.dclock.dataset.room = 'director';
+    this.dArc = this.dclock.querySelector('.qarc') as unknown as SVGCircleElement;
+    this.dNum = this.dclock.querySelector('.qnum') as unknown as SVGTextElement;
+    this.dPin = this.dclock.querySelector('.dpin') as unknown as SVGGElement;
+    this.dTag = this.dclock.querySelector('.qtag') as HTMLElement;
+    roof.append(this.dclock);
+    this.sbar = el('span', 'sbar');
+    this.sbar.hidden = true;
+    this.sbar.setAttribute('role', 'img');
     const bldg = (this.bldg = el('div', 'bldg'));
     // Once the player scrolls the building themselves, it is theirs: nothing here moves it again on its own.
     for (const ev of ['pointerdown', 'wheel', 'keydown'] as const) bldg.addEventListener(ev, () => (this.touched = true), { passive: true });
@@ -166,7 +239,7 @@ export class Tower {
     f.append(rail, view);
     this.arts.set(id, art);
     this.floors.set(id, f);
-    rail.append(el('span', 'fplate', `<span class="disc sm" aria-hidden="true">${DISC[id]}</span><span class="pn">${FLOOR_NAMES[id]}</span>`));
+    rail.append(el('span', 'fplate', `<span class="disc sm" aria-hidden="true">${DISC[id]}</span><span class="pn" data-live="name:${id}">${FLOOR_NAMES[id]}</span>`));
     const cue = el('span', 'cue-tag');
     cue.hidden = true;
     cue.setAttribute('aria-hidden', 'true');
@@ -174,7 +247,7 @@ export class Tower {
     if (id === 'departments') {
       // Each wing's label is a cell in the rail: its name and level, or (in the same place) the pile warning, the cue or a flash.
       for (const d of DEPTS) {
-        const c = el('span', `wcell wcell-${d}`, `<span class="wv wv-name">${DEPT_NAMES[d]} <span class="lvw">Lv </span><span data-live="lv:${d}"></span></span>${d === 'editing' ? '<span class="wv wv-note" aria-hidden="true"><span class="wg" aria-hidden="true">▲</span> Pages piling up</span>' : ''}<span class="wv wv-cue" aria-hidden="true"></span><span class="wv wv-flash" aria-hidden="true"></span><i class="acct-bar" aria-hidden="true" hidden></i>`);
+        const c = el('span', `wcell wcell-${d}`, `<span class="wv wv-name"><span data-live="wname:${d}">${DEPT_NAMES[d]}</span> <span class="lvw">Lv </span><span data-live="lv:${d}"></span></span><span class="wv wv-note" aria-hidden="true"><span class="wg" aria-hidden="true">▲</span> <span class="wn-t">${d === 'editing' ? 'Pages piling up' : 'Upgrade'}</span></span><span class="wv wv-cue" aria-hidden="true"></span><span class="wv wv-flash" aria-hidden="true"></span><i class="acct-bar" aria-hidden="true" hidden></i>`);
         this.cells.set(`departments:${d}`, c);
         rail.append(c);
         const w = el('button', `wing wing-${d}`);
@@ -192,6 +265,7 @@ export class Tower {
       b.setAttribute('aria-label', FLOOR_NAMES[id]);
       this.hits.set(id, b);
       rail.append(el('span', 'ftag', `<span data-live="${id}"></span>`));
+      if (id === 'pool') rail.append(this.sbar);
       const flag = el('span', 'flag');
       flag.append(cue);
       if (id === 'pool') flag.append(this.limitTag);
@@ -209,6 +283,8 @@ export class Tower {
     }
     this.props = p;
     let rebuilt = false;
+    this.setHotel(!!p.hotel);
+    const buses = p.hotel ? this.busChanges(p) : null;
     const key = towerKey(p);
     if (key !== this.key) {
       this.key = key;
@@ -234,6 +310,7 @@ export class Tower {
     patchLive(this.host, p);
     this.labels(p);
     this.setBottleneck(p.bottleneck);
+    if (p.hotel) this.hotelRoof(p, buses);
     // First seconds only: bring the floor that matters (the cued one, else the limit, else the lobby) into view.
     if (!this.touched && performance.now() - this.born < 2500 && !this.settling) {
       this.settling = true;
@@ -321,7 +398,9 @@ export class Tower {
     const c = this.cells.get(`departments:${d}`);
     if (!c) return;
     const cueOn = !!this.cued && this.cued.room === 'departments' && (this.cued.view && (DEPTS as readonly string[]).includes(this.cued.view) ? this.cued.view : 'recruiting') === d;
-    const st = this.flashes.has(d) ? 'flash' : cueOn ? 'cue' : this.pile && d === 'editing' ? 'note' : 'name';
+    const up = this.hotelOn && !!this.props?.hotel?.staff[d].affordable;
+    const st = this.flashes.has(d) ? 'flash' : cueOn ? 'cue' : up || (this.pile && d === 'editing') ? 'note' : 'name';
+    c.classList.toggle('up', up);
     if (c.dataset.state !== st) c.dataset.state = st;
     const cueEl = c.querySelector<HTMLElement>('.wv-cue');
     const want = cueOn ? `● ${this.cued!.tag}` : '';
@@ -333,10 +412,10 @@ export class Tower {
     const set = (b: HTMLElement | undefined, v: string) => {
       if (b && b.getAttribute('aria-label') !== v) b.setAttribute('aria-label', v);
     };
-    for (const id of ['personnel', 'pool', 'research', 'director'] as const) set(this.hits.get(id), `${FLOOR_NAMES[id]}: ${floorHint(id, p)}`);
+    for (const id of ['personnel', 'pool', 'research', 'director'] as const) set(this.hits.get(id), `${floorName(id, p)}: ${floorHint(id, p)}`);
     for (const d of DEPTS) {
       const pile = p.bottleneck === 'editing' && d === 'editing' ? '. Pages are piling up' : '';
-      set(this.hits.get(`departments:${d}`), `${DEPT_NAMES[d]}: ${deptHint(d, p)}${pile}${this.acctNote[d] ?? ''}`);
+      set(this.hits.get(`departments:${d}`), `${wingName(d, p)}: ${deptHint(d, p)}${pile}${this.acctNote[d] ?? ''}`);
     }
   }
 
@@ -380,6 +459,153 @@ export class Tower {
     wing?.classList.add('cued');
     const target = wing ?? this.hits.get(cue.room) ?? this.hits.get('departments:recruiting');
     target?.setAttribute('aria-description', cue.tag);
+  }
+
+  // ---------- after Infinity ----------
+
+  /** The hotel look is a class on the tower: names flip by data-live, the roof becomes the sky, the pool carries a share bar. */
+  private setHotel(on: boolean): void {
+    if (on === this.hotelOn) return;
+    this.hotelOn = on;
+    this.host.classList.toggle('hotel', on);
+    this.dclock.hidden = !on;
+    this.sbar.hidden = !on;
+    this.dKey = '';
+    this.sbarKey = '';
+    const note = this.cells.get('departments:editing')?.querySelector('.wn-t');
+    if (note) note.textContent = on ? 'Upgrade' : 'Pages piling up';
+    for (const d of DEPTS) this.paintCell(d);
+  }
+
+  /** Which buses came or went since the last frame, read from market status (state, not events, so it also holds after a reload or catch-up). */
+  private busChanges(p: FloorProps): { arrived: string[]; left: { id: string; node: Node | null }[] } {
+    const out: { arrived: string[]; left: { id: string; node: Node | null }[] } = { arrived: [], left: [] };
+    const first = this.marketSeen.size === 0;
+    for (const m of p.hotel!.markets) {
+      const was = this.marketSeen.get(m.id);
+      this.marketSeen.set(m.id, m.status);
+      if (first || !was || was === m.status) continue;
+      if (was === 'inTransit' && m.status === 'onboarding') out.arrived.push(m.id);
+      if (was === 'onboarding' && m.status === 'online') out.left.push({ id: m.id, node: this.arts.get('personnel')!.querySelector(`.bus-${m.id}`)?.cloneNode(true) ?? null });
+    }
+    return out;
+  }
+
+  /** Everything the hotel adds to the building each frame: street effects, the share bar, the deadline clock, the upgrade notes. */
+  private hotelRoof(p: FloorProps, buses: { arrived: string[]; left: { id: string; node: Node | null }[] } | null): void {
+    const h = p.hotel!;
+    const fx = this.arts.get('personnel')!.querySelector('.tw-fx');
+    for (const id of buses?.arrived ?? []) {
+      this.pendingShuffle = id;
+      const bus = this.arts.get('personnel')!.querySelector(`.bus-${id}`);
+      if (bus && !reduceMotion.matches) bus.classList.add('arrive');
+    }
+    for (const b of buses?.left ?? []) {
+      if (!fx || !b.node || reduceMotion.matches) continue;
+      const g = b.node as SVGGElement;
+      g.classList.remove('arrive');
+      g.classList.add('depart');
+      g.addEventListener('animationend', () => g.remove(), { once: true });
+      fx.append(g);
+    }
+    if (this.pendingShuffle) {
+      const m = h.markets.find((x) => x.id === this.pendingShuffle);
+      if (!m || m.status !== 'onboarding') this.pendingShuffle = null;
+      else if (!document.body.classList.contains('room-open')) {
+        const id = this.pendingShuffle;
+        this.pendingShuffle = null;
+        // Bring the Front Desk into view after the cue's own scroll (same frame) has run, then return to the floor that matters.
+        requestAnimationFrame(() => requestAnimationFrame(() => { if (!this.touched) this.reveal('personnel'); }));
+        this.playShuffle(id);
+      }
+    }
+    // the share bar on the Typing Pool rail
+    const parts = splitParts(h);
+    const sk = parts.map((x) => `${x.id}:${x.pct}`).join('|');
+    if (sk !== this.sbarKey) {
+      this.sbarKey = sk;
+      this.sbar.innerHTML = parts.map((x) => `<i class="seg m-${x.id}" style="flex-grow:${x.share.toFixed(3)}"><b>${x.glyph} ${x.pct}</b></i>`).join('');
+      this.sbar.setAttribute('aria-label', floorHint('pool', p));
+    }
+    // upgrades you can afford light their wing cell
+    const uk = DEPTS.map((d) => (h.staff[d].affordable ? 1 : 0)).join('');
+    if (uk !== this.upKey) {
+      this.upKey = uk;
+      for (const d of DEPTS) this.paintCell(d);
+    }
+    this.deadlineClock(p);
+  }
+
+  private upKey = '';
+
+  /** The roof clock after Infinity: the pinned Commission's time left, or a prompt to pin one. Same 44 px target as the quarter clock. */
+  private deadlineClock(p: FloorProps): void {
+    const h = p.hotel!;
+    const pin = h.pinned;
+    const key = pin ? `${pin.id}|${Math.ceil(pin.secondsLeft)}|${Math.round(pin.frac * 100)}` : `none|${h.offers}|${h.reward}`;
+    if (key === this.dKey) return;
+    this.dKey = key;
+    const frac = pin ? Math.min(1, pin.secondsLeft / Math.max(1, pin.totalSeconds)) : 0;
+    this.dArc.setAttribute('stroke-dashoffset', (CLOCK_C * (1 - frac)).toFixed(2));
+    this.dNum.textContent = pin ? `${Math.max(1, Math.ceil(pin.secondsLeft / 60))}m` : '';
+    this.dPin.style.display = pin ? 'none' : '';
+    const prompt = !pin && (h.offers > 0 || h.reward);
+    const text = pin ? `${mmss(pin.secondsLeft)} left` : h.reward ? 'Reward to use' : h.offers > 0 ? 'Pin a Commission' : 'No offers yet';
+    this.dTag.textContent = text;
+    this.dTag.classList.toggle('calm', !prompt);
+    this.dclock.setAttribute('aria-label', pin
+      ? `${KIND_NAMES[pin.kind] ?? 'Commission'} Commission, ${Math.round(pin.frac * 100)} percent delivered, ${Math.max(0, Math.ceil(pin.secondsLeft / 5) * 5)} seconds left. Open the Director's Office`
+      : `${text}. Open the Director's Office`);
+    this.dTag.hidden = false;
+  }
+
+  /** The Hilbert shuffle on the Front Desk: "everyone, please move to twice your room number", and the new guests take the odd rooms. About 3 seconds. */
+  private playShuffle(market: string): void {
+    const view = this.floors.get('personnel')?.querySelector<HTMLElement>('.flr-view');
+    if (!view) return;
+    this.endShuffle();
+    const look = marketLook(market);
+    const glyphs = Array.from(look.glyphs);
+    const calm = reduceMotion.matches;
+    const wrap = el('div', 'shuffle');
+    wrap.setAttribute('aria-hidden', 'true');
+    let html = `<p class="sh-cap">${calm ? `Everyone, please move to twice your room number. The ${look.name} guests take the odd rooms.` : 'Everyone, please move to twice your room number!'}</p>`;
+    if (!calm) {
+      html += '<div class="sh-row">';
+      for (let n = 1; n <= 4; n++) html += `<div class="door res" style="--s:${n - 1};--mv:${n}"><b data-n="${n}">${n}</b></div>`;
+      for (let k = 0; k < 4; k++) html += `<div class="door arr" style="--s:${2 * k};--k:${k}"><i>${glyphs[k % glyphs.length]}</i><b>${2 * k + 1}</b></div>`;
+      html += '</div>';
+    }
+    wrap.innerHTML = html;
+    view.append(wrap);
+    this.shuffleEl = wrap;
+    const at = (ms: number, fn: () => void) => this.shuffleTimers.push(window.setTimeout(fn, ms));
+    requestAnimationFrame(() => wrap.classList.add('on'));
+    if (calm) {
+      at(3600, () => this.endShuffle());
+      return;
+    }
+    at(120, () => wrap.classList.add('go'));
+    // the numbers tick from n to 2n while the doors slide
+    for (let step = 1; step <= 5; step++) {
+      at(350 + step * 190, () => {
+        wrap.querySelectorAll<HTMLElement>('b[data-n]').forEach((b) => {
+          const n = Number(b.dataset.n);
+          b.textContent = String(Math.round(n + (n * step) / 5));
+        });
+      });
+    }
+    at(1650, () => wrap.classList.add('arrive'));
+    at(2700, () => wrap.classList.remove('on'));
+    at(3000, () => this.endShuffle());
+  }
+
+  private endShuffle(): void {
+    for (const id of this.shuffleTimers) window.clearTimeout(id);
+    this.shuffleTimers = [];
+    this.shuffleEl?.remove();
+    this.shuffleEl = null;
+    if (!this.touched && this.hotelOn && !document.body.classList.contains('room-open')) this.reveal(this.relevant());
   }
 
   /** The button to give focus back to when a room closes. */

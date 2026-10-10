@@ -57,6 +57,15 @@ const REELS: Reel[] = [
   { id: 'permit-issued', n: 9, title: 'Permit Issued', room: 'director', essential: true,
     say: () => 'The Director holds the switch. Lift the cover to see what changes.' },
 ];
+// The hotel's reels: what each new room is for, the first time it matters.
+REELS.push(
+  { id: 'hotel-offers', n: 10, title: 'Commissions', room: 'director', essential: true,
+    say: () => 'Clients send Commissions. Pin one and the Editors work on it. Its deadline starts when you pin it, and the offers show what each one delays.' },
+  { id: 'hotel-bus', n: 11, title: 'The Bus', room: 'personnel',
+    say: () => 'A bus has arrived. The Shift Crews onboard its staff, and then its market is online. The Front Desk shows the time left.' },
+  { id: 'hotel-vault', n: 12, title: 'The Vault', room: 'research',
+    say: () => 'Golden Bananas buy epic research in the Records Library. It lasts across every later run.' },
+);
 const BY_ID = new Map(REELS.map((r) => [r.id, r]));
 
 const MAX_QUEUE = 2;
@@ -84,6 +93,8 @@ export class Ernest {
   private shown = false;
   private lastSay = '';
   private lastOpen: string | null = null;
+  /** Set by main while a full-screen ceremony plays: no card, no detection. */
+  suppressed = false;
 
   constructor(private wrap: HTMLElement, private ctx: Ctx, private t: Tuning) {
     const q = <E extends HTMLElement>(sel: string) => wrap.querySelector(sel) as E;
@@ -109,8 +120,17 @@ export class Ernest {
 
   /** Called at most once per tick. `open` is the open room's id, or null on the building. */
   update(open: string | null): void {
+    if (this.suppressed) {
+      this.hide();
+      return;
+    }
     this.calls++;
     const s = this.ctx.state();
+    // After Infinity the finite reels are moot: drop any that are waiting or showing.
+    if (s.phase === 'hotel') {
+      this.queue = this.queue.filter((r) => r.n >= 10);
+      if (this.current && this.current.n < 10) this.retire();
+    }
     this.detect(s, open);
     if (open) progress.markOpened(open);
     this.lastOpen = open;
@@ -157,6 +177,13 @@ export class Ernest {
       this.enqueue(BY_ID.get(id)!);
     };
 
+    if (s.phase === 'hotel') {
+      const hot = s.hotel;
+      now('hotel-offers', () => !!hot && s.objective.kind !== 'commission' && Object.values(hot.commissions).some((c) => c.status === 'offered'));
+      now('hotel-bus', () => !!hot && Object.values(hot.markets).some((m) => m.status === 'onboarding'));
+      now('hotel-vault', () => s.save.golden > 0);
+      return;
+    }
     now('first-hire', () => seatedOf(s) <= 1);
     now('records', () => !progress.hasOpened('research') && this.ctx.can('ernest:words', (c, tu, sk) => researchTier(c, tu, sk, 'words')));
     now('who-does-what', () => open === 'departments' && this.lastOpen !== 'departments' && !progress.hasOpened('departments'));

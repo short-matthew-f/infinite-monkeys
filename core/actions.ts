@@ -135,6 +135,7 @@ export function researchTier(s: GameState, t: Tuning, sink: EventSink, id: strin
  */
 export function setShares(s: GameState, t: Tuning, sink: EventSink, next: Shares): boolean {
   if (t.budget && s.phase === 'finite') return false;
+  if (t.hotel.autoStaff && s.phase === 'hotel') return false;
   const vals = DEPTS.map((d) => next[d]);
   if (!vals.every(validAmount) || Math.abs(vals.reduce((a, b) => a + b, 0) - 1) > 1e-6) return false;
   const previous = { ...s.shares };
@@ -175,8 +176,28 @@ export function setMarketAllocation(s: GameState, t: Tuning, sink: EventSink, ne
   if (!h || !validSplit(next, Object.keys(h.markets))) return false;
   const previous = { ...h.allocation };
   h.allocation = { ...previous, ...next };
+  // A split set by hand holds until the player switches automatic back on.
+  h.marketAuto = false;
   sink({ type: 'allocationChanged', tick: s.tick, layer: 'markets', previous, next: { ...h.allocation }, suggested: suggestMarketAllocation(s, t, s.objective), objective: s.objective });
   return true;
+}
+
+/** With hotel.autoStaff: let the market split follow the pinned objective (on), or hold the current split (off). */
+export function setMarketAuto(s: GameState, t: Tuning, sink: EventSink, on: boolean): boolean {
+  const h = s.hotel;
+  if (!h || !t.hotel.autoStaff) return false;
+  if (on) {
+    const previous = { ...h.allocation };
+    h.allocation = suggestMarketAllocation(s, t, s.objective);
+    sink({ type: 'allocationChanged', tick: s.tick, layer: 'markets', previous, next: { ...h.allocation }, suggested: { ...h.allocation }, objective: s.objective });
+  }
+  h.marketAuto = on;
+  return true;
+}
+
+/** Is the market split following the pinned objective automatically? */
+export function marketAutoOn(s: GameState, t: Tuning): boolean {
+  return !!t.hotel.autoStaff && !!s.hotel && s.hotel.marketAuto !== false;
 }
 
 /** One tap: adopt the suggested split for the pinned objective. */

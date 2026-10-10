@@ -110,6 +110,9 @@ export const prototypeTuning: Tuning = {
   // Editing's self-replication catches up while it's behind on reviews (DESIGN.md §13): a department that reaches
   // stage 4 after the others would otherwise trail their exponential head start for 30+ minutes.
   readiness: { ...classicTuning.readiness, editingCatchUpMax: 4 },
+  // In the hotel the staff follow the suggested shares and the market split follows the pinned objective, as the
+  // heads and the tier split do before Infinity; the player steers by pinning Commissions.
+  hotel: { ...classicTuning.hotel, autoStaff: true },
   budget: { quarterSeconds: 180, suggestedDiscretionary: 0.7, minDiscretionary: 0.1, sweepShare: 1, editingShareCap: 0.35, readinessEditingShareCap: 0.8,
     requisitions: { levels: 3, priceFactor: 0.8, openSeconds: 60, cooldownSeconds: 10 },
     morale: { max: 1.6, fadePerSecond: 0.002 },

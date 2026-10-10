@@ -36,7 +36,12 @@ If `tsx`'s CLI is blocked in your environment, run the report with
 
 ## Status
 
-- **93 tests run green**, unit and sim assertions (`npm run check`).
+- **107 tests run green**, unit and sim assertions (`npm run check`).
+- **The hotel is playable** (Oct 10 2026): the Infinity ceremony, the
+  hotel-phase tower, and the five rooms switch to Front Desk, Typing Pool
+  (market split), Staff (upgrades), Records Library (epic vault) and the
+  Commissions desk. Staff are automatic (`hotel.autoStaff`); the player steers
+  by pinning Commissions. The end screen and questionnaire (M6) are not built.
 - **The quarterly budget is the game** (Oct 8 2026). `prototypeTuning` includes
   it; `classicTuning` keeps the free-shares economy for tests and comparison sims.
 - **Green does not mean every acceptance criterion is met.** The dead-gap
@@ -113,10 +118,15 @@ never reimplement them.
 - **Suggested hotel funding.** Nothing pending: 100% Editing. A bus in
   transit or a market onboarding: 50% to that crew, 5% floor for the
   other.
+  In the shipped game (`hotel.autoStaff`) the crews follow it every tick and
+  `setShares` is refused, as the heads do before Infinity.
 - **Suggested market split.** Maximize bananas: all to home. A pinned
   Commission: fastest completion, split by remaining work, and **never**
   to a market that isn't online yet (capacity goes to online requirements
   or home until it is). Re-apply when a market comes online.
+  With `autoStaff` the split follows the suggestion every tick until the
+  player sets one by hand (`setMarketAllocation`); `setMarketAuto` turns
+  automatic back on.
 - **Reference pool.** Owned editorial capability at a fixed 90% Editing
   share. It freezes Commission requirements and rewards at offer time and
   prices hotel upgrades at declaration, so funding can't game either.

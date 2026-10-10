@@ -1,0 +1,132 @@
+/* The Infinity ceremony (game/world/infinity.ts): a full-screen overlay above the tower.
+   Performance (design/STYLE.md): the endless building is one SVG moved by one transform transition; the sky is a
+   static gradient; the only other motion is a few opacity/transform changes on small elements.
+   Reduced motion (.calm): no climb, no spin, no flip; every beat crossfades in the same order. */
+.inf {
+  --inf-wall: color-mix(in srgb, var(--paper-shade) 78%, var(--concrete));
+  --inf-line: color-mix(in srgb, var(--edge) 70%, var(--concrete));
+  position: absolute; inset: 0; z-index: 70; overflow: hidden; container-type: inline-size;
+  background: var(--screen); color: var(--ink);
+  opacity: 0; transition: opacity .3s ease;
+  font: 400 1rem/1.45 var(--font-body);
+}
+.inf.on { opacity: 1; }
+.inf:focus { outline: none; }
+.inf p, .inf h2, .inf ul { margin: 0; }
+.inf[hidden], .inf [hidden] { display: none !important; }
+.inf.jump, .inf.jump * { transition: none !important; animation-duration: .001s !important; }
+
+/* sky: dusk at the street, night above */
+.inf-sky { position: absolute; inset: 0; background: linear-gradient(to top, color-mix(in srgb, var(--tangerine) 62%, var(--glow)) 0%, color-mix(in srgb, var(--walnut) 55%, var(--screen)) 38%, var(--screen) 82%); }
+.inf-bldg { position: absolute; left: 0; right: 0; bottom: 0; transform: translateY(0); transition: transform 6.6s cubic-bezier(.45, .05, .25, 1); }
+.inf-bldg svg { display: block; width: 100%; height: auto; }
+.inf.climbing .inf-bldg { transform: translateY(66%); will-change: transform; }
+.inf-wall { fill: var(--inf-wall); stroke: var(--inf-line); stroke-width: 1.4; }
+.inf-win { fill: var(--screen); stroke: var(--inf-line); stroke-width: 1; }
+.inf-win.lit { fill: var(--glow); }
+.inf-plate-s { fill: var(--mustard); stroke: var(--screen); stroke-width: .8; }
+.inf-plate-t { font: 700 8.6px var(--font-display); letter-spacing: .08em; fill: var(--screen); text-anchor: middle; }
+.inf-road { fill: color-mix(in srgb, var(--concrete) 62%, var(--screen)); }
+.inf-door { fill: var(--glow); stroke: var(--inf-line); stroke-width: 1.4; }
+.inf-step { fill: var(--concrete); }
+.inf-sign rect { fill: var(--alert); stroke: var(--screen); stroke-width: .8; }
+.inf-sign text { font: 700 8.4px var(--font-display); letter-spacing: .1em; fill: var(--screen); text-anchor: middle; }
+
+/* layout over the building */
+.inf-ui { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 12cqw 16px 96px; pointer-events: none; }
+.inf-ui > * { pointer-events: auto; }
+
+/* the brass plaque with the counter */
+.inf-plaque { position: relative; width: min(100%, 340px); opacity: 0; transform: translateY(14px); transition: opacity .5s ease, transform .5s ease; }
+.inf.counting .inf-plaque { opacity: 1; transform: none; }
+.inf.card .inf-plaque, .inf.card.titles .inf-memo { opacity: 0; transform: translateY(-10px); transition: opacity .3s, transform .3s; pointer-events: none; }
+.inf-plate {
+  padding: 8px 14px 12px; text-align: center; border: 3px solid var(--screen); border-radius: 6px;
+  background: linear-gradient(#e6cb62, var(--mustard) 42%, #a2841a);
+  box-shadow: 0 4px 0 color-mix(in srgb, #000 40%, transparent), inset 0 0 0 2px color-mix(in srgb, #fff 38%, transparent);
+}
+.inf-lab { display: block; font: 700 .875rem/1.2 var(--font-display); letter-spacing: .22em; text-transform: uppercase; color: var(--screen); }
+.inf-face { margin-top: 6px; padding: 6px 8px; background: var(--screen); border: 2px solid var(--edge); border-radius: 3px; overflow: hidden; backface-visibility: hidden; }
+.inf-num { display: block; font: 600 clamp(22px, 7.4cqw, 38px)/1.15 var(--font-mono); font-variant-numeric: tabular-nums; color: var(--screen-ink); white-space: nowrap; text-shadow: 0 0 10px color-mix(in srgb, var(--screen-ink) 55%, transparent); }
+.inf-num.alef { font-family: 'Cambria Math', 'STIX Two Math', 'Apple Symbols', 'Times New Roman', serif; font-size: clamp(34px, 11cqw, 54px); line-height: 1; font-weight: 700; }
+.inf-stamp {
+  position: absolute; right: -6px; bottom: -18px; padding: 2px 10px 1px; border: 3px double var(--stamp); border-radius: 3px;
+  background: color-mix(in srgb, var(--sheet) 88%, transparent); color: var(--stamp);
+  font: 700 1rem/1.2 var(--font-display); letter-spacing: .14em; text-transform: uppercase; white-space: nowrap;
+  opacity: 0; transform: rotate(-8deg) scale(2.2);
+}
+.inf.stamped .inf-stamp { opacity: .96; transform: rotate(-8deg) scale(1); transition: transform .2s cubic-bezier(.3, 1.6, .5, 1), opacity .08s; }
+
+/* the roster: staff notice, titles flipping one by one */
+.inf-memo {
+  width: min(100%, 340px); margin-top: 18px; padding: 10px 12px 12px; background: var(--sheet); color: var(--ink);
+  border: 2px solid var(--edge); border-radius: 3px 3px 14px 3px; box-shadow: 0 5px 0 color-mix(in srgb, #000 35%, transparent);
+  opacity: 0; transform: translateY(12px); transition: opacity .4s, transform .4s;
+}
+.inf.titles .inf-memo { opacity: 1; transform: none; }
+.inf-memo-h { font: 700 .875rem/1.2 var(--font-type); letter-spacing: .12em; text-transform: uppercase; padding-bottom: 6px; border-bottom: 2px solid var(--walnut); }
+.inf-memo-h span { display: block; font-weight: 400; letter-spacing: .06em; color: var(--ink-muted); }
+.inf-rows { list-style: none; padding: 0; }
+.inf-row { padding: 7px 0 6px; border-bottom: 1px dotted var(--ink-muted); opacity: 0; transform: translateY(8px); transition: opacity .3s, transform .3s; }
+.inf-row.go { opacity: 1; transform: none; }
+.inf-row:last-child { border-bottom: 0; }
+.flap { display: inline-grid; perspective: 420px; font: 700 1.25rem/1.15 var(--font-display); letter-spacing: .04em; text-transform: uppercase; }
+.flap > span { grid-area: 1 / 1; backface-visibility: hidden; }
+.flap .now { opacity: 0; transform: rotateX(90deg); color: var(--stamp); }
+.inf-row.go .was { animation: flap-out .35s ease-in forwards; }
+.inf-row.go .now { animation: flap-in .4s cubic-bezier(.3, 1.5, .5, 1) .35s forwards; }
+@keyframes flap-out { to { opacity: 0; transform: rotateX(-90deg); } }
+@keyframes flap-in { to { opacity: 1; transform: rotateX(0); } }
+.inf-row small { display: block; font: 400 .875rem/1.3 var(--font-type); color: var(--ink-muted); }
+
+/* the closing card */
+.inf-card {
+  position: absolute; left: 50%; top: 50%; width: min(calc(100% - 32px), 340px); padding: 14px 16px 16px; text-align: center;
+  background: var(--sheet); color: var(--ink); border: 2px solid var(--edge); border-radius: 4px 4px 18px 4px;
+  box-shadow: 0 6px 0 color-mix(in srgb, #000 35%, transparent), 0 0 0 5px color-mix(in srgb, var(--mustard) 70%, transparent);
+  opacity: 0; transform: translate(-50%, -46%);
+}
+.inf.card .inf-card { opacity: 1; transform: translate(-50%, -50%); transition: opacity .4s, transform .4s; }
+.inf-busbox svg { display: block; width: 100%; max-width: 220px; margin: 0 auto 4px; overflow: hidden; border-radius: 3px; }
+.inf.card .inf-busbox .bus { animation: inf-bus 1.3s cubic-bezier(.2, .7, .3, 1) .3s both; }
+@keyframes inf-bus { from { transform: translateX(150px); } to { transform: none; } }
+.inf-h { text-wrap: balance; font: 700 1.75rem/1.1 var(--font-display); letter-spacing: .03em; text-transform: uppercase; }
+.inf-sub { text-wrap: balance; margin-top: 6px; color: var(--ink-muted); }
+.inf-go {
+  margin-top: 12px; min-height: 48px; padding: 0 22px; font: 700 1.1rem var(--font-display); letter-spacing: .1em; text-transform: uppercase; cursor: pointer;
+  background: var(--mustard); color: var(--screen); border: 2px solid var(--screen); border-radius: 3px 3px 10px 3px; box-shadow: 0 3px 0 var(--screen);
+}
+.inf-go:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--screen); }
+.inf-go:focus-visible, .inf-skip:focus-visible { outline: 3px solid var(--glow); outline-offset: 2px; }
+
+/* caption line and skip */
+.inf::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 150px; pointer-events: none; background: linear-gradient(to top, color-mix(in srgb, var(--screen) 88%, transparent), transparent); }
+.inf-cap, .inf-skip { z-index: 2; }
+.inf-cap {
+  position: absolute; left: 0; right: 0; bottom: calc(66px + env(safe-area-inset-bottom)); padding: 0 16px; text-align: center; pointer-events: none;
+  font: 400 .95rem/1.3 var(--font-type); letter-spacing: .04em; color: var(--glow); text-shadow: 0 1px 6px var(--screen), 0 0 2px var(--screen);
+}
+.inf-skip {
+  position: absolute; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); min-width: 72px; min-height: 48px; padding: 0 18px; cursor: pointer;
+  background: color-mix(in srgb, var(--screen) 80%, transparent); color: var(--glow); border: 2px solid var(--glow); border-radius: 3px 3px 10px 3px;
+  font: 700 1rem var(--font-display); letter-spacing: .14em; text-transform: uppercase;
+}
+.inf-skip:active { background: var(--glow); color: var(--screen); }
+.inf.card .inf-skip { opacity: .0; pointer-events: none; }
+.inf-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* reduced motion: the same beats, as crossfades */
+.inf.calm .inf-bldg { transition: none; }
+.inf.calm.climbing .inf-bldg { transform: translateY(40%); animation: calm-rise 1s ease both; }
+@keyframes calm-rise { from { opacity: 0; } to { opacity: 1; } }
+.inf.calm .inf-plaque, .inf.calm .inf-memo, .inf.calm .inf-row, .inf.calm .inf-card { transform: none; transition: opacity .8s ease; }
+.inf.calm .inf-card { transform: translate(-50%, -50%); }
+.inf.calm .inf-stamp { transform: rotate(-8deg); transition: opacity .6s; }
+.inf.calm .inf-row.go .was { animation: calm-out .6s forwards; }
+.inf.calm .inf-row.go .now { animation: calm-in .6s .3s forwards; transform: none; }
+@keyframes calm-out { to { opacity: 0; } }
+@keyframes calm-in { to { opacity: 1; } }
+.inf.calm.card .inf-busbox .bus { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .inf-bldg, .inf-plaque, .inf-memo, .inf-row, .inf-card { transition: opacity .8s ease; }
+}

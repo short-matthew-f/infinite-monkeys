@@ -15,6 +15,8 @@ import {
   metersFull,
   secondsToTicks,
   selfRepRate,
+  suggestHotelShares,
+  suggestMarketAllocation,
   suggestTierAllocation,
 } from './model.js';
 import type { GameState } from './state.js';
@@ -144,6 +146,7 @@ function stepHotel(s: GameState, t: Tuning, sink: EventSink): void {
   const h = s.hotel;
   if (!h) return;
   const dt = t.tickSeconds;
+  autoStaff(s, t);
 
   // Unlock chain: access → bus in transit → Shift Crews onboarding → online.
   // Work is spent at the current speed every tick, so upgrades and funding
@@ -207,6 +210,16 @@ function stepHotel(s: GameState, t: Tuning, sink: EventSink): void {
       sink({ type: 'commissionFailed', tick: s.tick, id: c.id });
     }
   }
+  // Again after this tick's arrivals and completions, so the state (and previews read from it) is never a tick stale.
+  autoStaff(s, t);
+}
+
+/** Auto staff: the transformed departments follow the suggested shares, and Editors follow the pinned objective unless set by hand. */
+function autoStaff(s: GameState, t: Tuning): void {
+  const h = s.hotel;
+  if (!h || !t.hotel.autoStaff) return;
+  s.shares = suggestHotelShares(s, t);
+  if (h.marketAuto !== false) h.allocation = suggestMarketAllocation(s, t, s.objective);
 }
 
 function completeCommission(s: GameState, t: Tuning, id: string, sink: EventSink): void {

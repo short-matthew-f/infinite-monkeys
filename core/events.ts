@@ -69,6 +69,10 @@ export type GameEvent =
   | { type: 'stageReached'; tick: number; stage: string }
   | { type: 'permitStamped'; tick: number }
   | { type: 'infinityDeclared'; tick: number }
+  | { type: 'sightingOpened'; tick: number; work: string; line: number; expiresTick: number; reward: number }
+  | { type: 'sightingCaught'; tick: number; work: string; line: number; reward: number; isNew: boolean; completed: boolean }
+  | { type: 'sightingMissed'; tick: number; work: string; line: number }
+  | { type: 'workCompleted'; tick: number; work: string }
   | { type: 'titleFlipped'; tick: number; from: string; to: string }
   | { type: 'busArrived'; tick: number; market: string }
   | { type: 'marketOnline'; tick: number; market: string }

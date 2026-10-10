@@ -20,6 +20,7 @@ import {
   titleLine,
   type FeedStage,
 } from '../content/feed-lines.js';
+import { commissionTitle, marketName, rewardLineData } from './hotel/names.js';
 import './feed.css';
 
 const DEPT_NAMES: Record<DeptId, string> = { recruiting: 'Recruiting', construction: 'Construction', editing: 'Editing' };
@@ -161,6 +162,22 @@ function mount(root: HTMLElement, ctx: Ctx): () => void {
       }
       case 'auditFound':
         push(e.tick, `The audit is back: ${f.bananaText(e.amount)} found, and they go to the pot.`, false, true);
+        break;
+      // The hotel: facts, so offline events reach the ticker too.
+      case 'busArrived':
+        push(e.tick, `The ${marketName(e.market)} bus has arrived. The Shift Crews are onboarding its staff.`, false, true);
+        break;
+      case 'marketOnline':
+        push(e.tick, `The ${marketName(e.market)} market is online. Editors can be assigned work there.`, false, true);
+        break;
+      case 'commissionOffered':
+        push(e.tick, `Commission offered: ${commissionTitle(e.id)}. It pays ${rewardLineData(e.reward)}.`, false, true);
+        break;
+      case 'commissionCompleted':
+        push(e.tick, `Commission complete: ${commissionTitle(e.id)}. Paid: ${rewardLineData(e.reward)}.`, false, true);
+        break;
+      case 'commissionFailed':
+        push(e.tick, `Commission lapsed: ${commissionTitle(e.id)}. The deadline passed first.`, false, true);
         break;
       default:
         break;

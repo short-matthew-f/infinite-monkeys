@@ -74,6 +74,8 @@ export interface HotelState {
   upgradeCostBase: Num;
   /** A completed Commission whose reward hasn't been used yet. */
   pendingReward: { commission: string; kind: CommissionKind } | null;
+  /** With hotel.autoStaff: the split follows suggestMarketAllocation until the player sets one by hand. Missing = on. */
+  marketAuto?: boolean;
 }
 
 export interface BudgetState {
@@ -132,6 +134,26 @@ export interface SaveState {
   epics: string[];
   discoveryRewardsClaimed: string[];
   clues: string[];
+  /** The Complete Works: line indices found per work. Persists across runs. Missing on old saves. */
+  works?: Record<string, number[]>;
+}
+
+/** A line on the floor, catchable until expiresTick. */
+export interface Sighting {
+  work: string;
+  line: number;
+  openedTick: number;
+  expiresTick: number;
+  /** Bananas a catch pays, quoted when sighted. */
+  reward: number;
+}
+
+export interface PagesState {
+  open: Sighting | null;
+  /** When the next sighting appears (if none is open). */
+  nextTick: number;
+  caught: number;
+  missed: number;
 }
 
 export interface GameState {
@@ -161,6 +183,8 @@ export interface GameState {
   budget?: BudgetState | null;
   /** Support offices' effects, once the budget opens. Older saves lack it. */
   office?: OfficeState | null;
+  /** Sightings (t.pages). Created when they unlock. */
+  pages?: PagesState | null;
 }
 
 export function newSave(): SaveState {

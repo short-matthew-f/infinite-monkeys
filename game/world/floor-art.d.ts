@@ -29,6 +29,20 @@ export interface FloorProps {
   };
   /** What limits income right now (core's finiteBottleneck), or null outside the finite phase. */
   bottleneck: 'typing' | 'editing' | null;
+  /** Present only after Infinity (state.phase === 'hotel'): what the building shows of the hotel. Every value from core. */
+  hotel?: {
+    /** Each market in tuning order. `secondsLeft` is the bus or onboarding time left at current speeds; `share` is its part of the Editors' time (online markets sum to 1). */
+    markets: { id: string; status: 'locked' | 'inTransit' | 'onboarding' | 'online'; secondsLeft: number; share: number }[];
+    /** Hotel upgrade lines on the three Departments wings: Bus Wranglers (recruiting), Shift Crews (construction), Editors (editing). */
+    staff: Record<'recruiting' | 'construction' | 'editing', { level: number; affordable: boolean }>;
+    golden: number;
+    /** Commissions waiting to be pinned. */
+    offers: number;
+    /** A completed Commission whose reward is unused. */
+    reward: boolean;
+    /** The pinned Commission: delivered over required (0..1), time left until its deadline, and the full allowance. */
+    pinned: { id: string; kind: string; frac: number; secondsLeft: number; totalSeconds: number } | null;
+  };
   /** The office heads' projects, once the budget has opened (absent before). */
   office?: {
     on: boolean;
