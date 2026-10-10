@@ -8,12 +8,14 @@ import type { Tuning } from '../core/index.js';
  * Meaningful: an unlock (stage, research, a department's first level), or a
  * purchase the bot valued at least 5% above waiting.
  */
-export function longestDeadGap(log: DecisionLog, t: Tuning, untilTick: number, opts: { countRebalances?: boolean; countReviews?: number; countRequisitions?: boolean } = {}): number {
+export function longestDeadGap(log: DecisionLog, t: Tuning, untilTick: number, opts: { countRebalances?: boolean; countReviews?: number; countRequisitions?: boolean; countSightings?: boolean } = {}): number {
   // Budget mode: answering a head's requisition is a decision whatever its size, when asked.
   const ticks = log.purchases.filter((p) => (p.meaningful || (opts.countRequisitions && p.id === 'requisition')) && p.tick <= untilTick).map((p) => p.tick);
   // Budget mode: a review counts as action only when the signed lines moved by at least this much.
   // Department auto-buys never count (they aren't player decisions and aren't in the log).
   if (opts.countReviews !== undefined) for (const r of log.reviews) if (r.change >= opts.countReviews && r.tick <= untilTick) ticks.push(r.tick);
+  // Sightings caught: attention rewarded, not a strategic choice. Reported separately; F2 doesn't count them.
+  if (opts.countSightings) for (const k of log.sightings ?? []) if (k <= untilTick) ticks.push(k);
   // Proposed (M2): a Readiness rebalancing episode is a meaningful action too.
   if (opts.countRebalances) for (const r of readinessRebalances(log)) if (r.tick <= untilTick) ticks.push(r.tick);
   ticks.sort((a, b) => a - b);

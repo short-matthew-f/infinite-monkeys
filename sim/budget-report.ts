@@ -27,13 +27,15 @@ function play(t: Tuning, bot: keyof typeof BOTS | 'memo') {
     declare: r.declaredSeconds, s4: firstStage(4),
     gap: longestDeadGap(r.log, t, until),
     gapAct: longestDeadGap(r.log, t, until, { countRebalances: true, countReviews: 0.05, countRequisitions: true }),
+    gapSight: longestDeadGap(r.log, t, until, { countRebalances: true, countReviews: 0.05, countRequisitions: true, countSightings: true }),
+    caught: r.log.sightings.filter((k) => k <= until).length,
     reviews: r.log.reviews.length, bigReviews: r.log.reviews.filter((x) => x.change >= 0.05).length, autoBuys, manualLevels, req,
   };
 }
 
 function row(label: string, t: Tuning, bot: keyof typeof BOTS | 'memo') {
   const x = play(t, bot);
-  console.log(`${label.padEnd(44)} declare ${min(x.declare).padStart(6)} stage4 ${min(x.s4).padStart(6)} | gap ${sec(x.gap).padStart(5)} (counting all decisions ${sec(x.gapAct).padStart(5)}) | reviews ${String(x.reviews).padStart(3)} (${x.bigReviews} moved ≥5%) | requisitions ${x.req.granted}/${x.req.offered} paid | levels auto ${x.autoBuys} / hand ${x.manualLevels}`);
+  console.log(`${label.padEnd(44)} declare ${min(x.declare).padStart(6)} stage4 ${min(x.s4).padStart(6)} | gap ${sec(x.gap).padStart(5)} (counting all decisions ${sec(x.gapAct).padStart(5)}, +sightings ${sec(x.gapSight).padStart(5)}, ${x.caught} caught) | reviews ${String(x.reviews).padStart(3)} (${x.bigReviews} moved ≥5%) | requisitions ${x.req.granted}/${x.req.offered} paid | levels auto ${x.autoBuys} / hand ${x.manualLevels}`);
 }
 
 const variant = (b: Partial<BudgetDef>): Tuning => ({ ...TB, budget: { ...TB.budget!, ...b } });
@@ -42,6 +44,7 @@ const mode = process.argv[3] ?? 'grid';
 console.log(`# ${bot} bot, ${mode}\n`);
 row('today (free shares)', T, bot);
 row('budget (prototypeTuning)', TB, bot);
+if (mode === 'pages') for (const r of [0, 5, 10, 15]) row(`sighting reward ${r}s of income`, { ...TB, pages: r ? { ...TB.pages!, rewardIncomeSeconds: r } : null }, bot);
 if (mode === 'grid') for (const q of [90, 120, 180, 240]) for (const d of [0.3, 0.5, 0.7]) row(`q=${q}s disc=${d}`, variant({ quarterSeconds: q, suggestedDiscretionary: d }), bot);
 if (mode === 'sweep') for (const sw of [1, 0.5, 0]) row(`sweep=${sw}`, variant({ sweepShare: sw }), bot);
 if (mode === 'caps') for (const [e, r] of [[0.5, 0.5], [0.5, 0.8], [0.35, 0.5], [0.35, 0.8], [0.35, 1], [0.2, 0.8]] as const) row(`editing cap ${e}, at stage 4 ${r}`, variant({ editingShareCap: e, readinessEditingShareCap: r }), bot);

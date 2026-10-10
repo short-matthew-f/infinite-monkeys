@@ -7,6 +7,8 @@ import {
   buyDeptLevel,
   DEPTS,
   catchUp,
+  deptOutput,
+  meters,
   selfRepRate,
   setTierAllocation,
   setTierAuto,
@@ -453,8 +455,21 @@ describe('quarterly budget', () => {
     s.depts.editing.rep = 1e9;
     expect(selfRepRate(s, TB, 'editing')).toBe(base);
     s.depts.editing.rep = 1e-9;
-    expect(selfRepRate(s, TB, 'editing')).toBeCloseTo(base * TB.readiness.editingCatchUpMax!, 12);
+    const chased = Math.max(TB.depts.recruiting.selfRepRate, TB.depts.construction.selfRepRate);
+    expect(selfRepRate(s, TB, 'editing')).toBeCloseTo(Math.max(base, chased) * TB.readiness.selfRepCatchUpMax!, 12);
     expect(selfRepRate(s, TB, 'recruiting')).toBe(TB.depts.recruiting.selfRepRate);
     expect(selfRepRate(s, T, 'editing')).toBe(T.depts.editing.selfRepRate);
+  });
+
+  it("the heads' split counts the bathrooms, so Recruiting and Construction outputs balance and both meters can fill", () => {
+    const s = lateFiniteState(3, TB);
+    for (const d of DEPTS) s.depts[d].stage = 4;
+    s.office = newOffice();
+    s.office.owned.bathrooms = 2;
+    s.shares = headShares(s, TB);
+    const r = N.toNumber(deptOutput(s, TB, 'recruiting')), c = N.toNumber(deptOutput(s, TB, 'construction'));
+    expect(c / r).toBeCloseTo(1, 6);
+    const m = meters(s, TB);
+    expect(m.recruiting).toBeCloseTo(m.construction, 6);
   });
 });

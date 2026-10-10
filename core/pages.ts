@@ -21,14 +21,7 @@ export function workComplete(s: GameState, w: WorkDef): boolean {
   return foundLines(s, w.id).length >= w.lines.length;
 }
 
-/** Review speed from completed works (1 with none, or without t.pages). */
-export function worksReviewMult(s: GameState, t: Tuning): number {
-  const p = t.pages;
-  if (!p) return 1;
-  let n = 0;
-  for (const w of p.works) if (workComplete(s, w)) n++;
-  return p.workReviewMult ** n;
-}
+export { worksReviewMult } from './model.js';
 
 /** Works the monkeys can be typing now: home works before Infinity (once the unlock tier is found), and works in online markets after. */
 export function availableWorks(s: GameState, t: Tuning): WorkDef[] {
@@ -106,7 +99,10 @@ export function catchSighting(s: GameState, t: Tuning, sink: EventSink): boolean
   const isNew = !found.includes(o.line);
   if (isNew) found.push(o.line);
   const completed = isNew && found.length === w.lines.length;
-  sink({ type: 'sightingCaught', tick: s.tick, work: w.id, line: o.line, reward: o.reward, isNew, completed });
+  // The line that completes a work is the jackpot.
+  const bonus = completed ? incomeRate(s, t) * p.completionIncomeSeconds : 0;
+  if (bonus > 0) s.bananas = N.add(s.bananas, N.of(bonus));
+  sink({ type: 'sightingCaught', tick: s.tick, work: w.id, line: o.line, reward: o.reward + bonus, isNew, completed });
   if (completed) sink({ type: 'workCompleted', tick: s.tick, work: w.id });
   return true;
 }

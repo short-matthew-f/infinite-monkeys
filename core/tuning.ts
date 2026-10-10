@@ -170,6 +170,8 @@ export interface PagesDef {
   openSeconds: number;
   /** A catch pays this many seconds of current income. */
   rewardIncomeSeconds: number;
+  /** The catch that completes a work also pays this many seconds of income. */
+  completionIncomeSeconds: number;
   /** Each completed work multiplies review speed by this (the Editors know it by heart). */
   workReviewMult: number;
   works: WorkDef[];
@@ -197,8 +199,8 @@ export interface Tuning {
     minMonkeys: number;
     ratioThreshold: number;
     stabilitySeconds: number;
-    /** Optional: Editing's self-replication speeds up by demand/pool while behind, up to this factor (1 or missing = off). */
-    editingCatchUpMax?: number;
+    /** Optional: Editing behind review demand self-replicates faster by demand/pool, up to this factor (1 or missing = off). See selfRepRate. */
+    selfRepCatchUpMax?: number;
   };
   hotel: {
     homeMarket: string;

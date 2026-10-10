@@ -13,6 +13,7 @@
 // Bots use only the public core API and the same tick function as the game.
 
 import {
+  catchSighting,
   applySuggestedAllocation,
   buyDeptLevel,
   buyDeptStage,
@@ -55,6 +56,8 @@ export interface BotConfig {
   minGain: number;
   /** Re-balance funding only when the suggested shares improve average meters by this fraction. */
   rebalanceThreshold: number;
+  /** Catches sightings (the idler, who isn't watching, doesn't). */
+  catchesSightings?: boolean;
   /** Budget mode: weigh an open request before any other purchase (a player who reads memos first). */
   requestsFirst?: boolean;
 }
@@ -62,8 +65,8 @@ export interface BotConfig {
 const base = { lookaheadSeconds: 90, terminalSeconds: 120, maxPurchasesPerDecision: 6, minGain: 0.0, rebalanceThreshold: 0.1 };
 
 export const BOTS: Record<'casual' | 'hard' | 'idler', BotConfig> = {
-  casual: { ...base, name: 'casual', decisionSeconds: 10, manualHire: true },
-  hard: { ...base, name: 'hard', decisionSeconds: 2, manualHire: true },
+  casual: { ...base, name: 'casual', decisionSeconds: 10, manualHire: true, catchesSightings: true },
+  hard: { ...base, name: 'hard', decisionSeconds: 2, manualHire: true, catchesSightings: true },
   idler: { ...base, name: 'idler', decisionSeconds: 10, manualHire: false },
 };
 
@@ -135,6 +138,8 @@ function allStage4(s: GameState): boolean {
 
 /** Policy upkeep every decision: suggested tier split, and funding shares when they help enough. */
 function upkeep(s: GameState, t: Tuning, bot: BotConfig, sink: EventSink, log?: DecisionLog): void {
+  // A sighting on the floor is caught (a bot that looks every decision always sees it within the window).
+  if (bot.catchesSightings && s.pages?.open && catchSighting(s, t, sink)) log?.sightings.push(s.tick);
   applySuggestedAllocation(s, t, sink);
   if (t.budget && s.phase === 'finite') {
     // Budget mode: the heads set shares; at an open review the bot signs the suggested lines.
@@ -201,12 +206,14 @@ export interface DecisionLog {
   rebalances: { tick: number; before: number; after: number }[];
   /** Budget reviews signed, with how much the lines moved (0..1, half the L1 distance). */
   reviews: { tick: number; change: number }[];
+  /** Sightings caught (core/pages.ts). */
+  sightings: number[];
   readinessPinnedTick: number | null;
   declaredTick: number | null;
 }
 
 export function newLog(): DecisionLog {
-  return { purchases: [], rebalances: [], reviews: [], readinessPinnedTick: null, declaredTick: null };
+  return { purchases: [], rebalances: [], reviews: [], sightings: [], readinessPinnedTick: null, declaredTick: null };
 }
 
 /** One decision. Mutates the real state. */

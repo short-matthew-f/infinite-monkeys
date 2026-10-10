@@ -836,6 +836,30 @@ multiplier, locked per quarter, with no department accounts).
   "all decisions" figure counts rebalancing the free slider, which no longer
   exists in this mode.
 
+## 14. Sightings and the Complete Works (Oct 10 2026)
+
+The title promises monkeys typing Shakespeare; this is where the player sees
+it happen. Rules as implemented (`core/pages.ts`, `content/works.ts`):
+
+- Once Words are discovered, now and then (every 45–90 s, gameplay stream) a
+  monkey types a real line from a public-domain passage. It stays on the
+  floor for 10 s. A catch (`catchSighting`) pays 5 s of income and files the
+  line; a miss costs nothing. Sightings during catch-up simply expire.
+- Lines belong to works: six Shakespeare passages (Sonnet 18, "To be, or not
+  to be", "Tomorrow, and tomorrow", Twelfth Night, As You Like It, Sonnet
+  116) before Infinity; Pushkin arrives with the Cyrillic bus and Homer with
+  the Greek one. Missing lines come first; once a market's works are complete,
+  lines repeat and still pay.
+- The line that completes a work pays an extra 20 s of income, and every
+  completed work makes the Editors 5% faster (`worksReviewMult`, in
+  `reviewSpeedMult`): they know it by heart. The Complete Works persist
+  across runs (`save.works`).
+- Sim: catching bots declare at 25.0 min (casual) against 25.2 without
+  sightings, so pacing barely moves; the payoff is the moment and the
+  collection. Catches make the longest gap between player actions about 90 s,
+  but F2 measures meaningful purchases, so catches don't count toward it and
+  its marker stays.
+
 ## Appendix A: Playthrough (Hypothesis)
 
 A casual player's experience. Timing is a hypothesis, faster than §9 in the first hour.

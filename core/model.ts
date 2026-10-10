@@ -25,7 +25,17 @@ function epicMult(s: GameState, t: Tuning, pick: (e: Tuning['epics'][number]['ef
 
 /** Review speed: epics, plus the offices' review boosts (finite phase only). */
 export const reviewSpeedMult = (s: GameState, t: Tuning) =>
-  epicMult(s, t, (e) => (e.type === 'reviewSpeed' ? e.mult : null)) * timedMult(s, 'review') * permMult(s, t, 'review');
+  epicMult(s, t, (e) => (e.type === 'reviewSpeed' ? e.mult : null)) * timedMult(s, 'review') * permMult(s, t, 'review') * worksReviewMult(s, t);
+
+/** Review speed from completed works in the Complete Works (the Editors know them by heart); 1 without t.pages. */
+export function worksReviewMult(s: GameState, t: Tuning): number {
+  const p = t.pages;
+  const found = s.save.works;
+  if (!p || !found) return 1;
+  let n = 0;
+  for (const w of p.works) if ((found[w.id]?.length ?? 0) >= w.lines.length) n++;
+  return p.workReviewMult ** n;
+}
 export const onboardingMult = (s: GameState, t: Tuning) => epicMult(s, t, (e) => (e.type === 'onboardingTime' ? e.mult : null));
 export const marketCostMult = (s: GameState, t: Tuning, market: string) =>
   epicMult(s, t, (e) => (e.type === 'marketReviewCost' && e.market === market ? e.mult : null));
@@ -246,18 +256,23 @@ export function meters(s: GameState, t: Tuning): Meters {
 }
 
 /**
- * Self-replication rate per second at stage 4. Editing's speeds up by
- * demand/pool while it's behind (capped by readiness.editingCatchUpMax), so a
- * late stage 4 catches up instead of trailing the others' head start.
+ * Self-replication rate per second at stage 4. Editing, while it's behind
+ * review demand, speeds up by demand/pool (capped by
+ * readiness.selfRepCatchUpMax) on top of the rate demand grows at, so a late
+ * Editing stage 4 always catches up. (Recruiting and Construction don't need
+ * this: their funding shares rebalance any capability ratio.)
  */
 export function selfRepRate(s: GameState, t: Tuning, d: DeptId): number {
   const base = t.depts[d].selfRepRate;
-  const max = t.readiness.editingCatchUpMax ?? 1;
+  const max = t.readiness.selfRepCatchUpMax ?? 1;
+  if (max <= 1) return base;
   if (d !== 'editing' || max <= 1) return base;
-  const pool = N.add(hiredEditingCapacity(s, t), N.of(t.editorInChiefCapacity * reviewSpeedMult(s, t)));
+  const own = N.add(hiredEditingCapacity(s, t), N.of(t.editorInChiefCapacity * reviewSpeedMult(s, t)));
   const demand = certifyTiers(s, t, N.zero, s.tierAllocation).demand;
-  if (N.lte(pool, N.zero) || N.lte(demand, pool)) return base;
-  return base * Math.min(max, N.ratio(demand, pool));
+  if (N.lte(own, N.zero) || N.lte(demand, own)) return base;
+  // Demand grows with headcount, as fast as the faster of Recruiting and Construction; outrun that, times the gap.
+  const chased = Math.max(t.depts.recruiting.selfRepRate, t.depts.construction.selfRepRate);
+  return Math.max(base, chased) * Math.min(max, N.ratio(demand, own));
 }
 
 export function metersFull(m: Meters): boolean {
@@ -270,7 +285,8 @@ export function metersFull(m: Meters): boolean {
  */
 export function suggestShares(s: GameState, t: Tuning): Record<DeptId, number> {
   if (s.phase === 'hotel') return suggestHotelShares(s, t);
-  const aR = N.toNumber(capability(s, t, 'recruiting'));
+  // Recruiting's permanent office boost (bathrooms) counts, or the balance is off by it and Construction's meter caps below full.
+  const aR = N.toNumber(capability(s, t, 'recruiting')) * permMult(s, t, 'recruiting');
   const aC = N.toNumber(capability(s, t, 'construction'));
   const aE = N.toNumber(capability(s, t, 'editing')) * t.reviewSpeedPerEditor * reviewSpeedMult(s, t);
   const demand = N.toNumber(certifyTiers(s, t, N.zero, s.tierAllocation).demand);

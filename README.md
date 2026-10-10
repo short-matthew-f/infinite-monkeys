@@ -69,14 +69,21 @@ never reimplement them.
   value per review unit). In the budget game the split follows it
   automatically (`tierAuto`) until the player sets one by hand
   (`setTierAllocation`); `setTierAuto` switches automatic back on.
+- **Sightings** (`core/pages.ts`). Once Words are discovered, a real line
+  from a public-domain work appears every 45–90 s and is catchable for 10 s
+  (`catchSighting`): 5 s of income, plus 20 s for the line that completes a
+  work. Each completed work multiplies review speed by 1.05. Pushkin and
+  Homer lines come with the Cyrillic and Greek markets.
 - **Departments.** Recruiting, Construction, Editing. Each has permanent
   capability (levels, stages 1–4) and a funding share. Effective output =
   capability × share × 3, so equal shares give 1.0×. At stage 4 each
   department self-replicates at its own rate (Recruiting 0.4%/s,
   Construction 0.3%/s, Editing 0.35%/s), so balance drifts. In the budget
-  game Editing's rate speeds up by demand/pool while it's behind, up to 4×
-  (`selfRepRate`, `readiness.editingCatchUpMax`), so an Editing stage 4
-  bought after the others catches up in minutes instead of 20–30.
+  game Editing, while behind review demand, replicates at least as fast as
+  headcount grows, times demand/pool up to 4× (`selfRepRate`,
+  `readiness.selfRepCatchUpMax`), so an Editing stage 4 bought after the
+  others catches up in minutes instead of 20–30. The heads' split counts
+  Recruiting's bathrooms, so the two crews' outputs still balance.
 - **Suggested funding.** Editing gets enough to cover review demand plus
   headroom, capped at 50%. The rest balances Recruiting against
   Construction. A department with no capability gets no share.

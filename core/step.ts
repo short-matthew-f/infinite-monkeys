@@ -23,6 +23,7 @@ import type { GameState } from './state.js';
 import { activeBudget, autoBuy, headShares, maybeRequisition, settleAudits, upgradeSave, bankIncome, maybeEndQuarter, maybeOpenBudget } from './budget.js';
 import { DEPTS, type Tuning } from './tuning.js';
 import { fadeOffice, offlineBonusSeconds } from './office.js';
+import { maybeSighting } from './pages.js';
 
 /** Advances the game by exactly one tick. The only way time passes in core. */
 export function step(s: GameState, t: Tuning, sink: EventSink): void {
@@ -110,6 +111,7 @@ function stepFinite(s: GameState, t: Tuning, sink: EventSink): void {
   }
 
   if (b) maybeEndQuarter(s, t, b, sink);
+  maybeSighting(s, t, sink);
 
   // Infinity Readiness: the Stability Window needs all meters full continuously.
   if (!s.stability.permit) {
@@ -210,6 +212,7 @@ function stepHotel(s: GameState, t: Tuning, sink: EventSink): void {
       sink({ type: 'commissionFailed', tick: s.tick, id: c.id });
     }
   }
+  maybeSighting(s, t, sink);
   // Again after this tick's arrivals and completions, so the state (and previews read from it) is never a tick stale.
   autoStaff(s, t);
 }

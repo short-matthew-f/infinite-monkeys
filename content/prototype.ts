@@ -1,6 +1,7 @@
 // Accelerated prototype tuning (PROTOTYPE.md §3, §4). Data only.
 // Every number here is a hypothesis for the M2 sim to validate.
 
+import { WORKS } from './works.js';
 import type { Tuning } from '../core/tuning.js';
 
 // The economy without the quarterly budget: free funding shares the player sets
@@ -107,12 +108,14 @@ export const prototypeTuning: Tuning = {
   // Stages cost 25% more than classic: the heads' projects (morale, managers, audits...)
   // speed the climb, and this keeps the casual game inside 25-35 minutes (sim, Oct 8 2026).
   depts: Object.fromEntries(Object.entries(classicTuning.depts).map(([d, v]) => [d, { ...v, stageCosts: v.stageCosts.map((c) => c * 1.25) }])) as Tuning['depts'],
-  // Editing's self-replication catches up while it's behind on reviews (DESIGN.md §13): a department that reaches
-  // stage 4 after the others would otherwise trail their exponential head start for 30+ minutes.
-  readiness: { ...classicTuning.readiness, editingCatchUpMax: 4 },
+  // Editing behind at stage 4 self-replicates faster until it catches up (DESIGN.md §13): otherwise a late Editing
+  // stage 4 trails the others' exponential head start for 20-30 minutes (a playtest stall).
+  readiness: { ...classicTuning.readiness, selfRepCatchUpMax: 4 },
   // In the hotel the staff follow the suggested shares and the market split follows the pinned objective, as the
   // heads and the tier split do before Infinity; the player steers by pinning Commissions.
   hotel: { ...classicTuning.hotel, autoStaff: true },
+  // Sightings (DESIGN.md §14): now and then a monkey types a real line; catch it within 10 s.
+  pages: { unlockTier: 'words', gapSeconds: [45, 90], openSeconds: 10, rewardIncomeSeconds: 5, completionIncomeSeconds: 20, workReviewMult: 1.05, works: WORKS },
   budget: { quarterSeconds: 180, suggestedDiscretionary: 0.7, minDiscretionary: 0.1, sweepShare: 1, editingShareCap: 0.35, readinessEditingShareCap: 0.8,
     requisitions: { levels: 3, priceFactor: 0.8, openSeconds: 60, cooldownSeconds: 10 },
     morale: { max: 1.6, fadePerSecond: 0.002 },
